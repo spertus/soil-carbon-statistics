@@ -1,0 +1,31 @@
+---
+title: "Simulation Test Bed for Measuring SOC"
+author: "Jake Spertus"
+date: "October 31st, 2019"
+output: html_notebook
+---
+
+```{r setup}
+library(MASS)
+library(tidyverse)
+```
+
+This notebook serves to describe and implement a simulation environment to test the procedures currently used to measure soil organic carbon (SOC) against a known groundtruth. Questions to be answered include:
+
+- With what accuracy can we recover true SOC on average (mean squared error)?
+- Are estimates of SOC likely to center on the truth (bias)?
+- Are estimates of uncertainty (standard errors) reflecting the true degree of uncertainty in the estimates (coverage of confidence intervals / type 1 error rate)? 
+
+As a first step, we simulate a "ground truth" (so to speak), which is a 3-dimensional grid on a rectangular prism that represents SOC concentration (in percent) over the plot of land to be studied. The dimensions are `latitude`, `longitude`, and `depth` (in that order). The scale is in meters. A function called `simulate_ground_truth()` is created below, with tunable parameters to choose the nature of the SOC grid. The output data is an `array` with dimensions in the order noted.
+
+```{r simulate truth}
+#ground truth simulating function, based on draws from a multivariate normal passed through a probit function.
+#inputs:
+#average concentration = average carbon concentration as a decimal fraction, must be between 0 and 1
+#horizontal_smoothness = variation over lat-long space of SOC concentration. 0 means there is no autocorrelation whatsoever, so that % SOC at adjacent gridpoints is independent. 1 indicates % SOC is constant.
+#vertical_smoothness = variation over vertical space of SOC concentration. 0 means no autocorrelation, 1 means constant.
+#vertical_decline = how the %SOC tails off over depth on the exponential scale. Deeper soil horizons will generally have less Carbon. 0 means there is no decline, larger negative numbers yield a faster decline, positive numbers would mean %SOC increases with lower depth. 
+simulate_ground_truth <- function(average_concentration = .2, horizontal_smoothness = .1, vertical_smoothness = 0, vertical_decline = 0){
+  
+}
+```
