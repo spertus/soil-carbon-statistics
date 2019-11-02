@@ -8,6 +8,8 @@ output: html_notebook
 ```{r setup}
 library(MASS)
 library(tidyverse)
+library(gstat)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 This notebook serves to describe and implement a simulation environment to test the procedures currently used to measure soil organic carbon (SOC) against a known groundtruth. Questions to be answered include:
@@ -23,9 +25,28 @@ As a first step, we simulate a "ground truth" (so to speak), which is a 3-dimens
 #inputs:
 #average concentration = average carbon concentration as a decimal fraction, must be between 0 and 1
 #horizontal_smoothness = variation over lat-long space of SOC concentration. 0 means there is no autocorrelation whatsoever, so that % SOC at adjacent gridpoints is independent. 1 indicates % SOC is constant.
-#vertical_smoothness = variation over vertical space of SOC concentration. 0 means no autocorrelation, 1 means constant.
-#vertical_decline = how the %SOC tails off over depth on the exponential scale. Deeper soil horizons will generally have less Carbon. 0 means there is no decline, larger negative numbers yield a faster decline, positive numbers would mean %SOC increases with lower depth. 
-simulate_ground_truth <- function(average_concentration = .2, horizontal_smoothness = .1, vertical_smoothness = 0, vertical_decline = 0){
-  
+simulate_ground_truth <- function(average_surface_concentration = .2, horizontal_smoothness = .1){
+  #horizontal grid is 100 x 100
+  #x refers to longitude, y refers to latitude
+  grid <- expand.grid(1:100, 1:100)
+  names(grid) <- c("y","x")
+
+  normal_surface_concentration <- qnorm(average_surface_concentration)
+  #gstat is used to create a random field with correlation
+  variogram_model <- vgm(psill = 0.025, model = "Gau", range = 5)
+  gstat_object <- gstat(formula = z ~ 1, locations = ~ x + y, dummy = TRUE, beta = normal_surface_concentration, model = variogram_model, nmax = 20)
+  simulated_surface <- predict(gstat_object, newdata = grid, nsim = 1)
+  simulated_surface_pct_carbon <- simulated_surface %>%
+    mutate(sim1 = pnorm(sim1))
+  simulated_surface_pct_carbon
+}
+```
+
+```{r plot simulated surface}
+#function to take a dataframe and plot a surface as a heatmap 
+#
+plot_surface <- function(surface){
+  ggplot(surface, aes(x = x, y = y, fill = sim1)) + 
+    geom_raster()
 }
 ```
