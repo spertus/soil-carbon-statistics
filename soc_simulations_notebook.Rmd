@@ -1,52 +1,68 @@
 ---
-title: "Simulation Test Bed for Measuring SOC"
+title: "Simulating SOC Measurement"
 author: "Jake Spertus"
 date: "October 31st, 2019"
 output: html_notebook
 ---
 
-```{r setup}
-library(MASS)
-library(tidyverse)
-library(gstat)
+```{r knitr setup, message = FALSE, warning = FALSE, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-This notebook serves to describe and implement a simulation environment to test the procedures currently used to measure soil organic carbon (SOC) against a known groundtruth. Questions to be answered include:
+```{r packages}
+library(tidyverse)
+library(Matrix)
+```
+
+## Goals
+
+This notebook serves to describe and implement a simulation to test the procedures currently used to measure soil organic carbon (SOC) against a known groundtruth. Questions to be answered include:
 
 - With what accuracy can we recover true SOC on average (mean squared error)?
 - Are estimates of SOC likely to center on the truth (bias)?
 - Are estimates of uncertainty (standard errors) reflecting the true degree of uncertainty in the estimates (coverage of confidence intervals / type 1 error rate)? 
 
-As a first step, we simulate a "ground truth" (so to speak), which is a 3-dimensional grid on a rectangular prism that represents SOC concentration (in percent) over the plot of land to be studied. The dimensions are `latitude`, `longitude`, and `depth` (in that order). The scale is in meters. A function called `simulate_ground_truth()` is created below, with tunable parameters to choose the nature of the SOC grid. The output data is an `array` with dimensions in the order noted.
+
+
+
+## Simulating Percent SOC
+
+As a first step, we simulate a "ground truth" (so to speak), which is a 3-dimensional grid on a rectangular prism that represents SOC concentration (in percent) over the plot of land to be studied. The dimensions are `latitude`, `longitude`, and `depth` (in that order). The scale is in meters. 
+
+However, simulating a field of % SOC is not entirely straightforward. In particular we would like to generate numbers that:
+
+- Are bounded between 0 and 1 (0% and 100% SOC).
+- Allow for arbitrary correlation between points.
+- Have an adjustable mean and variance.
+
+We can achieve these properties using a *Gaussian copula* (see [this post](https://stats.stackexchange.com/questions/37424/how-to-simulate-from-a-gaussian-copula/64988#64988)). Essentially we will simulate values form a multivariate normal distribution and then pass each one through a standard normal CDF to get uniformly distributed, correlated values. To simulate $d$ uniform [0,1] random variables with correlation matrix $P$, we follow these steps:
+
+1) Perform a Cholesky decomposition of $P$ and take $A$ to be the resulting lower triangular matrix. 
+
+2) Generate $Z = (Z_1, ..., Z_d)'$ from $d$ standard normals
+
+3) Set $X = A Z$
+
+4) Return $U = (\Phi(X_1), ..., \Phi(X_d))'$ where $\Phi$ is the standard normal CDF.
+
+
 
 ```{r simulate truth}
-#ground truth simulating function, based on draws from a multivariate normal passed through a probit function.
-#inputs:
-#average concentration = average carbon concentration as a decimal fraction, must be between 0 and 1
-#horizontal_smoothness = variation over lat-long space of SOC concentration. 0 means there is no autocorrelation whatsoever, so that % SOC at adjacent gridpoints is independent. 1 indicates % SOC is constant.
-simulate_ground_truth <- function(average_surface_concentration = .2, horizontal_smoothness = .1){
-  #horizontal grid is 100 x 100
-  #x refers to longitude, y refers to latitude
-  grid <- expand.grid(1:100, 1:100)
-  names(grid) <- c("y","x")
 
-  normal_surface_concentration <- qnorm(average_surface_concentration)
-  #gstat is used to create a random field with correlation
-  variogram_model <- vgm(psill = 0.025, model = "Gau", range = 5)
-  gstat_object <- gstat(formula = z ~ 1, locations = ~ x + y, dummy = TRUE, beta = normal_surface_concentration, model = variogram_model, nmax = 20)
-  simulated_surface <- predict(gstat_object, newdata = grid, nsim = 1)
-  simulated_surface_pct_carbon <- simulated_surface %>%
-    mutate(sim1 = pnorm(sim1))
-  simulated_surface_pct_carbon
+simulate_truth <- function(){
+  n_latitude <- 100
+  n_longitude <- 100
+  d <- n_latitude * n_longitude
+  corr <- .1
+  
+  P <- bandSparse(n = d, k = -c(0,1), diagonals = list(rep(1, d), rep(.8,d)), symm = TRUE)
+  A <- t(chol(P))
+  Z <- rnorm(n = d) %>% as.matrix()
+  X <- A %*% Z
 }
+
 ```
 
 ```{r plot simulated surface}
-#function to take a dataframe and plot a surface as a heatmap 
-#
-plot_surface <- function(surface){
-  ggplot(surface, aes(x = x, y = y, fill = sim1)) + 
-    geom_raster()
-}
+
 ```
