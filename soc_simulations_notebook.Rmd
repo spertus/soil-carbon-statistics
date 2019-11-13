@@ -23,6 +23,19 @@ This notebook serves to describe and implement a simulation to test the procedur
 - Are estimates of uncertainty (standard errors) reflecting the true degree of uncertainty in the estimates (coverage of confidence intervals / type 1 error rate)? 
 
 
+## Empirical Input: The Marin Data
+
+Simulations will be based off of samples from Marin County collected by the Silver Lab at UC Berkeley.
+
+```{r duplicate data}
+duplicate_data <- read_csv("mcp_duplicates.csv")
+#drop samples that were rerun fewer or more than 2 times
+multiple_dups <- names(which(table(duplicate_data$sample_name) != 2))
+#also drop runs of atropine standards
+duplicate_data <- duplicate_data %>%
+  filter(!(sample_name %in% multiple_dups)) %>%
+  filter(substr(sample_name, 1, 4) != 'atro') 
+```
 
 
 ## Simulating Percent SOC
@@ -50,15 +63,17 @@ We can achieve these properties using a *Gaussian copula* (see [this post](https
 ```{r simulate truth}
 
 simulate_truth <- function(){
-  n_latitude <- 100
-  n_longitude <- 100
+  n_latitude <- 10
+  n_longitude <- 10
   d <- n_latitude * n_longitude
-  corr <- .1
+  corr <- .4
   
-  P <- bandSparse(n = d, k = -c(0,1), diagonals = list(rep(1, d), rep(.8,d)), symm = TRUE)
+  P <- bandSparse(n = d, k = -c(0,1), diagonals = list(rep(1, d), rep(corr,d)), symm = TRUE)
   A <- t(chol(P))
   Z <- rnorm(n = d) %>% as.matrix()
   X <- A %*% Z
+  U <- .2 + pnorm(X[,1]) / 10
+  U_matrix <- matrix(U, nrow = n_latitude, ncol = n_longitude, byrow = TRUE)
 }
 
 ```
