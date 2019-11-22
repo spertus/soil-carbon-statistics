@@ -11,7 +11,6 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 ```{r packages}
 library(tidyverse)
-library(Matrix)
 ```
 
 ## Goals
@@ -27,7 +26,7 @@ This notebook serves to describe and implement a simulation to test the procedur
 
 Simulations will be based off of samples from Marin County collected by the Silver Lab at UC Berkeley.
 
-```{r duplicate data}
+```{r duplicate data, message = FALSE}
 duplicate_data <- read_csv("mcp_duplicates.csv")
 #drop samples that were rerun fewer or more than 2 times
 multiple_dups <- names(which(table(duplicate_data$sample_name) != 2))
@@ -35,6 +34,13 @@ multiple_dups <- names(which(table(duplicate_data$sample_name) != 2))
 duplicate_data <- duplicate_data %>%
   filter(!(sample_name %in% multiple_dups)) %>%
   filter(substr(sample_name, 1, 4) != 'atro') 
+
+duplicate_data
+```
+
+```{r pct carbon}
+pct_carbon <- duplicate_data$carbon / 100
+hist(pct_carbon, breaks = 30, xlab = "Proportion SOC")
 ```
 
 
@@ -48,6 +54,43 @@ However, simulating a field of % SOC is not entirely straightforward. In particu
 - Allow for arbitrary correlation between points.
 - Have an adjustable mean and variance.
 
+
+I have explored using a Gaussian copula for this, but for now I will use a beta distribution where the mean is a function varying across space. The [beta](https://en.wikipedia.org/wiki/Beta_distribution) is a distribution defined on [0,1], often used to model probabilities or proportions. For $X \sim \mbox{Beta}(\alpha, \beta)$ we have:
+
+$$\mathbb{P}(X = x) =  \frac{x^{\alpha - 1} (1-x)^{\beta - 1}}{\mbox{B}(\alpha, \beta)} ~~\mbox{where}~~ \mbox{B}(\alpha,\beta) = \frac{\Gamma(\alpha)\Gamma(\beta)}{\Gamma(\alpha + \beta)}$$
+$\Gamma$ is the Gamma function, a generalization of factorial. The beta has mean $\mathbb{E}(X) = \frac{\alpha}{\alpha + \beta}$ and variance $\mathbb{V}(X) = \frac{\alpha \beta}{(\alpha + \beta)^2 (\alpha + \beta + 1)}$
+
+Given a particular mean $\mathbb{E}(X) = \mu$ and variance $\mathbb{V}(X) = \sigma^2$, we can write the parameters in terms of them:
+
+\begin{align*}
+\alpha &= \bigg (\frac{1 - \mu}{\sigma^2} - \frac{1}{\mu} \bigg ) \mu^2\\
+\beta &= \alpha\bigg (\frac{1}{\mu} - 1 \bigg )
+\end{align*}
+
+Note that we must have $\mu \in (0,1)$ and $\sigma^2 < \mu (1 - \mu)$.
+
+We can fit a beta distribution to the marginal distribution of Carbon that we find in our duplicates:
+
+```{r beta fit}
+#little function to return beta parameters given a mean and variance
+compute_beta_params <- function(mu, sigma_squared){
+  alpha <- ((1 - mu) / sigma_squared - 1 / mu) * mu^2
+  beta <- alpha * (1 / mu - 1)
+  c("alpha" = alpha, "beta" = beta)
+}
+
+mean_carbon <- mean(pct_carbon)
+var_carbon <- var(pct_carbon)
+beta_params <- compute_beta_params(mu = mean_carbon, sigma_squared = var_carbon)
+grid <- seq(0, max(pct_carbon), by=.001)
+
+hist(pct_carbon, breaks = 30, xlab = "Proportion SOC", freq = FALSE)
+points(y = dbeta(grid, shape1 = beta_params[1], shape2 = beta_params[2]), x = grid, type = 'l', col = 'blue', lwd = 2)
+```
+
+
+
+<!--
 We can achieve these properties using a *Gaussian copula* (see [this post](https://stats.stackexchange.com/questions/37424/how-to-simulate-from-a-gaussian-copula/64988#64988)). Essentially we will simulate values form a multivariate normal distribution and then pass each one through a standard normal CDF to get uniformly distributed, correlated values. To simulate $d$ uniform [0,1] random variables with correlation matrix $P$, we follow these steps:
 
 1) Perform a Cholesky decomposition of $P$ and take $A$ to be the resulting lower triangular matrix. 
@@ -57,27 +100,59 @@ We can achieve these properties using a *Gaussian copula* (see [this post](https
 3) Set $X = A Z$
 
 4) Return $U = (\Phi(X_1), ..., \Phi(X_d))'$ where $\Phi$ is the standard normal CDF.
-
+-->
 
 
 ```{r simulate truth}
 
 simulate_truth <- function(){
-  n_latitude <- 10
-  n_longitude <- 10
+  #since silver lab plots are 60 x 25 meters, this gives a resolution of .1 meters
+  n_latitude <- 600
+  n_longitude <- 250
   d <- n_latitude * n_longitude
-  corr <- .4
   
-  P <- bandSparse(n = d, k = -c(0,1), diagonals = list(rep(1, d), rep(corr,d)), symm = TRUE)
-  A <- t(chol(P))
-  Z <- rnorm(n = d) %>% as.matrix()
-  X <- A %*% Z
-  U <- .2 + pnorm(X[,1]) / 10
-  U_matrix <- matrix(U, nrow = n_latitude, ncol = n_longitude, byrow = TRUE)
+  #first simulate a surface that is a "slope" with the mean decreasing linearly as we move down the surface
+  #mean varies across rows, it decreases linearly from .05 to .005
+  grid <- (1:n_latitude) / n_latitude
+  linear_mean <- .05 * (1-grid) + .005 * grid
+  mean_matrix <- matrix(data = rep(linear_mean, n_latitude), nrow = n_latitude, ncol = n_longitude)
+  #fix variance initially
+  var_matrix <- matrix(.004, nrow = n_latitude, ncol = n_longitude)
+  #simulated carbon matrix
+  carbon_matrix <- matrix(0, nrow = n_latitude, ncol = n_longitude)
+  for(i in 1:n_latitude){
+    for(j in 1:n_longitude){
+      beta_params <- compute_beta_params(mu = mean_matrix[i,j], sigma_squared = var_matrix[i,j])
+      carbon_matrix[i,j] <- rbeta(n = 1, shape1 = beta_params[1], shape2 = beta_params[2])
+    }
+  }
+  carbon_matrix
 }
 
+simulated_surface <- simulate_truth()
 ```
+
+We can see that the empirical mean over the rows follows the pattern we designated for the true mean. Interestingly the median gets very close to 0 when the mean gets small.
+
 
 ```{r plot simulated surface}
-
+plot(apply(simulated_surface, 1, mean), xlab = "Row", ylab = "Mean Prop Carbon")
 ```
+
+# Sampling 
+
+For our purposes, key features of Silver lab sampling are:
+
+- Plots are 60 by 25 meters.
+- Samples are taken along a transect with $n = 9$ samples per plot. It is not clear if these are randomized at all or merely start at one corner.
+- Soils are collected using a 7 cm corer, to a depth of 10 cm.
+
+
+
+
+# Measurement
+
+
+
+# Analysis 
+
