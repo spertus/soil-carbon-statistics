@@ -55,7 +55,7 @@ However, simulating a field of % SOC is not entirely straightforward. In particu
 - Have an adjustable mean and variance.
 
 
-I have explored using a Gaussian copula for this, but for now I will use a beta distribution where the mean is a function varying across space. The [beta](https://en.wikipedia.org/wiki/Beta_distribution) is a distribution defined on [0,1], often used to model probabilities or proportions. For $X \sim \mbox{Beta}(\alpha, \beta)$ we have:
+I have explored using a Gaussian copula for this, but for now I will use a beta distribution where the mean is a function varying across space, and besides sharing a similar mean, there is no spatial correlation among close points. The [beta](https://en.wikipedia.org/wiki/Beta_distribution) is a distribution defined on [0,1], often used to model probabilities or proportions. For $X \sim \mbox{Beta}(\alpha, \beta)$ we have:
 
 $$\mathbb{P}(X = x) =  \frac{x^{\alpha - 1} (1-x)^{\beta - 1}}{\mbox{B}(\alpha, \beta)} ~~\mbox{where}~~ \mbox{B}(\alpha,\beta) = \frac{\Gamma(\alpha)\Gamma(\beta)}{\Gamma(\alpha + \beta)}$$
 $\Gamma$ is the Gamma function, a generalization of factorial. The beta has mean $\mathbb{E}(X) = \frac{\alpha}{\alpha + \beta}$ and variance $\mathbb{V}(X) = \frac{\alpha \beta}{(\alpha + \beta)^2 (\alpha + \beta + 1)}$
@@ -69,7 +69,7 @@ Given a particular mean $\mathbb{E}(X) = \mu$ and variance $\mathbb{V}(X) = \sig
 
 Note that we must have $\mu \in (0,1)$ and $\sigma^2 < \mu (1 - \mu)$.
 
-We can fit a beta distribution to the marginal distribution of Carbon that we find in our duplicates:
+We can fit a beta distribution to the marginal distribution of carbon that we find in our duplicates:
 
 ```{r beta fit}
 #little function to return beta parameters given a mean and variance
@@ -90,34 +90,23 @@ points(y = dbeta(grid, shape1 = beta_params[1], shape2 = beta_params[2]), x = gr
 
 
 
-<!--
-We can achieve these properties using a *Gaussian copula* (see [this post](https://stats.stackexchange.com/questions/37424/how-to-simulate-from-a-gaussian-copula/64988#64988)). Essentially we will simulate values form a multivariate normal distribution and then pass each one through a standard normal CDF to get uniformly distributed, correlated values. To simulate $d$ uniform [0,1] random variables with correlation matrix $P$, we follow these steps:
-
-1) Perform a Cholesky decomposition of $P$ and take $A$ to be the resulting lower triangular matrix. 
-
-2) Generate $Z = (Z_1, ..., Z_d)'$ from $d$ standard normals
-
-3) Set $X = A Z$
-
-4) Return $U = (\Phi(X_1), ..., \Phi(X_d))'$ where $\Phi$ is the standard normal CDF.
--->
-
-
 ```{r simulate truth}
 
 simulate_truth <- function(){
   #since silver lab plots are 60 x 25 meters, this gives a resolution of .1 meters
   n_latitude <- 600
   n_longitude <- 250
+  #samples are collected at 4 depths: 0-10 cm, 10-30cm, 30-50cm, and 50-100cm
+  n_depth <- 4
   d <- n_latitude * n_longitude
   
   #first simulate a surface that is a "slope" with the mean decreasing linearly as we move down the surface
-  #mean varies across rows, it decreases linearly from .05 to .005
+  #mean varies across rows, it decreases linearly from .06 to .01
   grid <- (1:n_latitude) / n_latitude
-  linear_mean <- .05 * (1-grid) + .005 * grid
+  linear_mean <- .06 * (1-grid) + .01 * grid
   mean_matrix <- matrix(data = rep(linear_mean, n_latitude), nrow = n_latitude, ncol = n_longitude)
   #fix variance initially
-  var_matrix <- matrix(.004, nrow = n_latitude, ncol = n_longitude)
+  var_matrix <- matrix(.0003, nrow = n_latitude, ncol = n_longitude)
   #simulated carbon matrix
   carbon_matrix <- matrix(0, nrow = n_latitude, ncol = n_longitude)
   for(i in 1:n_latitude){
@@ -136,7 +125,19 @@ We can see that the empirical mean over the rows follows the pattern we designat
 
 
 ```{r plot simulated surface}
+#marginal histogram
+hist(simulated_surface, xlab = "Prop Carbon", freq = FALSE)
+#means by row
 plot(apply(simulated_surface, 1, mean), xlab = "Row", ylab = "Mean Prop Carbon")
+#turn to a long dataframe to plot with ggplot
+melted_simulated_surface <- reshape2::melt(simulated_surface)
+matplot <- ggplot(melted_simulated_surface, aes(x=Var2, y=Var1, fill=value)) + 
+  geom_tile() +
+  ylab("Latitude (Rows)") +
+  xlab("Longitude (Columns)") +
+  scale_y_reverse() +
+  scale_fill_gradient2(midpoint = 0.05)
+matplot
 ```
 
 # Sampling 
@@ -144,11 +145,20 @@ plot(apply(simulated_surface, 1, mean), xlab = "Row", ylab = "Mean Prop Carbon")
 For our purposes, key features of Silver lab sampling are:
 
 - Plots are 60 by 25 meters.
-- Samples are taken along a transect with $n = 9$ samples per plot. It is not clear if these are randomized at all or merely start at one corner.
-- Soils are collected using a 7 cm corer, to a depth of 10 cm.
+- Samples are taken along a transect with $n = 9$ samples per plot (sometimes $n=5$ samples per plot). It is not clear if these are randomized at all or merely start at one corner, however I believe the sampling falls under the category of systematic random sampling, i.e. the initial location is random (see figure from Allen et al below).
+- Soils are collected using a 7 cm corer, at 4 depths: 0-10 cm, 10-30 cm, 30-50 cm, and 50-100 cm.
 
+![*Soil sampling as described in Allen et al 2010 "A review of sampling designs for the measurement of soil organic carbon in Australian grazing lands."*](sampling_picture.png)
 
+We focus on "design based" (random) sampling here. An alternative approach is "model based" sampling, where sample locations are chosen purposively based on prior knowledge in the form of a model (e.g. a variogram). 
 
+Our notation follows Allen et al 2010. Let $\{y_1,...y_n\}$ be $n$ measurements of percent SOC taken within a plot and suppose, for the moment, they comprise a simple uniform random sample from the plot and are measured without error. Then in this simple case unbiased estimates of the mean $\mu_s$, variance \sigma_s^2, and variance of the mean \sigma_s^2(\hat{\mu}_s) are given by:
+
+\begin{align*}
+\hat{\mu}_s &= \frac{1}{n} \sum_{i=1}^n y_i\\
+\hat{\sigma}_s^2 &= \frac{1}{(n-1)} \sum_{i=1}^n y_i\\
+\hat{\sigma}_s^2(\hat{\mu}_s) &=  \frac{\hat{\sigma}_s^2}{n} 
+\end{align*}
 
 # Measurement
 
