@@ -29,11 +29,13 @@ Simulations will be based off of samples from Marin County collected by the Silv
 ```{r duplicate data, message = FALSE}
 duplicate_data <- read_csv("mcp_duplicates.csv")
 #drop samples that were rerun fewer or more than 2 times
-multiple_dups <- names(which(table(duplicate_data$sample_name) != 2))
+no_dups <- names(which(table(duplicate_data$sample_name) < 2))
 #also drop runs of atropine standards
 duplicate_data <- duplicate_data %>%
-  filter(!(sample_name %in% multiple_dups)) %>%
-  filter(substr(sample_name, 1, 4) != 'atro') 
+  filter(!(sample_name %in% no_dups)) %>%
+  filter(!(substr(sample_name, 1, 4) %in% c('atro','blan','Blan','dumm','Dumm'))) %>%
+  group_by(sample_name) %>%
+  filter(rank(time) <= 2)
 
 duplicate_data
 ```
@@ -43,6 +45,10 @@ pct_carbon <- duplicate_data$carbon / 100
 hist(pct_carbon, breaks = 30, xlab = "Proportion SOC")
 ```
 
+
+### Bulk Density 
+
+In addition to % SOC, bulk density measurements are needed to compute the total amount of SOC in a plot of land. For the time being we treat bulk density as known and fixed across a plot. Ryals et al (2014) report bulk density ranging from .87 to 1.27 g/cm$^3$, based on cores taken from teh walls of a pit, with one pit per plot. We will use 1 g/cm$^3$ as the bulk density in our simulations to compute total SOC.
 
 ## Simulating Percent SOC
 
@@ -97,6 +103,7 @@ simulate_truth <- function(){
   n_latitude <- 600
   n_longitude <- 250
   #samples are collected at 4 depths: 0-10 cm, 10-30cm, 30-50cm, and 50-100cm
+  #ADD DEPTH
   n_depth <- 4
   d <- n_latitude * n_longitude
   
@@ -140,6 +147,20 @@ matplot <- ggplot(melted_simulated_surface, aes(x=Var2, y=Var1, fill=value)) +
 matplot
 ```
 
+The total Carbon in a plot of land, in Megagrams Carbon per hectare (Mg C / ha), is computed from both the percent carbon and the bulk density (a measure of the density of the soil). The bulk density is itself difficult to sample and compute. For the time being we will treat this as fixed and known. From the Silver lab report for California's Fourth Climate Change Assessment, average bulk density across a number of Californian sites was about 1.2 grams per cubic centimeter (g / cm$^3$), which is the number I will use.
+
+```{r total carbon}
+#note that our imaginary surface is at the 10 x 10 x 10 cm scale, which is 1000 cubic centimeters.
+#this implies a bulk density of 1.2 * 1000 = 1200 grams per grid point. 
+carbon_mass_surface <- 1200 * simulated_surface
+#total carbon in megagrams
+total_carbon <- sum(carbon_mass_surface) * (1e-6)
+#a 60 x 25 meter plot is .15 of a hectare
+MgC_per_ha <- total_carbon / .15
+```
+
+The Mg C / ha in our simulation is `r round(MgC_per_ha)`, which is not very far off from 53 Mg C / ha observed in the Sierra foothills, as observed in [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X).
+
 # Sampling 
 
 For our purposes, key features of Silver lab sampling are:
@@ -152,7 +173,7 @@ For our purposes, key features of Silver lab sampling are:
 
 We focus on "design based" (random) sampling here. An alternative approach is "model based" sampling, where sample locations are chosen purposively based on prior knowledge in the form of a model (e.g. a variogram). 
 
-Our notation follows Allen et al 2010. Let $\{y_1,...y_n\}$ be $n$ measurements of percent SOC taken within a plot and suppose, for the moment, they comprise a simple uniform random sample from the plot and are measured without error. Then in this simple case unbiased estimates of the mean $\mu_s$, variance \sigma_s^2, and variance of the mean \sigma_s^2(\hat{\mu}_s) are given by:
+Our notation follows Allen et al 2010. Let $\{y_1,...y_n\}$ be $n$ measurements of percent SOC taken within a plot and suppose, for the moment, they comprise a simple uniform random sample from the plot and are measured without error. Then in this simple case unbiased estimates of the mean $\mu_s$, variance $\sigma_s^2$, and variance of the mean $\sigma_s^2(\hat{\mu}_s)$ are given by:
 
 \begin{align*}
 \hat{\mu}_s &= \frac{1}{n} \sum_{i=1}^n y_i\\
@@ -160,9 +181,68 @@ Our notation follows Allen et al 2010. Let $\{y_1,...y_n\}$ be $n$ measurements 
 \hat{\sigma}_s^2(\hat{\mu}_s) &=  \frac{\hat{\sigma}_s^2}{n} 
 \end{align*}
 
+
+However, Silver lab sampling is not based on simple random sampling. Instead, it is based on systematic random sampling (panel d in the plot above), where the original location is chosen at random and the rest of the locations are sampled along a transect. **Note that the below is not always how they do this. In Ryals et al (2014) they take 3 transects with 3 samples each. It is not clear how these transects are located.**
+
+```{r systematic random sampling}
+#function to collect samples from a simulated surface
+#inputs:
+  #surface: a simulated surface, i.e. a matrix or array with SOC concentrations at each point
+#outputs: samples collected along random transects, these are the true values (i.e. with no measurement error)  
+collect_sample <- function(surface){
+  #start randomly from lower left or lower right hand corner
+  left <- sample(c(TRUE, FALSE), size = 1)
+  if(left){
+    vertical_bounds <- c(nrow(surface)-ceiling(nrow(surface)/10), nrow(surface))
+    horizontal_bounds <- c(1,floor(ncol(surface)/10))
+  
+    initial_location <- c(sample(vertical_bounds[1]:vertical_bounds[2], size = 1), sample(horizontal_bounds[1]:horizontal_bounds[2], size = 1))
+    vertical_steps <- floor(seq(0, initial_location[1], length.out = 9))
+    horizontal_steps <- floor(seq(0, ncol(surface)-initial_location[2], length.out = 9))
+    
+    transect <- matrix(c(initial_location[1] - vertical_steps, initial_location[2] + horizontal_steps), nrow = length(vertical_steps))
+  } else {
+    vertical_bounds <- c(nrow(surface)-ceiling(nrow(surface)/10), nrow(surface))
+    horizontal_bounds <- c(ncol(surface),ncol(surface) - floor(ncol(surface)/10))
+  
+    initial_location <- c(sample(vertical_bounds[1]:vertical_bounds[2], size = 1), sample(horizontal_bounds[1]:horizontal_bounds[2], size = 1))
+    vertical_steps <- floor(seq(0, initial_location[1], length.out = 9))
+    horizontal_steps <- floor(seq(0, initial_location[2], length.out = 9))
+    
+    transect <- matrix(c(initial_location[1] - vertical_steps, initial_location[2] - horizontal_steps), nrow = length(vertical_steps))
+  }
+  true_samples <- simulated_surface[transect]
+  true_samples
+}
+soil_samples <- collect_sample(simulated_surface)
+```
+
+
 # Measurement
+
+Once samples have been taken, error in the assay itself remains a concern. The Silver lab takes duplicate measurements until two runs are within 10% of each other (this often happens after the first two runs of any given sample). These percent differences are computed as:
+
+$$\delta = 100 * \bigg | \frac{x_1 - x_2}{\frac{1}{2}(x_1 + x_2)} \bigg |$$
+
+I add in measurement noise for each point by drawing a random sample from the observed percent differences between the Marin County duplicates, and then adding uniform noise at the scale of the sampled percent difference.
+
+```{r measurement noise}
+pct_differences <- duplicate_data %>%
+  group_by(sample_name) %>%
+  summarize(N_pct_diff = pct_diff(nitrogen), C_pct_diff = pct_diff(carbon), N_abs_diff = abs_diff(nitrogen), C_abs_diff = abs_diff(carbon), C_mean = mean(carbon), N_mean = mean(nitrogen), C_range = abs(diff(carbon)))
+
+hist(pct_differences$C_pct_diff, breaks = 30)
+
+sampled_pds <- sample(pct_differences$C_pct_diff, size = length(soil_samples), replace = TRUE)
+#the size of the perturbation is equivalent to the random % difference multiplied by the actual size of each sample. The direction of the perturbation is random.
+perturbations <- sample(c(-1,1), size = length(soil_samples), replace = TRUE) * (sampled_pds / 100) * soil_samples
+
+measured_samples <- soil_samples + perturbations
+```
 
 
 
 # Analysis 
+
+
 
