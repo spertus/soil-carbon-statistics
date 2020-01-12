@@ -147,10 +147,19 @@ matplot <- ggplot(melted_simulated_surface, aes(x=Var2, y=Var1, fill=value)) +
 matplot
 ```
 
+The total Carbon in a plot of land, in Megagrams Carbon per hectare (Mg C / ha), is computed from both the percent carbon and the bulk density (a measure of the density of the soil). The bulk density is itself difficult to sample and compute. For the time being we will treat this as fixed and known. From the Silver lab report for California's Fourth Climate Change Assessment, average bulk density across a number of Californian sites was about 1.2 grams per cubic centimeter (g / cm$^3$), which is the number I will use.
 
 ```{r total carbon}
-
+#note that our imaginary surface is at the 10 x 10 x 10 cm scale, which is 1000 cubic centimeters.
+#this implies a bulk density of 1.2 * 1000 = 1200 grams per grid point. 
+carbon_mass_surface <- 1200 * simulated_surface
+#total carbon in megagrams
+total_carbon <- sum(carbon_mass_surface) * (1e-6)
+#a 60 x 25 meter plot is .15 of a hectare
+MgC_per_ha <- total_carbon / .15
 ```
+
+The Mg C / ha in our simulation is `r round(MgC_per_ha)`, which is not very far off from 53 Mg C / ha observed in the Sierra foothills, as observed in [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X).
 
 # Sampling 
 
@@ -234,4 +243,6 @@ measured_samples <- soil_samples + perturbations
 
 
 # Analysis 
+
+
 
