@@ -152,14 +152,15 @@ The total Carbon in a plot of land, in Megagrams Carbon per hectare (Mg C / ha),
 ```{r total carbon}
 #note that our imaginary surface is at the 10 x 10 x 10 cm scale, which is 1000 cubic centimeters.
 #this implies a bulk density of 1.2 * 1000 = 1200 grams per grid point. 
-carbon_mass_surface <- 1200 * simulated_surface
+bulk_density <- 1200
+carbon_mass_surface <- bulk_density * simulated_surface
 #total carbon in megagrams
 total_carbon <- sum(carbon_mass_surface) * (1e-6)
 #a 60 x 25 meter plot is .15 of a hectare
 MgC_per_ha <- total_carbon / .15
 ```
 
-The Mg C / ha in our simulation is `r round(MgC_per_ha)`, which is not very far off from 53 Mg C / ha observed in the Sierra foothills, as observed in [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X).
+The Mg C / ha in our simulation is `r round(MgC_per_ha)`, which is not very far off from 53 Mg C / ha observed in the Sierra foothills, as observed in [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X). In the [CCA4 report](https://www.energy.ca.gov/sites/default/files/2019-07/Agriculture_CCCA4-CNRA-2018-002.pdf), the Silver lab reported stocks of 11 to 108 Mg C / ha across a range of sites in California, with a mean stock of 27 Mg C / ha.
 
 # Sampling 
 
@@ -244,5 +245,9 @@ measured_samples <- soil_samples + perturbations
 
 # Analysis 
 
+According to [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X), the carbon stock in a plot is computed by averaging the samples and then multiplying by the bulk density measurement. These averages are then treated as fixed and analyzed with ANOVA for final inference about treatment effects. 
 
+```{r}
+plot_average <- mean(measured_samples * bulk_density)
+```
 
