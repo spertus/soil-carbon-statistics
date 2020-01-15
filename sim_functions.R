@@ -1,4 +1,4 @@
-
+library(tidyverse)
 
 ##### function to collect samples from a simulated surface ####
 #inputs:
@@ -49,7 +49,7 @@ perturbed_measurements <- function(true_samples, pct_perturbations){
   #bulk density: a vector of bulk densities (as total mass of plot) of length 1 (all BDs are the same) or length ncol(measurements) (each plot has its own BD)
   #treatement: a binary vector of length ncol(measurements) indicating whether a plot was treatment (1) or control (0)
 #outputs:
-#a list with the following elements
+#a vector with the following components
   #control_mean_SOC: intercept in ANOVA
   #ATE: estimate of average treatment effect, based on coefficient in ANOVA
   #ATE_se: the estimated standard error of the ATE estimate
@@ -58,11 +58,11 @@ estimate_ATE_anova <- function(measurements, bulk_density, treatment){
   mean_pct_SOC <- colMeans(measurements)
   total_SOC <- mean_pct_SOC * bulk_density
   ATE_anova <- lm(total_SOC ~ treatment)
-  list(
-    control_mean_SOC = coef(ATE_anova)[1],
-    ATE = coef(ATE_anova)[2],
-    ATE_se = summary(ATE_anova)$coefficients[2,2],
-    pval = summary(ATE_anova)$coefficients[4,4]
+  c(
+    "control_mean_SOC" = coef(ATE_anova)[1],
+    "ATE" = coef(ATE_anova)[2],
+    "ATE_se" = summary(ATE_anova)$coefficients[2,2],
+    "pval" = summary(ATE_anova)$coefficients[2,4]
   )
 }
 
@@ -70,5 +70,16 @@ estimate_ATE_anova <- function(measurements, bulk_density, treatment){
 
 ################## function to run simulations ################
 
+run_sims <- function(n_sims = 1000, surfaces, pct_perturbations, treatment, bulk_density){
+  results <- matrix(0, ncol = 4, nrow = n_sims)
+  for(i in 1:n_sims){
+    samples <- surfaces %>% 
+      map(collect_sample)
+    measured_samples <- samples %>%
+      map(perturbed_measurements, pct_perturbations = pct_perturbations) %>%
+      reduce(cbind)
+    results[i,] <- estimate_ATE_anova(measurements = measured_samples, bulk_density = bulk_density, treatment = treatment)
+  }
+}
 
 
