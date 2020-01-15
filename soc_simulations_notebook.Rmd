@@ -186,35 +186,6 @@ Our notation follows Allen et al 2010. Let $\{y_1,...y_n\}$ be $n$ measurements 
 However, Silver lab sampling is not based on simple random sampling. Instead, it is based on systematic random sampling (panel d in the plot above), where the original location is chosen at random and the rest of the locations are sampled along a transect. **Note that the below is not always how they do this. In Ryals et al (2014) they take 3 transects with 3 samples each. It is not clear how these transects are located.**
 
 ```{r systematic random sampling}
-#function to collect samples from a simulated surface
-#inputs:
-  #surface: a simulated surface, i.e. a matrix or array with SOC concentrations at each point
-#outputs: samples collected along random transects, these are the true values (i.e. with no measurement error)  
-collect_sample <- function(surface){
-  #start randomly from lower left or lower right hand corner
-  left <- sample(c(TRUE, FALSE), size = 1)
-  if(left){
-    vertical_bounds <- c(nrow(surface)-ceiling(nrow(surface)/10), nrow(surface))
-    horizontal_bounds <- c(1,floor(ncol(surface)/10))
-  
-    initial_location <- c(sample(vertical_bounds[1]:vertical_bounds[2], size = 1), sample(horizontal_bounds[1]:horizontal_bounds[2], size = 1))
-    vertical_steps <- floor(seq(0, initial_location[1], length.out = 9))
-    horizontal_steps <- floor(seq(0, ncol(surface)-initial_location[2], length.out = 9))
-    
-    transect <- matrix(c(initial_location[1] - vertical_steps, initial_location[2] + horizontal_steps), nrow = length(vertical_steps))
-  } else {
-    vertical_bounds <- c(nrow(surface)-ceiling(nrow(surface)/10), nrow(surface))
-    horizontal_bounds <- c(ncol(surface),ncol(surface) - floor(ncol(surface)/10))
-  
-    initial_location <- c(sample(vertical_bounds[1]:vertical_bounds[2], size = 1), sample(horizontal_bounds[1]:horizontal_bounds[2], size = 1))
-    vertical_steps <- floor(seq(0, initial_location[1], length.out = 9))
-    horizontal_steps <- floor(seq(0, initial_location[2], length.out = 9))
-    
-    transect <- matrix(c(initial_location[1] - vertical_steps, initial_location[2] - horizontal_steps), nrow = length(vertical_steps))
-  }
-  true_samples <- simulated_surface[transect]
-  true_samples
-}
 soil_samples <- collect_sample(simulated_surface)
 ```
 
