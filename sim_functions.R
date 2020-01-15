@@ -42,3 +42,33 @@ perturbed_measurements <- function(true_samples, pct_perturbations){
   measured_samples <- true_samples + perturbations
   measured_samples
 }
+
+############ functions to compute plot averages and ATEs ############
+#inputs:
+  #measurements: a matrix with samples in the rows and plots in the columns
+  #bulk density: a vector of bulk densities (as total mass of plot) of length 1 (all BDs are the same) or length ncol(measurements) (each plot has its own BD)
+  #treatement: a binary vector of length ncol(measurements) indicating whether a plot was treatment (1) or control (0)
+#outputs:
+#a list with the following elements
+  #control_mean_SOC: intercept in ANOVA
+  #ATE: estimate of average treatment effect, based on coefficient in ANOVA
+  #ATE_se: the estimated standard error of the ATE estimate
+  #pval: the p value of a test of whether the ATE is different from 0
+estimate_ATE_anova <- function(measurements, bulk_density, treatment){
+  mean_pct_SOC <- colMeans(measurements)
+  total_SOC <- mean_pct_SOC * bulk_density
+  ATE_anova <- lm(total_SOC ~ treatment)
+  list(
+    control_mean_SOC = coef(ATE_anova)[1],
+    ATE = coef(ATE_anova)[2],
+    ATE_se = summary(ATE_anova)$coefficients[2,2],
+    pval = summary(ATE_anova)$coefficients[4,4]
+  )
+}
+
+
+
+################## function to run simulations ################
+
+
+
