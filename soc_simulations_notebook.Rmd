@@ -98,7 +98,7 @@ points(y = dbeta(grid, shape1 = beta_params[1], shape2 = beta_params[2]), x = gr
 
 ```{r simulate truth}
 
-simulate_truth <- function(){
+simulate_truth <- function(i){
   #since silver lab plots are 60 x 25 meters, this gives a resolution of .1 meters
   n_latitude <- 600
   n_longitude <- 250
@@ -185,9 +185,6 @@ Our notation follows Allen et al 2010. Let $\{y_1,...y_n\}$ be $n$ measurements 
 
 However, Silver lab sampling is not based on simple random sampling. Instead, it is based on systematic random sampling (panel d in the plot above), where the original location is chosen at random and the rest of the locations are sampled along a transect. **Note that the below is not always how they do this. In Ryals et al (2014) they take 3 transects with 3 samples each. It is not clear how these transects are located.**
 
-```{r systematic random sampling}
-soil_samples <- collect_sample(simulated_surface)
-```
 
 
 # Measurement
@@ -199,17 +196,15 @@ $$\delta = 100 * \bigg | \frac{x_1 - x_2}{\frac{1}{2}(x_1 + x_2)} \bigg |$$
 I add in measurement noise for each point by drawing a random sample from the observed percent differences between the Marin County duplicates, and then adding uniform noise at the scale of the sampled percent difference.
 
 ```{r measurement noise}
+abs_diff <- function(x){
+  abs(x[1] - x[2])
+}
+pct_diff <- function(x){
+  2 * 100 * abs((x[1] - x[2]) / (x[1] + x[2]))
+}
 pct_differences <- duplicate_data %>%
   group_by(sample_name) %>%
   summarize(N_pct_diff = pct_diff(nitrogen), C_pct_diff = pct_diff(carbon), N_abs_diff = abs_diff(nitrogen), C_abs_diff = abs_diff(carbon), C_mean = mean(carbon), N_mean = mean(nitrogen), C_range = abs(diff(carbon)))
-
-hist(pct_differences$C_pct_diff, breaks = 30)
-
-sampled_pds <- sample(pct_differences$C_pct_diff, size = length(soil_samples), replace = TRUE)
-#the size of the perturbation is equivalent to the random % difference multiplied by the actual size of each sample. The direction of the perturbation is random.
-perturbations <- sample(c(-1,1), size = length(soil_samples), replace = TRUE) * (sampled_pds / 100) * soil_samples
-
-measured_samples <- soil_samples + perturbations
 ```
 
 
@@ -218,7 +213,26 @@ measured_samples <- soil_samples + perturbations
 
 According to [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X), the carbon stock in a plot is computed by averaging the samples and then multiplying by the bulk density measurement. These averages are then treated as fixed and analyzed with ANOVA for final inference about treatment effects. 
 
-```{r}
-plot_average <- mean(measured_samples * bulk_density)
+
+# Simulations 
+
+We first generate 10 plots (5 treatment, 5 control) using the varying mean beta surface described above. All surfaces are generated in exactly the same way so that the true treatment effect is 0 (Fisher's sharp null holds, Neyman's null holds). Then we run 1000 simulations of the sampling, measurement, and analysis schemes as described above. 
+
+```{r simulations}
+source("sim_functions.R")
+surfaces <- lapply(1:10, simulate_truth)
+treatment <- c(rep(1, 5), rep(0, 5))
+#bulk density as the weight of the entire plot in grams
+bulk_density <- 1200 * 600 * 250
+#run simulations
+simulation_results <- run_sims(n_sims = 1000, surfaces = surfaces, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment, bulk_density = bulk_density)
+
+avg_estimated_std_error <- mean(simulation_results[,3])
+true_std_error <- sd(simulation_results[,2])
+type_1_error_rate <- mean(simulation_results[,4] < .05)
+hist(simulation_results[,2] / 1e6, xlab = "SOC ATE (Mg C / ha)", main = "Estimated ATE Distribution", breaks = 30)
 ```
+
+At signficance level $\alpha = .05$, the type 1 error rate for the Silver lab method is `r round(type_1_error_rate, 3)`. The average estimated standard error is $`r round(avg_estimated_std_error, -6)`$ while the true standard error is $`r round(true_std_error, -6)`$. Thus the uncertainty *is* underestimated, but the resulting p-values are still conservative.
+
 
