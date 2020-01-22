@@ -69,7 +69,14 @@ estimate_ATE_anova <- function(measurements, bulk_density, treatment){
 
 
 ################## function to run simulations ################
-
+#inputs: 
+  #n_sims: number of simulated samples to draw
+  #surfaces: a collection of surfaces (i.e. plots) as a list
+  #pct_perturbations: a vector of perturbations (i.e. measurement errors)
+  #treatment: a binary vector indicating whether a plot is treated (1) or control (0)
+  #bulk_density: a vector of bulk densities (see estimate_ATE_anova())
+#outputs:
+  #a matrix of results with columns for control SOC estimate, treatment effect, estimated standard error, and a p value
 run_sims <- function(n_sims = 1000, surfaces, pct_perturbations, treatment, bulk_density){
   results <- matrix(0, ncol = 4, nrow = n_sims)
   for(i in 1:n_sims){
@@ -80,6 +87,7 @@ run_sims <- function(n_sims = 1000, surfaces, pct_perturbations, treatment, bulk
       reduce(cbind)
     results[i,] <- estimate_ATE_anova(measurements = measured_samples, bulk_density = bulk_density, treatment = treatment)
   }
+  results
 }
 
 
