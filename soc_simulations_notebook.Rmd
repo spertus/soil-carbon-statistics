@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 ```{r packages}
 library(tidyverse)
+source("sim_functions.R")
 ```
 
 ## Goals
@@ -95,49 +96,8 @@ points(y = dbeta(grid, shape1 = beta_params[1], shape2 = beta_params[2]), x = gr
 ```
 
 
-
-```{r simulate truth}
-
-simulate_truth <- function(i){
-  #since silver lab plots are 60 x 25 meters, this gives a resolution of .1 meters
-  n_latitude <- 600
-  n_longitude <- 250
-  #samples are collected at 4 depths: 0-10 cm, 10-30cm, 30-50cm, and 50-100cm
-  #ADD DEPTH
-  n_depth <- 4
-  d <- n_latitude * n_longitude
-  
-  #first simulate a surface that is a "slope" with the mean decreasing linearly as we move down the surface
-  #mean varies across rows, it decreases linearly from .06 to .01
-  grid <- (1:n_latitude) / n_latitude
-  linear_mean <- .06 * (1-grid) + .01 * grid
-  mean_matrix <- matrix(data = rep(linear_mean, n_latitude), nrow = n_latitude, ncol = n_longitude)
-  #fix variance initially
-  var_matrix <- matrix(.0003, nrow = n_latitude, ncol = n_longitude)
-  #simulated carbon matrix
-  carbon_matrix <- matrix(0, nrow = n_latitude, ncol = n_longitude)
-  for(i in 1:n_latitude){
-    for(j in 1:n_longitude){
-      beta_params <- compute_beta_params(mu = mean_matrix[i,j], sigma_squared = var_matrix[i,j])
-      carbon_matrix[i,j] <- rbeta(n = 1, shape1 = beta_params[1], shape2 = beta_params[2])
-    }
-  }
-  carbon_matrix
-}
-
-simulated_surface <- simulate_truth()
-```
-
-We can see that the empirical mean over the rows follows the pattern we designated for the true mean. Interestingly the median gets very close to 0 when the mean gets small.
-
-
 ```{r plot simulated surface}
-#marginal histogram
-hist(simulated_surface, xlab = "Prop Carbon", freq = FALSE)
-#means by row
-plot(apply(simulated_surface, 1, mean), xlab = "Row", ylab = "Mean Prop Carbon")
-#turn to a long dataframe to plot with ggplot
-melted_simulated_surface <- reshape2::melt(simulated_surface)
+simulated_surface <- simulate_truth()
 matplot <- ggplot(melted_simulated_surface, aes(x=Var2, y=Var1, fill=value)) + 
   geom_tile() +
   ylab("Latitude (Rows)") +
@@ -235,4 +195,42 @@ hist(simulation_results[,2] / 1e6, xlab = "SOC ATE (Mg C / ha)", main = "Estimat
 
 At signficance level $\alpha = .05$, the type 1 error rate for the Silver lab method is `r round(type_1_error_rate, 3)`. The average estimated standard error is $`r round(avg_estimated_std_error, -6)`$ while the true standard error is $`r round(true_std_error, -6)`$. Thus the uncertainty *is* underestimated, but the resulting p-values are still conservative.
 
+
+
+# An irregular surface
+
+The surface we sampled from has a mean that varies in such a way that the systematic random sampling is not biased. However, if the mean may vary in a way such that the transects cannot get a representative sample. For example, there may be a ridge of high carbon through the middle of a plot. In this context we may run into issues of bias in systematic sampling.
+
+```{r plot ridge surface}
+simulated_ridge_surface <- simulate_truth(1, ridge = TRUE)
+melted_simulated_ridge_surface <- reshape2::melt(simulated_ridge_surface)
+matplot <- ggplot(melted_simulated_ridge_surface, aes(x=Var2, y=Var1, fill=value)) + 
+  geom_tile() +
+  ylab("Latitude (Rows)") +
+  xlab("Longitude (Columns)") +
+  scale_y_reverse() +
+  scale_fill_gradient()
+matplot
+```
+
+```{r ridge surface}
+ridge_surfaces <- lapply(1:10, simulate_truth, ridge = TRUE)
+treatment <- c(rep(1, 5), rep(0, 5))
+#bulk density as the weight of the entire plot in grams
+bulk_density <- 1200 * 600 * 250
+#run simulations
+ridge_simulation_results <- run_sims(n_sims = 1000, surfaces = ridge_surfaces, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment, bulk_density = bulk_density)
+
+true_control_avg_SOC_ridge <- mean(unlist(ridge_surfaces[treatment == 0])) 
+estimated_control_avg_SOC_ridge <- mean(ridge_simulation_results[,1]) / bulk_density
+pct_bias_control_avg_ridge <- (estimated_control_avg_SOC_ridge - true_control_avg_SOC_ridge) / true_control_avg_SOC_ridge
+
+estimated_ate_ridge <- mean(ridge_simulation_results[,2])
+avg_estimated_std_error_ridge <- mean(ridge_simulation_results[,3])
+true_std_error_ridge <- sd(ridge_simulation_results[,2])
+type_1_error_rate_ridge <- mean(ridge_simulation_results[,4] < .05)
+hist(ridge_simulation_results[,2] / 1e6, xlab = "SOC ATE (Mg C / ha)", main = "Estimated ATE Distribution for ridge surfaces", breaks = 30)
+```
+
+In the ridge surface example the absolute bias (i.e. in the intercept) is remarkable. Control average SOC is overestimated by a factor of almost 2: the percent bias is `r round(pct_bias_control_avg_ridge, 2)`. However, the ATE itself is still relatively unbiased. Further a hypothesis test of 0 treatment effect is still conservative (type 1 error rate = `r round(type_1_error_rate_ridge, 3)` $< .05$) even though the estimated standard error is too low (average estimate = $`r round(avg_estimated_std_error_ridge, -6)`$; true empirical std error = $`r round(true_std_error_ridge, -6)`$).
 
