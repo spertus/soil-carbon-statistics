@@ -62,54 +62,24 @@ However, simulating a field of % SOC is not entirely straightforward. In particu
 - Have an adjustable mean and variance.
 
 
-I have explored using a Gaussian copula for this, but for now I will use a beta distribution where the mean is a function varying across space, and besides sharing a similar mean, there is no spatial correlation among close points. The [beta](https://en.wikipedia.org/wiki/Beta_distribution) is a distribution defined on [0,1], often used to model probabilities or proportions. For $X \sim \mbox{Beta}(\alpha, \beta)$ we have:
 
-$$\mathbb{P}(X = x) =  \frac{x^{\alpha - 1} (1-x)^{\beta - 1}}{\mbox{B}(\alpha, \beta)} ~~\mbox{where}~~ \mbox{B}(\alpha,\beta) = \frac{\Gamma(\alpha)\Gamma(\beta)}{\Gamma(\alpha + \beta)}$$
-$\Gamma$ is the Gamma function, a generalization of factorial. The beta has mean $\mathbb{E}(X) = \frac{\alpha}{\alpha + \beta}$ and variance $\mathbb{V}(X) = \frac{\alpha \beta}{(\alpha + \beta)^2 (\alpha + \beta + 1)}$
 
-Given a particular mean $\mathbb{E}(X) = \mu$ and variance $\mathbb{V}(X) = \sigma^2$, we can write the parameters in terms of them:
 
-\begin{align*}
-\alpha &= \bigg (\frac{1 - \mu}{\sigma^2} - \frac{1}{\mu} \bigg ) \mu^2\\
-\beta &= \alpha\bigg (\frac{1}{\mu} - 1 \bigg )
-\end{align*}
+```{r simulated surface}
+source("sim_functions.R")
 
-Note that we must have $\mu \in (0,1)$ and $\sigma^2 < \mu (1 - \mu)$.
+test_sim <- simulate_truth(size = c(250,600), nugget = .01, sill = .05, range = 20, intercept = .01, y_trend = TRUE, max_mean = .2)
 
-We can fit a beta distribution to the marginal distribution of carbon that we find in our duplicates:
-
-```{r beta fit}
-#little function to return beta parameters given a mean and variance
-compute_beta_params <- function(mu, sigma_squared){
-  alpha <- ((1 - mu) / sigma_squared - 1 / mu) * mu^2
-  beta <- alpha * (1 / mu - 1)
-  c("alpha" = alpha, "beta" = beta)
-}
-
-mean_carbon <- mean(pct_carbon)
-var_carbon <- var(pct_carbon)
-beta_params <- compute_beta_params(mu = mean_carbon, sigma_squared = var_carbon)
-grid <- seq(0, max(pct_carbon), by=.001)
-
-hist(pct_carbon, breaks = 30, xlab = "Proportion SOC", freq = FALSE)
-points(y = dbeta(grid, shape1 = beta_params[1], shape2 = beta_params[2]), x = grid, type = 'l', col = 'blue', lwd = 2)
+sim_plot <- ggplot(data = simulation, aes(x = x, y = y, fill = z)) + 
+  geom_raster()
+sim_plot
 ```
 
 
-```{r plot simulated surface}
-simulated_surface <- simulate_truth()
-matplot <- ggplot(melted_simulated_surface, aes(x=Var2, y=Var1, fill=value)) + 
-  geom_tile() +
-  ylab("Latitude (Rows)") +
-  xlab("Longitude (Columns)") +
-  scale_y_reverse() +
-  scale_fill_gradient2(midpoint = 0.05)
-matplot
-```
-
+<!---
 The total Carbon in a plot of land, in Megagrams Carbon per hectare (Mg C / ha), is computed from both the percent carbon and the bulk density (a measure of the density of the soil). The bulk density is itself difficult to sample and compute. For the time being we will treat this as fixed and known. From the Silver lab report for California's Fourth Climate Change Assessment, average bulk density across a number of Californian sites was about 1.2 grams per cubic centimeter (g / cm$^3$), which is the number I will use.
 
-```{r total carbon}
+```{r total carbon, include = FALSE}
 #note that our imaginary surface is at the 10 x 10 x 10 cm scale, which is 1000 cubic centimeters.
 #this implies a bulk density of 1.2 * 1000 = 1200 grams per grid point. 
 bulk_density <- 1200
@@ -121,6 +91,8 @@ MgC_per_ha <- total_carbon / .15
 ```
 
 The Mg C / ha in our simulation is `r round(MgC_per_ha)`, which is not very far off from 53 Mg C / ha observed in the Sierra foothills, as observed in [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X). In the [CCA4 report](https://www.energy.ca.gov/sites/default/files/2019-07/Agriculture_CCCA4-CNRA-2018-002.pdf), the Silver lab reported stocks of 11 to 108 Mg C / ha across a range of sites in California, with a mean stock of 27 Mg C / ha.
+!--->
+
 
 # Sampling 
 
@@ -128,22 +100,8 @@ For our purposes, key features of Silver lab sampling are:
 
 - Plots are 60 by 25 meters.
 - Samples are taken along a transect with $n = 9$ samples per plot (sometimes $n=5$ samples per plot). It is not clear if these are randomized at all or merely start at one corner, however I believe the sampling falls under the category of systematic random sampling, i.e. the initial location is random (see figure from Allen et al below).
+- Occasionally, plots are stratified and multiple transects will be taken (e.g. 3 transects with 3 samples each)
 - Soils are collected using a 7 cm corer, at 4 depths: 0-10 cm, 10-30 cm, 30-50 cm, and 50-100 cm.
-
-![*Soil sampling as described in Allen et al 2010 "A review of sampling designs for the measurement of soil organic carbon in Australian grazing lands."*](sampling_picture.png)
-
-We focus on "design based" (random) sampling here. An alternative approach is "model based" sampling, where sample locations are chosen purposively based on prior knowledge in the form of a model (e.g. a variogram). 
-
-Our notation follows Allen et al 2010. Let $\{y_1,...y_n\}$ be $n$ measurements of percent SOC taken within a plot and suppose, for the moment, they comprise a simple uniform random sample from the plot and are measured without error. Then in this simple case unbiased estimates of the mean $\mu_s$, variance $\sigma_s^2$, and variance of the mean $\sigma_s^2(\hat{\mu}_s)$ are given by:
-
-\begin{align*}
-\hat{\mu}_s &= \frac{1}{n} \sum_{i=1}^n y_i\\
-\hat{\sigma}_s^2 &= \frac{1}{(n-1)} \sum_{i=1}^n y_i\\
-\hat{\sigma}_s^2(\hat{\mu}_s) &=  \frac{\hat{\sigma}_s^2}{n} 
-\end{align*}
-
-
-However, Silver lab sampling is not based on simple random sampling. Instead, it is based on systematic random sampling (panel d in the plot above), where the original location is chosen at random and the rest of the locations are sampled along a transect. **Note that the below is not always how they do this. In Ryals et al (2014) they take 3 transects with 3 samples each. It is not clear how these transects are located.**
 
 
 
@@ -176,61 +134,19 @@ According to [Ryals et al 2014](https://www.sciencedirect.com/science/article/ab
 
 # Simulations 
 
-We first generate 10 plots (5 treatment, 5 control) using the varying mean beta surface described above. All surfaces are generated in exactly the same way so that the true treatment effect is 0 (Fisher's sharp null holds, Neyman's null holds). Then we run 1000 simulations of the sampling, measurement, and analysis schemes as described above. 
+We first generate 10 plots (5 treatment, 5 control) using the simulation set up above. All surfaces are generated in exactly the same way so that the true treatment effect is 0. Then we run 1000 simulations of the sampling, measurement, and analysis schemes as described above. 
 
 ```{r simulations}
-source("sim_functions.R")
 surfaces <- lapply(1:10, simulate_truth)
 treatment <- c(rep(1, 5), rep(0, 5))
 #bulk density as the weight of the entire plot in grams
-bulk_density <- 1200 * 600 * 250
+#bulk_density <- 1200 * 600 * 250
 #run simulations
-simulation_results <- run_sims(n_sims = 1000, surfaces = surfaces, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment, bulk_density = bulk_density)
+simulation_results <- run_sims(n_sims = 10, surfaces = surfaces, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment)
 
 avg_estimated_std_error <- mean(simulation_results[,3])
 true_std_error <- sd(simulation_results[,2])
 type_1_error_rate <- mean(simulation_results[,4] < .05)
-hist(simulation_results[,2] / 1e6, xlab = "SOC ATE (Mg C / ha)", main = "Estimated ATE Distribution", breaks = 30)
+hist(simulation_results[,2], xlab = "SOC ATE (% C)", main = "Estimated ATE Distribution", breaks = 30)
 ```
-
-At signficance level $\alpha = .05$, the type 1 error rate for the Silver lab method is `r round(type_1_error_rate, 3)`. The average estimated standard error is $`r round(avg_estimated_std_error, -6)`$ while the true standard error is $`r round(true_std_error, -6)`$. Thus the uncertainty *is* underestimated, but the resulting p-values are still conservative.
-
-
-
-# An irregular surface
-
-The surface we sampled from has a mean that varies in such a way that the systematic random sampling is not biased. However, if the mean may vary in a way such that the transects cannot get a representative sample. For example, there may be a ridge of high carbon through the middle of a plot. In this context we may run into issues of bias in systematic sampling.
-
-```{r plot ridge surface}
-simulated_ridge_surface <- simulate_truth(1, ridge = TRUE)
-melted_simulated_ridge_surface <- reshape2::melt(simulated_ridge_surface)
-matplot <- ggplot(melted_simulated_ridge_surface, aes(x=Var2, y=Var1, fill=value)) + 
-  geom_tile() +
-  ylab("Latitude (Rows)") +
-  xlab("Longitude (Columns)") +
-  scale_y_reverse() +
-  scale_fill_gradient()
-matplot
-```
-
-```{r ridge surface}
-ridge_surfaces <- lapply(1:10, simulate_truth, ridge = TRUE)
-treatment <- c(rep(1, 5), rep(0, 5))
-#bulk density as the weight of the entire plot in grams
-bulk_density <- 1200 * 600 * 250
-#run simulations
-ridge_simulation_results <- run_sims(n_sims = 1000, surfaces = ridge_surfaces, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment, bulk_density = bulk_density)
-
-true_control_avg_SOC_ridge <- mean(unlist(ridge_surfaces[treatment == 0])) 
-estimated_control_avg_SOC_ridge <- mean(ridge_simulation_results[,1]) / bulk_density
-pct_bias_control_avg_ridge <- (estimated_control_avg_SOC_ridge - true_control_avg_SOC_ridge) / true_control_avg_SOC_ridge
-
-estimated_ate_ridge <- mean(ridge_simulation_results[,2])
-avg_estimated_std_error_ridge <- mean(ridge_simulation_results[,3])
-true_std_error_ridge <- sd(ridge_simulation_results[,2])
-type_1_error_rate_ridge <- mean(ridge_simulation_results[,4] < .05)
-hist(ridge_simulation_results[,2] / 1e6, xlab = "SOC ATE (Mg C / ha)", main = "Estimated ATE Distribution for ridge surfaces", breaks = 30)
-```
-
-In the ridge surface example the absolute bias (i.e. in the intercept) is remarkable. Control average SOC is overestimated by a factor of almost 2: the percent bias is `r round(pct_bias_control_avg_ridge, 2)`. However, the ATE itself is still relatively unbiased. Further a hypothesis test of 0 treatment effect is still conservative (type 1 error rate = `r round(type_1_error_rate_ridge, 3)` $< .05$) even though the estimated standard error is too low (average estimate = $`r round(avg_estimated_std_error_ridge, -6)`$; true empirical std error = $`r round(true_std_error_ridge, -6)`$).
 
