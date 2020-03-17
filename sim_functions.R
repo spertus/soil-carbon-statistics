@@ -34,29 +34,29 @@ simulate_truth <- function(i = 1, size = c(250,600), nugget = .01, sill = .05, r
 #inputs:
 #surface: a simulated surface, i.e. a matrix or array with SOC concentrations at each point
 #outputs: samples collected along random transects, these are the true values (i.e. with no measurement error)  
-collect_sample <- function(surface){
+collect_sample <- function(surface, transect = TRUE, n_samp = 9){
   #start randomly from lower left or lower right hand corner
-  left <- sample(c(TRUE, FALSE), size = 1)
-  if(left){
-    vertical_bounds <- c(nrow(surface)-ceiling(nrow(surface)/10), nrow(surface))
-    horizontal_bounds <- c(1,floor(ncol(surface)/10))
-    
-    initial_location <- c(sample(vertical_bounds[1]:vertical_bounds[2], size = 1), sample(horizontal_bounds[1]:horizontal_bounds[2], size = 1))
-    vertical_steps <- floor(seq(0, initial_location[1], length.out = 9))
-    horizontal_steps <- floor(seq(0, ncol(surface)-initial_location[2], length.out = 9))
-    
-    transect <- matrix(c(initial_location[1] - vertical_steps, initial_location[2] + horizontal_steps), nrow = length(vertical_steps))
-  } else {
-    vertical_bounds <- c(nrow(surface)-ceiling(nrow(surface)/10), nrow(surface))
-    horizontal_bounds <- c(ncol(surface),ncol(surface) - floor(ncol(surface)/10))
-    
-    initial_location <- c(sample(vertical_bounds[1]:vertical_bounds[2], size = 1), sample(horizontal_bounds[1]:horizontal_bounds[2], size = 1))
-    vertical_steps <- floor(seq(0, initial_location[1], length.out = 9))
-    horizontal_steps <- floor(seq(0, initial_location[2], length.out = 9))
-    
-    transect <- matrix(c(initial_location[1] - vertical_steps, initial_location[2] - horizontal_steps), nrow = length(vertical_steps))
+  x_grid <- 1:max(surface$x)
+  y_grid <- 1:max(surface$y)
+  
+  if(transect){
+    #start randomly in lower left corner
+    start_x <- sample(1:floor(max(surface$x)/n_samp), size = 1)
+    start_y <- sample(1:floor(max(surface$y)/n_samp), size = 1)
+    x_increment <- round(max(surface$x)/n_samp)
+    y_increment <- round(max(surface$y)/n_samp)
+    x_grid <- seq(start_x, max(surface$x), by = x_increment)
+    y_grid <- seq(start_y, max(surface$y), by = y_increment)
+    #also randomly start from lower left or right corner
+    if(sample(c(TRUE, FALSE), size = 1)){
+      x_grid <- rev(x_grid)
+      }
   }
-  true_samples <- simulated_surface[transect]
+  
+  true_samples <- surface %>% 
+    filter(paste(x,y) %in% paste(x_grid, y_grid)) %>%
+    dplyr::pull(z)
+    
   true_samples
 }
 
@@ -76,18 +76,16 @@ perturbed_measurements <- function(true_samples, pct_perturbations){
 ############ functions to compute plot averages and ATEs ############
 #inputs:
   #measurements: a matrix with samples in the rows and plots in the columns
-  #bulk density: a vector of bulk densities (as total mass of plot) of length 1 (all BDs are the same) or length ncol(measurements) (each plot has its own BD)
-  #treatement: a binary vector of length ncol(measurements) indicating whether a plot was treatment (1) or control (0)
+  #treatment: a binary vector of length ncol(measurements) indicating whether a plot was treatment (1) or control (0)
 #outputs:
 #a vector with the following components
   #control_mean_SOC: intercept in ANOVA
   #ATE: estimate of average treatment effect, based on coefficient in ANOVA
   #ATE_se: the estimated standard error of the ATE estimate
   #pval: the p value of a test of whether the ATE is different from 0
-estimate_ATE_anova <- function(measurements, bulk_density, treatment){
+estimate_ATE_anova <- function(measurements, treatment){
   mean_pct_SOC <- colMeans(measurements)
-  total_SOC <- mean_pct_SOC * bulk_density
-  ATE_anova <- lm(total_SOC ~ treatment)
+  ATE_anova <- lm(mean_pct_SOC ~ treatment)
   c(
     "control_mean_SOC" = coef(ATE_anova)[1],
     "ATE" = coef(ATE_anova)[2],
@@ -104,18 +102,18 @@ estimate_ATE_anova <- function(measurements, bulk_density, treatment){
   #surfaces: a collection of surfaces (i.e. plots) as a list
   #pct_perturbations: a vector of perturbations (i.e. measurement errors)
   #treatment: a binary vector indicating whether a plot is treated (1) or control (0)
-  #bulk_density: a vector of bulk densities (see estimate_ATE_anova())
 #outputs:
   #a matrix of results with columns for control SOC estimate, treatment effect, estimated standard error, and a p value
-run_sims <- function(n_sims = 1000, surfaces, pct_perturbations, treatment, bulk_density){
+run_sims <- function(n_sims = 1000, surfaces, pct_perturbations, treatment){
   results <- matrix(0, ncol = 4, nrow = n_sims)
   for(i in 1:n_sims){
     samples <- surfaces %>% 
-      map(collect_sample)
-    measured_samples <- samples %>%
-      map(perturbed_measurements, pct_perturbations = pct_perturbations) %>%
+      map(collect_sample) %>%
       reduce(cbind)
-    results[i,] <- estimate_ATE_anova(measurements = measured_samples, bulk_density = bulk_density, treatment = treatment)
+    #measured_samples <- samples %>%
+    #  map(perturbed_measurements, pct_perturbations = pct_perturbations) %>%
+    #  reduce(cbind)
+    results[i,] <- estimate_ATE_anova(measurements = samples, treatment = treatment)
   }
   results
 }

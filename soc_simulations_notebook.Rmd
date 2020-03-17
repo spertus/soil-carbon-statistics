@@ -140,13 +140,13 @@ We first generate 10 plots (5 treatment, 5 control) using the simulation set up 
 surfaces <- lapply(1:10, simulate_truth)
 treatment <- c(rep(1, 5), rep(0, 5))
 #bulk density as the weight of the entire plot in grams
-bulk_density <- 1200 * 600 * 250
+#bulk_density <- 1200 * 600 * 250
 #run simulations
-simulation_results <- run_sims(n_sims = 1000, surfaces = surfaces, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment, bulk_density = bulk_density)
+simulation_results <- run_sims(n_sims = 10, surfaces = surfaces, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment)
 
 avg_estimated_std_error <- mean(simulation_results[,3])
 true_std_error <- sd(simulation_results[,2])
 type_1_error_rate <- mean(simulation_results[,4] < .05)
-hist(simulation_results[,2] / 1e6, xlab = "SOC ATE (Mg C / ha)", main = "Estimated ATE Distribution", breaks = 30)
+hist(simulation_results[,2], xlab = "SOC ATE (% C)", main = "Estimated ATE Distribution", breaks = 30)
 ```
 
