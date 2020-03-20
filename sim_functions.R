@@ -1,5 +1,6 @@
 library(tidyverse)
-
+library(data.table)
+library(gstat)
 ################## function to simulate a % SOC surface #################
 simulate_truth <- function(i = 1, size = c(250,600), nugget = .01, sill = .05, range = 20, intercept = .01, y_trend = TRUE, max_mean = .2){
   x <- 1:size[1]
@@ -43,19 +44,20 @@ collect_sample <- function(surface, transect = TRUE, n_samp = 9){
     #start randomly in lower left corner
     start_x <- sample(1:floor(max(surface$x)/n_samp), size = 1)
     start_y <- sample(1:floor(max(surface$y)/n_samp), size = 1)
-    x_increment <- round(max(surface$x)/n_samp)
-    y_increment <- round(max(surface$y)/n_samp)
-    x_grid <- seq(start_x, max(surface$x), by = x_increment)
-    y_grid <- seq(start_y, max(surface$y), by = y_increment)
+    x_increment <- floor(max(surface$x)/n_samp)
+    y_increment <- floor(max(surface$y)/n_samp)
+    x_grid <- round(seq(start_x, x_increment*n_samp, length.out = n_samp))
+    y_grid <- round(seq(start_y, y_increment*n_samp, length.out = n_samp))
     #also randomly start from lower left or right corner
     if(sample(c(TRUE, FALSE), size = 1)){
       x_grid <- rev(x_grid)
-      }
+    }
+    grid <- data.frame("x" = x_grid, "y" = y_grid)
   }
   
   true_samples <- surface %>% 
-    filter(paste(x,y) %in% paste(x_grid, y_grid)) %>%
-    dplyr::pull(z)
+    inner_join(grid, by = c("x","y")) %>% 
+    pull(z)
     
   true_samples
 }
