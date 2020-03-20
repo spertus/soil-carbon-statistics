@@ -47,10 +47,6 @@ hist(pct_carbon, breaks = 30, xlab = "Proportion SOC")
 ```
 
 
-### Bulk Density 
-
-In addition to % SOC, bulk density measurements are needed to compute the total amount of SOC in a plot of land. For the time being we treat bulk density as known and fixed across a plot. Ryals et al (2014) report bulk density ranging from .87 to 1.27 g/cm$^3$, based on cores taken from teh walls of a pit, with one pit per plot. We will use 1 g/cm$^3$ as the bulk density in our simulations to compute total SOC.
-
 ## Simulating Percent SOC
 
 As a first step, we simulate a "ground truth" (so to speak), which is a 3-dimensional grid on a rectangular prism that represents SOC concentration (in percent) over the plot of land to be studied. The dimensions are `latitude`, `longitude`, and `depth` (in that order). The scale is in meters. 
@@ -70,7 +66,14 @@ source("sim_functions.R")
 
 test_sim <- simulate_truth(size = c(250,600), nugget = .01, sill = .05, range = 20, intercept = .01, y_trend = TRUE, max_mean = .2)
 
-sim_plot <- ggplot(data = simulation, aes(x = x, y = y, fill = z)) + 
+#marginal histogram
+sim_hist <- ggplot(data = test_sim, aes(z)) +
+  geom_histogram(bins = 30) +
+  geom_vline(xintercept = mean(test_sim$z), size = 1.2, color = 'blue')
+sim_hist
+
+#surface
+sim_plot <- ggplot(data = test_sim, aes(x = x, y = y, fill = z)) + 
   geom_raster()
 sim_plot
 ```
@@ -79,18 +82,10 @@ sim_plot
 <!---
 The total Carbon in a plot of land, in Megagrams Carbon per hectare (Mg C / ha), is computed from both the percent carbon and the bulk density (a measure of the density of the soil). The bulk density is itself difficult to sample and compute. For the time being we will treat this as fixed and known. From the Silver lab report for California's Fourth Climate Change Assessment, average bulk density across a number of Californian sites was about 1.2 grams per cubic centimeter (g / cm$^3$), which is the number I will use.
 
-```{r total carbon, include = FALSE}
-#note that our imaginary surface is at the 10 x 10 x 10 cm scale, which is 1000 cubic centimeters.
-#this implies a bulk density of 1.2 * 1000 = 1200 grams per grid point. 
-bulk_density <- 1200
-carbon_mass_surface <- bulk_density * simulated_surface
-#total carbon in megagrams
-total_carbon <- sum(carbon_mass_surface) * (1e-6)
-#a 60 x 25 meter plot is .15 of a hectare
-MgC_per_ha <- total_carbon / .15
-```
+Typical carbon stocks: 
 
-The Mg C / ha in our simulation is `r round(MgC_per_ha)`, which is not very far off from 53 Mg C / ha observed in the Sierra foothills, as observed in [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X). In the [CCA4 report](https://www.energy.ca.gov/sites/default/files/2019-07/Agriculture_CCCA4-CNRA-2018-002.pdf), the Silver lab reported stocks of 11 to 108 Mg C / ha across a range of sites in California, with a mean stock of 27 Mg C / ha.
+- 53 Mg C / ha observed in the Sierra foothills, as observed in [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X). In the [CCA4 report](https://www.energy.ca.gov/sites/default/files/2019-07/Agriculture_CCCA4-CNRA-2018-002.pdf)
+- The Silver lab reported stocks of 11 to 108 Mg C / ha across a range of sites in California, with a mean stock of 27 Mg C / ha.
 !--->
 
 
@@ -137,12 +132,13 @@ According to [Ryals et al 2014](https://www.sciencedirect.com/science/article/ab
 We first generate 10 plots (5 treatment, 5 control) using the simulation set up above. All surfaces are generated in exactly the same way so that the true treatment effect is 0. Then we run 1000 simulations of the sampling, measurement, and analysis schemes as described above. 
 
 ```{r simulations}
-surfaces <- lapply(1:10, simulate_truth)
+#surfaces <- lapply(1:10, simulate_truth)
+#save(surfaces, file = "simulated_surfaces")
+load("simulated_surfaces")
 treatment <- c(rep(1, 5), rep(0, 5))
-#bulk density as the weight of the entire plot in grams
-#bulk_density <- 1200 * 600 * 250
+
 #run simulations
-simulation_results <- run_sims(n_sims = 10, surfaces = surfaces, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment)
+simulation_results <- run_sims(n_sims = 1000, surfaces = surfaces, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment)
 
 avg_estimated_std_error <- mean(simulation_results[,3])
 true_std_error <- sd(simulation_results[,2])
