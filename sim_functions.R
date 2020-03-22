@@ -35,12 +35,9 @@ simulate_truth <- function(i = 1, size = c(250,600), nugget = .01, sill = .05, r
 #inputs:
 #surface: a simulated surface, i.e. a matrix or array with SOC concentrations at each point
 #outputs: samples collected along random transects, these are the true values (i.e. with no measurement error)  
-collect_sample <- function(surface, transect = TRUE, n_samp = 9){
-  #start randomly from lower left or lower right hand corner
-  x_grid <- 1:max(surface$x)
-  y_grid <- 1:max(surface$y)
+collect_sample <- function(surface, design = "transect", n_samp = 9){
   
-  if(transect){
+  if(design == "transect"){
     #start randomly in lower left corner
     start_x <- sample(1:floor(max(surface$x)/n_samp), size = 1)
     start_y <- sample(1:floor(max(surface$y)/n_samp), size = 1)
@@ -53,6 +50,12 @@ collect_sample <- function(surface, transect = TRUE, n_samp = 9){
       x_grid <- rev(x_grid)
     }
     grid <- data.frame("x" = x_grid, "y" = y_grid)
+  } else if(design == "simple random sample"){
+    y_samples <- sample(1:max(surface$y), size = n_samp, replace = FALSE)
+    x_samples <- sample(1:max(surface$x), size = n_samp, replace = FALSE)
+    grid <- data.frame("x" = x_samples, "y" = y_samples)
+  } else{
+    stop("need to specify a sampling design")
   }
   
   true_samples <- surface %>% 

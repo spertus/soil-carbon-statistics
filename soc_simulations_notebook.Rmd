@@ -64,7 +64,7 @@ However, simulating a field of % SOC is not entirely straightforward. In particu
 ```{r simulated surface}
 source("sim_functions.R")
 
-test_sim <- simulate_truth(size = c(250,600), nugget = .01, sill = .05, range = 20, intercept = .01, y_trend = TRUE, max_mean = .2)
+test_sim <- simulate_truth(size = c(250,600), nugget = .005, sill = .02, range = 20, intercept = .005, y_trend = TRUE, max_mean = .1)
 
 #marginal histogram
 sim_hist <- ggplot(data = test_sim, aes(z)) +
@@ -129,12 +129,14 @@ According to [Ryals et al 2014](https://www.sciencedirect.com/science/article/ab
 
 # Simulations 
 
-We first generate 10 plots (5 treatment, 5 control) using the simulation set up above. All surfaces are generated in exactly the same way so that the true treatment effect is 0. Then we run 1000 simulations of the sampling, measurement, and analysis schemes as described above. 
+We first generate 10 plots (5 treatment, 5 control) using the simulation set up above. We first run simulations to test the type 1 error control when the sharp null hypothesis of no treatment effect for any units holds. In this setting all surfaces are generated in exactly the same way so that the true treatment effect is 0. We then check the power when the null hypothesis is wrong and there is a treatment effect. The specific alternative we consider is when there is an additive effect of 1% additional carbon across the entire plot.
 
-```{r simulations}
+
+
+```{r type 1 error control}
 #surfaces <- lapply(1:10, simulate_truth)
-#save(surfaces, file = "simulated_surfaces")
-load("simulated_surfaces")
+#save(surfaces, file = "simulated_surfaces_null")
+load("simulated_surfaces_null")
 treatment <- c(rep(1, 5), rep(0, 5))
 
 #run simulations
@@ -143,6 +145,26 @@ simulation_results <- run_sims(n_sims = 1000, surfaces = surfaces, pct_perturbat
 avg_estimated_std_error <- mean(simulation_results[,3])
 true_std_error <- sd(simulation_results[,2])
 type_1_error_rate <- mean(simulation_results[,4] < .05)
+rmse <- sqrt(mean(simulation_results[,2])^2 + true_std_error^2)
 hist(simulation_results[,2], xlab = "SOC ATE (% C)", main = "Estimated ATE Distribution", breaks = 30)
 ```
 
+When the null hypothesis holds, the type 1 error rate for a transect design with ANOVA is `r round(type_1_error_rate, 3)`, and the root mean squared error (RMSE) is `r round(rmse, 3)`.
+
+```{r power}
+#little function to add to z (the carbon at each site)
+add_treatment_effect <- function(data, effect){
+  data$z <- data$z + effect
+  data
+}
+
+#positive constant treatment effect of .01 (1%) for entire surface
+surfaces_alternative[which(treatment == 1)] <- surfaces[which(treatment == 1)] %>%
+  map(add_treatment_effect, effect = .01)
+
+simulation_results_alternative <- run_sims(n_sims = 1000, surfaces = surfaces_alternative, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment)
+power <- mean(simulation_results_alternative[,4] < .05)
+rmse_alternative <- sqrt(mean(simulation_results_alternative[,2])^2 + var(simulation_results_alternative[,2]))
+```
+
+The power of the transect design with $n = 9$ under the alternative of a 1% additive constant treatment effect is relatively low at `r round(power, 2)`
