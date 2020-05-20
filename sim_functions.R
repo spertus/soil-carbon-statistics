@@ -2,7 +2,19 @@ library(tidyverse)
 library(data.table)
 library(gstat)
 ################## function to simulate a % SOC surface #################
-simulate_truth <- function(i = 1, size = c(250,600), nugget = .01, sill = .05, range = 20, intercept = .01, y_trend = TRUE, max_mean = .2){
+simulate_truth <- function(size = c(250,600), nugget = .01, sill = .05, range = 20, intercept = .01, y_trend = TRUE, max_mean = .2){
+  #generates a 2-dimensional surface based on a variogram model, possibly with a trend
+  #relies on the gstat::gstat and gstat::vgm to sample from a Gaussian random field, then transforms to a copula (bounded [0,1] variable) using pnorm()
+  #inputs:
+    #size: a length-2 vector with x and y dimensions. Defaults to c(250,600) which corresponds to a 25 x 60 meter plot with resolution at 10cm
+    #nugget: (co)variance parameter, the nugget variance (distance 0 variance)
+    #sill: (co)variance parameter, the sill variance (maximum variance)
+    #range: (co)variance parameter, how far until sill variance is reached
+    #intercept: the mean, if y_trend is FALSE. If not, the mean at y = 0
+    #y_trend: boolean, should there be a trend in the y direction (e.g. to simulate a hill slope)?
+    #max_mean: mean at y == max(size[2]) if y_trend == TRUE, if y_trend == FALSE then ignored
+  #outputs:
+    #a dataframe with 3 columns: x (the x coordinate), y (the y coordinate), and z (the value of % SOC)
   x <- 1:size[1]
   y <- 1:size[2]
   xy <- expand.grid(x, y)
@@ -29,14 +41,55 @@ simulate_truth <- function(i = 1, size = c(250,600), nugget = .01, sill = .05, r
   simulation
 }
 
+############ function to plot a surface as a heatmap###############
+plot_surface <- function(surface){
+  ggplot(data = surface, aes(x = x, y = y, fill = z)) + geom_raster()
+}
 
-
-##### function to collect samples from a simulated surface ####
-#inputs:
-#surface: a simulated surface, i.e. a matrix or array with SOC concentrations at each point
-#outputs: samples collected along random transects, these are the true values (i.e. with no measurement error)  
-collect_sample <- function(surface, design = "transect", n_samp = 9){
+############### function to add samples at depth, given surface samples ##############
+add_depth_samples <- function(surface, increments = 4, decrease = "exponential", gamma = -1, proportions){
+  #SOC stocks are defined at depth, typically up to a meter
+  #standard increments for depth for SOC sequestration measurement are: 0-10cm, 10-30cm, 30-50cm, and 50-100cm (see eg Ryals et al 2014)
+  #some studies have found that soil carbon declines exponentially with depth (e.g Allen et al 2010 "a review of sampling designs...")
+  #this function adds new surfaces at depth.
+  #SOC at depth is completely determined by SOC at the surface (no randomness) with user-defined decreases
+  #inputs:
+  #surface: a simulated surface in (x,y) space, with %SOC at each location
+  #increments: the number of depth increments, depths 1:increments will be defined and returned
+  #decrease: how should the %SOC decrease with depth
+  #"exponential": SOC at depth = (SOC at surface) * exp(gamma * depth) 
+  #"manual": SOC at depth = (SOC at surface) * proportions[depth]
+  #gamma: relevant if decrease == "exponential", a tuning parameter for exponential decay of SOC. Positive gammas mean SOC increases with depth 
+  #proportions: relevenat if decrease == "manual", explicitly define proportions at lower depth. The first proportion (the surface) should always be 1
+  stopifnot(decrease == "exponential" | decrease == "manual")
   
+  surface_SOC <- surface %>% pull(z)
+  if(decrease == "exponential"){
+    index <- 0:(increments-1)
+    proportions <- exp(gamma * index)
+  }
+  proportions_matrix <- matrix(proportions, ncol = increments, nrow = length(surface_SOC), byrow = TRUE)
+  z_depth <- as.data.frame(surface_SOC * proportions_matrix)
+  colnames(z_depth) <- paste("z", 1:increments, sep = "")
+  surface_depth <- surface %>% 
+    dplyr::select(x,y) %>%
+    bind_cols(z_depth) %>%
+    pivot_longer(cols = starts_with("z"), names_to = "depth", names_prefix = "z", values_to = "z")
+}
+
+
+
+
+
+########## function to collect samples from a simulated surface ###########
+collect_sample <- function(surface, design = "transect", n_samp = 9){
+  #inputs:
+    #surface: a simulated surface, i.e. a matrix or array with SOC concentrations at each point
+    #design: the sampling design, currently:
+      #"transect" to sample along a transect starting randomly in either the lower left or right corner
+      #"simple random sample" for a simple random sample from the entire surface
+    #n_samp: the number of samples to draw
+  #outputs: samples collected along random transects, these are the true values (i.e. with no measurement error)  
   if(design == "transect"){
     #start randomly in lower left corner
     start_x <- sample(1:floor(max(surface$x)/n_samp), size = 1)
@@ -55,7 +108,7 @@ collect_sample <- function(surface, design = "transect", n_samp = 9){
     x_samples <- sample(1:max(surface$x), size = n_samp, replace = FALSE)
     grid <- data.frame("x" = x_samples, "y" = y_samples)
   } else{
-    stop("need to specify a sampling design")
+    stop("need to specify a valid sampling design")
   }
   
   true_samples <- surface %>% 
@@ -67,60 +120,29 @@ collect_sample <- function(surface, design = "transect", n_samp = 9){
 
 
 
+
+
 ########### function to perturb measurements of samples ##########
-#inputs:
-  #true_samples: true pct carbon (unknown) to be measured with error
-  #pct_perturbations: a vector of any length that gives magnitude of pct perturbations (probably empirically determined) to be randomly sampled. Sign is randomly sampled, so perturbations are symmetric about 0 (leading to unbiased but more variable estimates).
-perturbed_measurements <- function(true_samples, pct_perturbations){
-  random_perturbation_magnitude <- sample(pct_perturbations, size = length(true_samples), replace= TRUE)
-  perturbations <- true_samples * random_perturbation_magnitude * sample(c(-1,1), size = length(true_samples), replace = TRUE)
-  measured_samples <- true_samples + perturbations
+perturbed_measurements <- function(true_samples, error_type, error_bounds){
+  #adds independent, uniform measurement error to samples
+  #inputs:
+    #true_samples: true pct carbon (unknown) to be measured with error
+    #error_type: how should the error perturb the true vale?
+      #"additive": the errors are just added to the true values (unbiased implies centered at 0)
+      #"multiplicative": the true values are dilated by the errors (unbiased implies centered at 1)
+    #error_bounds: a length-2 vector specifying the lower and upper bounds of the (uniform error)
+  
+  error <- runif(n = true_samples, min = error_bounds[1], max = error_bounds[2])
+  if(error_type == "multiplicative"){
+    measured_samples <- true_samples * error
+  } else if(error_type == "additive"){
+    measured_samples <- true_samples + error
+  } else{
+    stop("input a valid error_type")
+  }
   measured_samples
 }
 
-############ functions to compute plot averages and ATEs ############
-#inputs:
-  #measurements: a matrix with samples in the rows and plots in the columns
-  #treatment: a binary vector of length ncol(measurements) indicating whether a plot was treatment (1) or control (0)
-#outputs:
-#a vector with the following components
-  #control_mean_SOC: intercept in ANOVA
-  #ATE: estimate of average treatment effect, based on coefficient in ANOVA
-  #ATE_se: the estimated standard error of the ATE estimate
-  #pval: the p value of a test of whether the ATE is different from 0
-estimate_ATE_anova <- function(measurements, treatment){
-  mean_pct_SOC <- colMeans(measurements)
-  ATE_anova <- lm(mean_pct_SOC ~ treatment)
-  c(
-    "control_mean_SOC" = coef(ATE_anova)[1],
-    "ATE" = coef(ATE_anova)[2],
-    "ATE_se" = summary(ATE_anova)$coefficients[2,2],
-    "pval" = summary(ATE_anova)$coefficients[2,4]
-  )
-}
 
-
-
-################## function to run simulations ################
-#inputs: 
-  #n_sims: number of simulated samples to draw
-  #surfaces: a collection of surfaces (i.e. plots) as a list
-  #pct_perturbations: a vector of perturbations (i.e. measurement errors)
-  #treatment: a binary vector indicating whether a plot is treated (1) or control (0)
-#outputs:
-  #a matrix of results with columns for control SOC estimate, treatment effect, estimated standard error, and a p value
-run_sims <- function(n_sims = 1000, surfaces, pct_perturbations, treatment){
-  results <- matrix(0, ncol = 4, nrow = n_sims)
-  for(i in 1:n_sims){
-    samples <- surfaces %>% 
-      map(collect_sample) %>%
-      reduce(cbind)
-    #measured_samples <- samples %>%
-    #  map(perturbed_measurements, pct_perturbations = pct_perturbations) %>%
-    #  reduce(cbind)
-    results[i,] <- estimate_ATE_anova(measurements = samples, treatment = treatment)
-  }
-  results
-}
 
 
