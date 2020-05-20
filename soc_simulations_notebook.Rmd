@@ -3,13 +3,17 @@ title: "Simulating SOC Measurement"
 author: "Jake Spertus"
 date: "October 31st, 2019"
 output: html_notebook
+header_includes:
+  -\usepackage{amsmath}
+  -\usepackage{amsfonts}
+bibliography: soilcarbonstatistics.bib
 ---
 
 ```{r knitr setup, message = FALSE, warning = FALSE, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-```{r packages}
+```{r packages, message = FALSE, results = FALSE}
 library(tidyverse)
 source("sim_functions.R")
 ```
@@ -57,13 +61,15 @@ However, simulating a field of % SOC is not entirely straightforward. In particu
 - Allow for arbitrary correlation between points.
 - Have an adjustable mean and variance.
 
+Points 1 and 3 could be handled naturally using a Beta distribution, but point 2 is trickier. In order to generate a correlated field we will use Gaussian copulas: we take draws on $\mathbb{R}$ from a multivariate Gaussian distribution, and then map them back to $[0,1]$. The correlation structure is fixed by assuming stationarity and employing a particular variogram to define the correlations over distance. This is a standard technique in geostatistics, a model-based approach with applications in soil science (especially local estimation / the mapping of soils). Variograms are widely variable   
 
-
-
+The idea here is to simulate the concentration of SOC in the topsoil (the first horizon, if you like) using a Gaussian copula and then extrapolate this to lower depths. In theory and in the field, we can sample anywhere on a plot so that %SOC comes from an infinite population. On a computer, we have a finite amount of memory to store a surface, so we must simulate it to some resolution. I have been using a $250 \times 600$ surface to represent a plot of land for sampling. If we take this as a standard 25m $\times$ 60m plot, we have a resolution of 10cm. We can consider a single point in the initial surface to represent the *average* %SOC in a $10 \times 10 \times 30$ centimeter cube. Note that 10 centimeters is a little bit larger than the diameter of a standard corer (7 cm in [@ryals_impacts_2014]).
 
 ```{r simulated surface}
 source("sim_functions.R")
 
+
+#Variogram input: Paterson et al 2018, "Variograms of soil properties..."
 test_sim <- simulate_truth(size = c(250,600), nugget = .005, sill = .02, range = 20, intercept = .005, y_trend = TRUE, max_mean = .1)
 
 #marginal histogram
@@ -73,10 +79,17 @@ sim_hist <- ggplot(data = test_sim, aes(z)) +
 sim_hist
 
 #surface
-sim_plot <- ggplot(data = test_sim, aes(x = x, y = y, fill = z)) + 
-  geom_raster()
-sim_plot
+plot_surface(test_sim)
 ```
+
+
+## Depth
+
+The above simulations took place in 2 dimensions. The generated surface can be thought of as the average density of SOC in the topsoil (say the first 0-30cm). For some goals (like enhanced productivity, tilth, water retention, etc) understanding concentrations in the top soil may be enough. For sequestration in particular, deeper soil horizons matter. Thus we must consider additional horizons for realistic simulations. 
+
+A typical field study might sample from 4 depths: for example 0-10, 10-30, 30-50, and 50-100cm [@ryals_impacts_2014]. Evidence suggests that SOC decreases exponentially with depth [@allen_review_2010].
+
+## Bulk Density
 
 
 <!---
@@ -99,6 +112,60 @@ For our purposes, key features of Silver lab sampling are:
 - Soils are collected using a 7 cm corer, at 4 depths: 0-10 cm, 10-30 cm, 30-50 cm, and 50-100 cm.
 
 
+## Upper bounds for simple random sampling
+
+We can use the *Hoeffding bound* to construct a finite sample confidence interval on the percent carbon estimated using simple random sampling. This bound is finite-sample valid and does not rely on any other assumptions other than the fact that percent carbon is in $[0,1]$. For samples $X_1, X_2, ... X_n$ drawn from a bounded population, the probability that the sample mean is $\epsilon$ far from the population mean is:
+
+$$P(|\bar{X} - \mathbb{E}[X_1]| \geq \epsilon) \leq 2\exp\{-2 n \epsilon^2\} $$
+
+If we would like a 95% confidence interval on the sample mean, then we can set the LHS equal to .05 and rearrange:
+
+\begin{align}
+.05 &\leq 2 \exp\{- 2 n \epsilon^2\}\\ 
+\log(.025) &\leq -2 n \epsilon^2\\
+\frac{\log(.025)}{-2\epsilon^2} &\leq n
+\end{align}
+
+Thus for a 95\% confidence interval with width $\epsilon$ we would need $\frac{\log(.025)}{-2\epsilon^2}$ samples. This is a lot. Below we plot $n$ as a function of $\epsilon$, the desired precision, on the $\log_{10}$ scale.
+
+On the other hand, we could consider the *central limit theorem* and an upper bound on the population variance. Since $X_i \in [0,1]$, we have that $\sigma^2 \leq 1/4$. The central limit theorem gives an asymptotic distribution of the variation of the sample mean from the population mean:
+
+$$\mathbb{P}(|\bar{X} - \mu| > \epsilon) = 2 \bigg (1 - \Phi \big (\frac{\epsilon}{\sigma / \sqrt{n}} \big ) \bigg ) \leq 2 \big (1-\Phi ( 4\epsilon \sqrt{n}) \big )$$
+Therefore if we wish to bound deviations from the mean by $\epsilon$ to occur with probability less than $\alpha$ we can collect $n$ so that:
+
+\begin{align}
+2(1 - \Phi(4 \epsilon \sqrt{n})) &\leq \alpha\\
+&\implies \\
+\Phi(4 \epsilon \sqrt{n}) \geq 1 - \alpha/2\\
+&\implies\\
+n \geq \frac{\Phi^{-1}(1-\alpha/2)^2}{16 \epsilon^2}
+\end{align}
+
+```{r}
+get_n_hoeffding <- function(epsilon, alpha = .05){
+  #compute the hoeffding bound given a level of precision (epsilon) and a level of desired confidence (alpha)
+  n <- log(alpha / 2) / (-2 * epsilon^2) 
+  n
+}
+#population variance is 1/4 in the worst case for pct carbon
+get_n_clt <- function(epsilon, alpha = .05, variance = 1/4){
+  #compute the sample sizes needed using a wald interval
+  n <- (qnorm(1 - alpha/2)^2) / (16 * epsilon^2)
+  n
+}
+
+epsilon_grid <- seq(.01, .1, length.out = 100)
+n_vs_epsilon <- data.frame(n_hoeffding = get_n_hoeffding(epsilon_grid), n_clt = get_n_clt(epsilon_grid), epsilon = epsilon_grid) %>%
+  pivot_longer(cols = c("n_hoeffding","n_clt"))
+
+
+
+ggplot(data = n_vs_epsilon, aes(x = epsilon, y = value, colour = name)) +
+  geom_line() +
+  theme_linedraw() +
+  scale_y_log10() +
+  labs(y = "n", x = "epsilon")
+```
 
 # Measurement
 
@@ -106,19 +173,6 @@ Once samples have been taken, error in the assay itself remains a concern. The S
 
 $$\delta = 100 * \bigg | \frac{x_1 - x_2}{\frac{1}{2}(x_1 + x_2)} \bigg |$$
 
-I add in measurement noise for each point by drawing a random sample from the observed percent differences between the Marin County duplicates, and then adding uniform noise at the scale of the sampled percent difference.
-
-```{r measurement noise}
-abs_diff <- function(x){
-  abs(x[1] - x[2])
-}
-pct_diff <- function(x){
-  2 * 100 * abs((x[1] - x[2]) / (x[1] + x[2]))
-}
-pct_differences <- duplicate_data %>%
-  group_by(sample_name) %>%
-  summarize(N_pct_diff = pct_diff(nitrogen), C_pct_diff = pct_diff(carbon), N_abs_diff = abs_diff(nitrogen), C_abs_diff = abs_diff(carbon), C_mean = mean(carbon), N_mean = mean(nitrogen), C_range = abs(diff(carbon)))
-```
 
 
 
@@ -133,38 +187,4 @@ We first generate 10 plots (5 treatment, 5 control) using the simulation set up 
 
 
 
-```{r type 1 error control}
-#surfaces <- lapply(1:10, simulate_truth)
-#save(surfaces, file = "simulated_surfaces_null")
-load("simulated_surfaces_null")
-treatment <- c(rep(1, 5), rep(0, 5))
-
-#run simulations
-simulation_results <- run_sims(n_sims = 1000, surfaces = surfaces, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment)
-
-avg_estimated_std_error <- mean(simulation_results[,3])
-true_std_error <- sd(simulation_results[,2])
-type_1_error_rate <- mean(simulation_results[,4] < .05)
-rmse <- sqrt(mean(simulation_results[,2])^2 + true_std_error^2)
-hist(simulation_results[,2], xlab = "SOC ATE (% C)", main = "Estimated ATE Distribution", breaks = 30)
-```
-
-When the null hypothesis holds, the type 1 error rate for a transect design with ANOVA is `r round(type_1_error_rate, 3)`, and the root mean squared error (RMSE) is `r round(rmse, 3)`.
-
-```{r power}
-#little function to add to z (the carbon at each site)
-add_treatment_effect <- function(data, effect){
-  data$z <- data$z + effect
-  data
-}
-
-#positive constant treatment effect of .01 (1%) for entire surface
-surfaces_alternative[which(treatment == 1)] <- surfaces[which(treatment == 1)] %>%
-  map(add_treatment_effect, effect = .01)
-
-simulation_results_alternative <- run_sims(n_sims = 1000, surfaces = surfaces_alternative, pct_perturbations = pct_differences$C_pct_diff, treatment = treatment)
-power <- mean(simulation_results_alternative[,4] < .05)
-rmse_alternative <- sqrt(mean(simulation_results_alternative[,2])^2 + var(simulation_results_alternative[,2]))
-```
-
-The power of the transect design with $n = 9$ under the alternative of a 1% additive constant treatment effect is relatively low at `r round(power, 2)`
+# References 
