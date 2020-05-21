@@ -70,7 +70,7 @@ add_depth_samples <- function(surface, increments = 4, decrease = "exponential",
   }
   proportions_matrix <- matrix(proportions, ncol = increments, nrow = length(surface_SOC), byrow = TRUE)
   z_depth <- as.data.frame(surface_SOC * proportions_matrix)
-  colnames(z_depth) <- paste("z", 1:increments, sep = "")
+  colnames(z_depth) <- paste("z", 0:(increments-1), sep = "")
   surface_depth <- surface %>% 
     dplyr::select(x,y) %>%
     bind_cols(z_depth) %>%

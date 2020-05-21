@@ -61,7 +61,9 @@ However, simulating a field of % SOC is not entirely straightforward. In particu
 - Allow for arbitrary correlation between points.
 - Have an adjustable mean and variance.
 
-Points 1 and 3 could be handled naturally using a Beta distribution, but point 2 is trickier. In order to generate a correlated field we will use Gaussian copulas: we take draws on $\mathbb{R}$ from a multivariate Gaussian distribution, and then map them back to $[0,1]$. The correlation structure is fixed by assuming stationarity and employing a particular variogram to define the correlations over distance. This is a standard technique in geostatistics, a model-based approach with applications in soil science (especially local estimation / the mapping of soils). Variograms are widely variable   
+Points 1 and 3 could be handled naturally using a Beta distribution, but point 2 is trickier. In order to generate a correlated field we will use Gaussian copulas: we take draws on $\mathbb{R}$ from a multivariate Gaussian distribution, and then map them back to $[0,1]$. The correlation structure is fixed by assuming stationarity and employing a particular variogram to define the correlations over distance. This is a standard technique in geostatistics, a model-based approach with applications in soil science (especially local estimation / the mapping of soils). 
+
+Of course, variograms must themselves be estimated and variograms for SOC are kind of all over the place. [@paterson_variograms_2018] holds a compendium of variograms estimated from various studies of SOC, the vast majority of which were conducted on cropland. In this compilation, there are no SOC variograms on rangeland, and relatively few in the United States at all. I have decided to set the nugget variance equal to 0.005 and the sill variance equal to 0.02, with a range of 20 units (corresponding at a 10cm scale to 2m). This choice is poorly constrained to the best of my knowledge, but seems reasonable.
 
 The idea here is to simulate the concentration of SOC in the topsoil (the first horizon, if you like) using a Gaussian copula and then extrapolate this to lower depths. In theory and in the field, we can sample anywhere on a plot so that %SOC comes from an infinite population. On a computer, we have a finite amount of memory to store a surface, so we must simulate it to some resolution. I have been using a $250 \times 600$ surface to represent a plot of land for sampling. If we take this as a standard 25m $\times$ 60m plot, we have a resolution of 10cm. We can consider a single point in the initial surface to represent the *average* %SOC in a $10 \times 10 \times 30$ centimeter cube. Note that 10 centimeters is a little bit larger than the diameter of a standard corer (7 cm in [@ryals_impacts_2014]).
 
@@ -70,16 +72,16 @@ source("sim_functions.R")
 
 
 #Variogram input: Paterson et al 2018, "Variograms of soil properties..."
-test_sim <- simulate_truth(size = c(250,600), nugget = .005, sill = .02, range = 20, intercept = .005, y_trend = TRUE, max_mean = .1)
+surface <- simulate_truth(size = c(250,600), nugget = .005, sill = .02, range = 20, intercept = .005, y_trend = TRUE, max_mean = .1)
 
 #marginal histogram
-sim_hist <- ggplot(data = test_sim, aes(z)) +
+sim_hist <- ggplot(data = surface, aes(z)) +
   geom_histogram(bins = 30) +
-  geom_vline(xintercept = mean(test_sim$z), size = 1.2, color = 'blue')
+  geom_vline(xintercept = mean(surface$z), size = 1.2, color = 'blue')
 sim_hist
 
 #surface
-plot_surface(test_sim)
+plot_surface(surface)
 ```
 
 
@@ -87,7 +89,20 @@ plot_surface(test_sim)
 
 The above simulations took place in 2 dimensions. The generated surface can be thought of as the average density of SOC in the topsoil (say the first 0-30cm). For some goals (like enhanced productivity, tilth, water retention, etc) understanding concentrations in the top soil may be enough. For sequestration in particular, deeper soil horizons matter. Thus we must consider additional horizons for realistic simulations. 
 
-A typical field study might sample from 4 depths: for example 0-10, 10-30, 30-50, and 50-100cm [@ryals_impacts_2014]. Evidence suggests that SOC decreases exponentially with depth [@allen_review_2010].
+A typical field study might sample from 4 depths: for example 0-10, 10-30, 30-50, and 50-100cm [@ryals_impacts_2014]. Evidence suggests that SOC decreases exponentially with depth [@allen_review_2010]. 
+
+Let's generically define some number of horizons, say 4, that represent discrete horizons (e.g. as above 0-10,10-30,...) and identify these with indices 0,1,2,3 where 0 is the surface and 3 is the deepest horizon. Let $z(x,y,0)$ be the %SOC at the surface then the %SOC at deeper horizons is generated as: 
+
+$$z(x,y,d) = z(x,y,0) \exp(\gamma d)$$
+
+The parameter $\gamma$ determines how fast %SOC declines with depth (typically $\gamma < 0$ and larger $|\gamma|$ means a faster decline).
+
+
+```{r}
+#as an alternative to exponential decrease one can explicitly specify the dropoff by specifying decrease = "manual" and the proportions argument
+surface_depth <- add_depth_samples(surface = surface, increments = 4, decrease = "exponential", gamma = -1)
+boxplot(z ~ depth, data = surface_depth)
+```
 
 ## Bulk Density
 
@@ -166,6 +181,10 @@ ggplot(data = n_vs_epsilon, aes(x = epsilon, y = value, colour = name)) +
   scale_y_log10() +
   labs(y = "n", x = "epsilon")
 ```
+
+# Compositing
+
+# Sample Preparation
 
 # Measurement
 
