@@ -67,6 +67,23 @@ Of course, variograms must themselves be estimated and variograms for SOC are ki
 
 The idea here is to simulate the concentration of SOC in the topsoil (the first horizon, if you like) using a Gaussian copula and then extrapolate this to lower depths. In theory and in the field, we can sample anywhere on a plot so that %SOC comes from an infinite population. On a computer, we have a finite amount of memory to store a surface, so we must simulate it to some resolution. I have been using a $250 \times 600$ surface to represent a plot of land for sampling. If we take this as a standard 25m $\times$ 60m plot, we have a resolution of 10cm. We can consider a single point in the initial surface to represent the *average* %SOC in a $10 \times 10 \times 30$ centimeter cube. Note that 10 centimeters is a little bit larger than the diameter of a standard corer (7 cm in [@ryals_impacts_2014]).
 
+
+### Notation
+
+To begin we consider %SOC as a two-dimensional surface defined over plots $\mathcal{P} \subset \mathbb{R}^2$, where $\mathbb{R}^2$ is a vector space with the usual Euclidean norm $\|u\| = \sqrt{u_1^2 + u_2^2}$ and inner product $\langle u,v \rangle = u_1v_1 + u_2v_2$. Typically, $\mathcal{P} \equiv [a,b]\times[c,d]$, a rectangular plot. For example in [@ryals_impacts_2014] we have a $25 \times 60$ meter plot so that $|a-b| = 25$ and $|c-d| = 60$. A typical element of $\mathcal{P}$ is an ordered pair $(x,y)$, which denotes the position of a point in the plot. Since we typically will consider a single plot, we can define (0,0) to be the lower left hand corner of the plot, so that points $(x,y)$ are relative to the position of the plot itself in $\mathbb{R}^2$. WLOG, we'll typically also take the orientation of the plot to be such that the $y$ direction indicates North/South (latitude) and the $x$ direction indicates East/West (longitude). For example, $(1,2)$ indicates a point 1 meter to the east and 2 meters to the north of the origin. 
+
+Given any point $(x,y)$ there is an associated concentration of soil carbon (%SOC), which we will denote by $z(x,y)$. Note that %SOC is not truly defined at a precise point $(x,y)$ - there is considerable variance at ever smaller scales: a tiny piece of root may be 100\% carbon, while a patch of sand may be 0\% carbon. $z(x,y)$ is better conceptualized as an average over a small window centered at $(x,y)$. In a design-based framework (as we are considering here), $z(x,y)$ is a fixed, unknown number. Typically the parameter of interest is:
+
+$$\mu \equiv \int_\mathcal{P} z(x,y) d\mathcal{P}  = \int_a^b \int_c^d z(x,y) dy dx$$
+
+This is the "population average" %SOC over the plot $\mathcal{P}$. We wish to estimate $\mu$ using data. In field studies, data take the form of finite samples determined at specific values of $x$ and $y$: $\{z(x_1,y_1), z(x_2, y_2), ... z(x_n, y_n) \}$ often we'll denote the data $\{z_1, z_2, ... z_n\} \equiv \{z_i\}_{i=1}^n$ when the locations themselves are not super important. 
+
+The properties of the data $\{z_i\}_{i=1}^n$ and estimators based on them depend on how the sampling locations $(x_1,y_1),...,(x_n,y_n)$ were chosen. For example, we can easily get an unbiased estimator by simple random sampling, choosing $x_i \sim U[a,b]$ and $y_i \sim U[c,d]$ independently where $U[a,b]$ denotes the uniform distribution on $[a,b]$. Chosen in this way we have an unbiased sample mean:
+
+$$\mathbb{E}\bigg [\frac{1}{n} \sum_{i=1}^n z_i \bigg ] = \mu$$
+
+Other sampling mechanisms (e.g. stratified sampling) can also satisfy unbiasedness and may have lower variance, which is very important since collecting samples is expensive. 
+
 ```{r simulated surface}
 source("sim_functions.R")
 
