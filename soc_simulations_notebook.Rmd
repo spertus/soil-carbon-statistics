@@ -1,7 +1,7 @@
 ---
-title: "Simulating SOC Measurement"
+title: "SOC Measurement"
 author: "Jake Spertus"
-date: "October 31st, 2019"
+date: "May 20th, 2020"
 output: html_notebook
 header_includes:
   -\usepackage{amsmath}
@@ -26,55 +26,15 @@ This notebook serves to describe and implement a simulation to test the procedur
 - Are estimates of SOC likely to center on the truth (bias)?
 - Are estimates of uncertainty (standard errors) reflecting the true degree of uncertainty in the estimates (coverage of confidence intervals / type 1 error rate)? 
 
+# Notation
 
-## Empirical Input: The Marin Data
+### The Surface
 
-Simulations will be based off of samples from Marin County collected by the Silver Lab at UC Berkeley.
-
-```{r duplicate data, message = FALSE}
-duplicate_data <- read_csv("mcp_duplicates.csv")
-#drop samples that were rerun fewer or more than 2 times
-no_dups <- names(which(table(duplicate_data$sample_name) < 2))
-#also drop runs of atropine standards
-duplicate_data <- duplicate_data %>%
-  filter(!(sample_name %in% no_dups)) %>%
-  filter(!(substr(sample_name, 1, 4) %in% c('atro','blan','Blan','dumm','Dumm'))) %>%
-  group_by(sample_name) %>%
-  filter(rank(time) <= 2)
-
-duplicate_data
-```
-
-```{r pct carbon}
-pct_carbon <- duplicate_data$carbon / 100
-hist(pct_carbon, breaks = 30, xlab = "Proportion SOC")
-```
-
-
-## Simulating Percent SOC
-
-As a first step, we simulate a "ground truth" (so to speak), which is a 3-dimensional grid on a rectangular prism that represents SOC concentration (in percent) over the plot of land to be studied. The dimensions are `latitude`, `longitude`, and `depth` (in that order). The scale is in meters. 
-
-However, simulating a field of % SOC is not entirely straightforward. In particular we would like to generate numbers that:
-
-- Are bounded between 0 and 1 (0% and 100% SOC).
-- Allow for arbitrary correlation between points.
-- Have an adjustable mean and variance.
-
-Points 1 and 3 could be handled naturally using a Beta distribution, but point 2 is trickier. In order to generate a correlated field we will use Gaussian copulas: we take draws on $\mathbb{R}$ from a multivariate Gaussian distribution, and then map them back to $[0,1]$. The correlation structure is fixed by assuming stationarity and employing a particular variogram to define the correlations over distance. This is a standard technique in geostatistics, a model-based approach with applications in soil science (especially local estimation / the mapping of soils). 
-
-Of course, variograms must themselves be estimated and variograms for SOC are kind of all over the place. [@paterson_variograms_2018] holds a compendium of variograms estimated from various studies of SOC, the vast majority of which were conducted on cropland. In this compilation, there are no SOC variograms on rangeland, and relatively few in the United States at all. I have decided to set the nugget variance equal to 0.005 and the sill variance equal to 0.02, with a range of 20 units (corresponding at a 10cm scale to 2m). This choice is poorly constrained to the best of my knowledge, but seems reasonable.
-
-The idea here is to simulate the concentration of SOC in the topsoil (the first horizon, if you like) using a Gaussian copula and then extrapolate this to lower depths. In theory and in the field, we can sample anywhere on a plot so that %SOC comes from an infinite population. On a computer, we have a finite amount of memory to store a surface, so we must simulate it to some resolution. I have been using a $250 \times 600$ surface to represent a plot of land for sampling. If we take this as a standard 25m $\times$ 60m plot, we have a resolution of 10cm. We can consider a single point in the initial surface to represent the *average* %SOC in a $10 \times 10 \times 30$ centimeter cube. Note that 10 centimeters is a little bit larger than the diameter of a standard corer (7 cm in [@ryals_impacts_2014]).
-
-
-### Notation
-
-To begin we consider %SOC as a two-dimensional surface defined over plots $\mathcal{P} \subset \mathbb{R}^2$, where $\mathbb{R}^2$ is a vector space with the usual Euclidean norm $\|u\| = \sqrt{u_1^2 + u_2^2}$ and inner product $\langle u,v \rangle = u_1v_1 + u_2v_2$. Typically, $\mathcal{P} \equiv [a,b]\times[c,d]$, a rectangular plot. For example in [@ryals_impacts_2014] we have a $25 \times 60$ meter plot so that $|a-b| = 25$ and $|c-d| = 60$. A typical element of $\mathcal{P}$ is an ordered pair $(x,y)$, which denotes the position of a point in the plot. Since we typically will consider a single plot, we can define (0,0) to be the lower left hand corner of the plot, so that points $(x,y)$ are relative to the position of the plot itself in $\mathbb{R}^2$. WLOG, we'll typically also take the orientation of the plot to be such that the $y$ direction indicates North/South (latitude) and the $x$ direction indicates East/West (longitude). For example, $(1,2)$ indicates a point 1 meter to the east and 2 meters to the north of the origin. 
+To begin we will consider %SOC as a two-dimensional surface defined over plots $\mathcal{P} \subset \mathbb{R}^2$, where $\mathbb{R}^2$ is a vector space with the usual Euclidean norm $\|u\| = \sqrt{u_1^2 + u_2^2}$ and inner product $\langle u,v \rangle = u_1v_1 + u_2v_2$. Typically, $\mathcal{P} \equiv [a,b]\times[c,d]$, a rectangular plot. For example in [@ryals_impacts_2014] we have a $25 \times 60$ meter plot so that $|a-b| = 25$ and $|c-d| = 60$. A typical element of $\mathcal{P}$ is an ordered pair $(x,y)$, which denotes the position of a point in the plot. Since we typically will consider a single plot, we can define (0,0) to be the lower left hand corner of the plot, so that points $(x,y)$ are relative to the position of the plot itself in $\mathbb{R}^2$. WLOG, we'll typically also take the orientation of the plot to be such that the $y$ direction indicates North/South (latitude) and the $x$ direction indicates East/West (longitude). For example, $(1,2)$ indicates a point 1 meter to the east and 2 meters to the north of the origin. 
 
 Given any point $(x,y)$ there is an associated concentration of soil carbon (%SOC), which we will denote by $z(x,y)$. Note that %SOC is not truly defined at a precise point $(x,y)$ - there is considerable variance at ever smaller scales: a tiny piece of root may be 100\% carbon, while a patch of sand may be 0\% carbon. $z(x,y)$ is better conceptualized as an average over a small window centered at $(x,y)$. In a design-based framework (as we are considering here), $z(x,y)$ is a fixed, unknown number. Typically the parameter of interest is:
 
-$$\mu \equiv \int_\mathcal{P} z(x,y) d\mathcal{P}  = \int_a^b \int_c^d z(x,y) dy dx$$
+$$\mu \equiv \int_\mathcal{P} z(x,y) d\mathcal{P}  = \int_a^b \int_c^d z(x,y)~ dy ~dx$$
 
 This is the "population average" %SOC over the plot $\mathcal{P}$. We wish to estimate $\mu$ using data. In field studies, data take the form of finite samples determined at specific values of $x$ and $y$: $\{z(x_1,y_1), z(x_2, y_2), ... z(x_n, y_n) \}$ often we'll denote the data $\{z_1, z_2, ... z_n\} \equiv \{z_i\}_{i=1}^n$ when the locations themselves are not super important. 
 
@@ -83,6 +43,45 @@ The properties of the data $\{z_i\}_{i=1}^n$ and estimators based on them depend
 $$\mathbb{E}\bigg [\frac{1}{n} \sum_{i=1}^n z_i \bigg ] = \mu$$
 
 Other sampling mechanisms (e.g. stratified sampling) can also satisfy unbiasedness and may have lower variance, which is very important since collecting samples is expensive. 
+
+
+### Depth
+
+In reality, %SOC is a defined in 3-dimensions because soil has depth. For sequestration research in particular depth is an important consideration. We will let $d$ denote depth and set $d=0$ to be the soil surface so that it is always defined relatively (as opposed to say, altitude). With depth taken into account, $\mathcal{P} \subset \mathcal{R}^3$ and typically $\mathcal{P} = [a,b] \times [c,d] \times [e,f]$ with $|e - f| = 1$ meter. $z(x,y,d)$ is the %SOC at position $(x,y)$ and depth $d$. The parameter of interest (with apologies for overloading $d$) is:
+
+$$\mu = \int_\mathcal{P} z(x,y,d) d\mathcal{P} = \int_a^b \int_c^d \int_e^f z(x,y,d) ~dd ~dy ~dx$$
+
+A typical sampling design will *not* randomly sample $d \sim U[e,f]$. Typically, $d$ is specified in advance to cover a discrete grid of depths $\mathcal{D} \equiv \{d_1, d_2,...d_m\}$. For example $m = 4$ and  $\mathcal{D} = \{.1, .3, .5, 1.0\}$ meters. Further, there is typically no random sampling in depth. At *every* surface point $(x_i, y_i)$ we gather samples $\{z(x_i, y_i, d_1), z(x_i, y_i, d_2), ..., z(x_i, y_i, d_m)\}$. For brevity we'll denote the sample at position $(x_i, y_i)$ and depth $d_j$ by $z_i(d_j)$. Furthermore, when dealing with the surface $z_i(d_1)$ we will often supress depth completely, simply writing $z_i(d_1) \equiv z_i$
+
+
+
+# Simulation
+
+### The Surface
+
+We start by simulating a two-dimensional surface $\{z(x, y) | (x,y) \in \mathcal{P} \subset \mathbb{R}^2\}$ as random draws from a distrubition, and then add additional depths deterministically.
+
+The function $z(x,y)$ representing %SOC over the plot $\mathcal{P}$ should satisfy a few properties in order to be realistic. At the same time, we want to be able to randomly generate an arbitrarily large number of surfaces. We seek a distribution $\mathcal{F}$ so that $z(x,y,d) \sim \mathcal{F}$ will satisfy these properties. Namely $z(x,y,d)$ should:
+
+- Have a user-specifiable mean and variance.
+- Be bounded between 0 and 1 (0% and 100% SOC).
+- $z(x_i,y_i)$ should be close to $z(x_j, y_j)$ when $(x_i,y_i)$ is close to $(x_j,y_j)$.
+
+Points 1 and 2 could be handled naturally using a Beta distribution, but point 3 is trickier. In order to generate a correlated field we will first generate draws from a multivariate Gaussian with a covariance matrix that makes draws close when points are close (point 3). We will then squash these draws back to the interval $[0,1]$ using the Gaussian CDF $\Phi(\cdot)$. The correlation structure in the Gaussian is fixed by assuming stationarity and employing a particular variogram to define the covariance over distance. This is a standard technique in geostatistics, a model-based approach with applications in soil science (especially local estimation / the mapping of soils). 
+
+
+In symbols we define $\mathcal{P} \subset \mathbb{R}^2$ as a discrete $I \times J$ grid and generate a random length-$(I\cdot J)$ vector $\boldsymbol{\zeta} \sim \mathcal{N}_{I\cdot J}(\theta, \Sigma)$. Then $Z(x_i, y_j) \equiv \Phi(\zeta_{i\cdot j})$. The nature of realizations $z(x_i, y_j)$ depend on the parameters $\theta$ and $\Sigma$. 
+
+- $\theta$ determines where realizations will be centered. For example we may have 3\% SOC on average in a rangeland plot, giving $\theta = \Phi^{-1}(.03) \approx -1.9$. $\theta$ can also exhibit a trend in $(x_i, y_j)$. In this case we will write $\theta(x_i,y_j)$. If there is a linear trend we might write $\theta(x_i,y_j) \equiv \beta_0 + \beta_x x_i + \beta_y y_j$. This might happen if the plot lies on a slope, for example, wherein ridges tend to have less carbon than valleys. 
+- $\Sigma$ determines the variability of $z(x_i, y_j)$ and how similar close points are to each other. 
+
+
+
+Of course, variograms must themselves be estimated and variograms for SOC are kind of all over the place. [@paterson_variograms_2018] holds a compendium of variograms estimated from various studies of SOC, the vast majority of which were conducted on cropland. In this compilation, there are no SOC variograms on rangeland, and relatively few in the United States at all. I have decided to set the nugget variance equal to 0.005 and the sill variance equal to 0.02, with a range of 20 units (corresponding at a 10cm scale to 2m). This choice is poorly constrained to the best of my knowledge, but seems reasonable.
+
+The idea here is to simulate the concentration of SOC in the topsoil (the first horizon, if you like) using a Gaussian copula and then extrapolate this to lower depths. In theory and in the field, we can sample anywhere on a plot so that %SOC comes from an infinite population. On a computer, we have a finite amount of memory to store a surface, so we must simulate it to some resolution. I have been using a $250 \times 600$ surface to represent a plot of land for sampling. If we take this as a standard 25m $\times$ 60m plot, we have a resolution of 10cm. We can consider a single point in the initial surface to represent the *average* %SOC in a $10 \times 10 \times 30$ centimeter cube. Note that 10 centimeters is a little bit larger than the diameter of a standard corer (7 cm in [@ryals_impacts_2014]).
+
+
 
 ```{r simulated surface}
 source("sim_functions.R")
@@ -102,7 +101,7 @@ plot_surface(surface)
 ```
 
 
-## Depth
+## Simulating depth
 
 The above simulations took place in 2 dimensions. The generated surface can be thought of as the average density of SOC in the topsoil (say the first 0-30cm). For some goals (like enhanced productivity, tilth, water retention, etc) understanding concentrations in the top soil may be enough. For sequestration in particular, deeper soil horizons matter. Thus we must consider additional horizons for realistic simulations. 
 
@@ -121,17 +120,7 @@ surface_depth <- add_depth_samples(surface = surface, increments = 4, decrease =
 boxplot(z ~ depth, data = surface_depth)
 ```
 
-## Bulk Density
 
-
-<!---
-The total Carbon in a plot of land, in Megagrams Carbon per hectare (Mg C / ha), is computed from both the percent carbon and the bulk density (a measure of the density of the soil). The bulk density is itself difficult to sample and compute. For the time being we will treat this as fixed and known. From the Silver lab report for California's Fourth Climate Change Assessment, average bulk density across a number of Californian sites was about 1.2 grams per cubic centimeter (g / cm$^3$), which is the number I will use.
-
-Typical carbon stocks: 
-
-- 53 Mg C / ha observed in the Sierra foothills, as observed in [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X). In the [CCA4 report](https://www.energy.ca.gov/sites/default/files/2019-07/Agriculture_CCCA4-CNRA-2018-002.pdf)
-- The Silver lab reported stocks of 11 to 108 Mg C / ha across a range of sites in California, with a mean stock of 27 Mg C / ha.
-!--->
 
 
 # Sampling 
@@ -201,6 +190,10 @@ ggplot(data = n_vs_epsilon, aes(x = epsilon, y = value, colour = name)) +
 
 # Compositing
 
+Not every sample taken is measured for %SOC. Instead, soils are thoroughly blended together into a *composite* sample, which is then measured. The idea is to avoid the (heavy) labor costs of measurement, allowing more samples to be taken per plot. Theoretically, we could just composite $n$ soil samples down to 1 sample and measure it 1 time, yielding the sample mean we would get if we had measured all $n$ samples. In practice, this is a problem because of measurement error. We must measure at least a few times in order to get a good estimate of $\mu$ and the variance in the measurement error (if there is bias in measurement we may be out of luck; more on this below).  
+
+In symbols, we take samples $\{z_1,...z_n\}$ 
+
 # Sample Preparation
 
 # Measurement
@@ -211,16 +204,41 @@ $$\delta = 100 * \bigg | \frac{x_1 - x_2}{\frac{1}{2}(x_1 + x_2)} \bigg |$$
 
 
 
-
-# Analysis 
-
-According to [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X), the carbon stock in a plot is computed by averaging the samples and then multiplying by the bulk density measurement. These averages are then treated as fixed and analyzed with ANOVA for final inference about treatment effects. 
+# Bulk Density
 
 
-# Simulations 
+<!---
+The total Carbon in a plot of land, in Megagrams Carbon per hectare (Mg C / ha), is computed from both the percent carbon and the bulk density (a measure of the density of the soil). The bulk density is itself difficult to sample and compute. For the time being we will treat this as fixed and known. From the Silver lab report for California's Fourth Climate Change Assessment, average bulk density across a number of Californian sites was about 1.2 grams per cubic centimeter (g / cm$^3$), which is the number I will use.
 
-We first generate 10 plots (5 treatment, 5 control) using the simulation set up above. We first run simulations to test the type 1 error control when the sharp null hypothesis of no treatment effect for any units holds. In this setting all surfaces are generated in exactly the same way so that the true treatment effect is 0. We then check the power when the null hypothesis is wrong and there is a treatment effect. The specific alternative we consider is when there is an additive effect of 1% additional carbon across the entire plot.
+Typical carbon stocks: 
 
+- 53 Mg C / ha observed in the Sierra foothills, as observed in [Ryals et al 2014](https://www.sciencedirect.com/science/article/abs/pii/S003807171300312X). In the [CCA4 report](https://www.energy.ca.gov/sites/default/files/2019-07/Agriculture_CCCA4-CNRA-2018-002.pdf)
+- The Silver lab reported stocks of 11 to 108 Mg C / ha across a range of sites in California, with a mean stock of 27 Mg C / ha.
+!--->
+
+
+## Empirical Input: The Marin Data
+
+Simulations will be based off of samples from Marin County collected by the Silver Lab at UC Berkeley.
+
+```{r duplicate data, message = FALSE}
+duplicate_data <- read_csv("mcp_duplicates.csv")
+#drop samples that were rerun fewer or more than 2 times
+no_dups <- names(which(table(duplicate_data$sample_name) < 2))
+#also drop runs of atropine standards
+duplicate_data <- duplicate_data %>%
+  filter(!(sample_name %in% no_dups)) %>%
+  filter(!(substr(sample_name, 1, 4) %in% c('atro','blan','Blan','dumm','Dumm'))) %>%
+  group_by(sample_name) %>%
+  filter(rank(time) <= 2)
+
+duplicate_data
+```
+
+```{r pct carbon}
+pct_carbon <- duplicate_data$carbon / 100
+hist(pct_carbon, breaks = 30, xlab = "Proportion SOC")
+```
 
 
 # References 

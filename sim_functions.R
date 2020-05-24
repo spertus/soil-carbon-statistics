@@ -119,7 +119,27 @@ collect_sample <- function(surface, design = "transect", n_samp = 9){
 }
 
 
-
+########### function to composite samples #############
+composite_samples <- function(samples, k = 5){
+  #this function reduces a set of samples to a smaller set wherein each element is the average over groups of the original sample
+  #assumes perfect mixing and equal weights of composited material
+  #groupings are determined by samples, with n/k samples in each group (except for possibly the last, see below)
+  #if (length(samples) %% k) != 0, then the last group will accomodate all the additional samples
+  #input:
+    #samples: a length-n vector of samples from the plot
+    #k: the number of samples we want out ("composite from n down to k")
+  #output: the composite samples. a named vector of length k, names give number of composites in each group (last group may have more and this needs to be accounted for).
+  
+  index <- rep(1:k, each = floor(length(samples)/k))
+  
+  if((length(samples)) %% k != 0){
+    warning("n is not divisible by k! Remainder is composited with the last group.")
+    index <- c(index, rep(k, times = (length(samples) %% k)))
+  }
+  composites <- tapply(X = samples, INDEX = index, FUN = mean)
+  names(composites) <- table(index)
+  composites
+}
 
 
 ########### function to perturb measurements of samples ##########
