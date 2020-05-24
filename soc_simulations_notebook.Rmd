@@ -192,9 +192,42 @@ ggplot(data = n_vs_epsilon, aes(x = epsilon, y = value, colour = name)) +
 
 Not every sample taken is measured for %SOC. Instead, soils are thoroughly blended together into a *composite* sample, which is then measured. The idea is to avoid the (heavy) labor costs of measurement, allowing more samples to be taken per plot. Theoretically, we could just composite $n$ soil samples down to 1 sample and measure it 1 time, yielding the sample mean we would get if we had measured all $n$ samples. In practice, this is a problem because of measurement error. We must measure at least a few times in order to get a good estimate of $\mu$ and the variance in the measurement error (if there is bias in measurement we may be out of luck; more on this below).  
 
-In symbols, we take samples $\{z_1,...z_n\}$ 
+
+Given samples $\{z_1,...z_n\}$ we bin them into $k$ groups of size $n/k$ (ideally $k$ should be a factor of $n$). The samples in each group are then physically mixed together to form composite samples $\{s_1, ... s_k\}$. Let $\{c_1,...,c_k\}$ be a set of sets, where each $c_i = \{c_{i1}, c_{i2},..., c_{i (n/k)}\}$ are the indices of the constituent samples of $s_i$. We assume that samples are mixed in equal proportions (*equal proportions compositing*), so that $s_i = \sum_{j \in c_i} \frac{k}{n} z_j$. Although we won't deal with it here, it is possible to get properties of composite samples that have been mixed without equal proportions of the constituent samples and an unbiased estimator with known variance can be recovered [@patil_composite_2011]. Crucially, the scientist still must know the proportions each soil was mixed in. A concern then is haphazardly compositing samples in the field. Compositing should be precise and mixing should be thorough. Additivity is another important assumption we've made, and is generally needed for valid compositing: the amount of SOC in the composited sample should equal the sum of the amount in the constituent samples. This assumption is met for SOC, but may be violated for other soil attributes, for example pH [@allen_review_2010]. 
+
+Under equal proportions compositing the sample mean of the composite samples is an unbiased estimate of $\mu$:
+
+$$\mathbb{E}\bigg [\frac{1}{k} \sum_{i=1}^k s_i  \bigg ] = \mathbb{E}\bigg [\frac{1}{k} \sum_{i=1}^k \sum_{j \in c_i} \frac{k}{n} z_j \bigg ] = \mathbb{E}\bigg [\frac{1}{n} \sum_{i=1}^n z_i  \bigg ] = \mu$$
+Furthermore, because the sample mean of the composite samples is equivalent to the sample mean of the constiutents, it's variance is also 
+
+$$\mathbb{V}\bigg[ \frac{1}{k} \sum_{i=1}^k s_i \bigg ] = \mathbb{V}\bigg [\frac{1}{n} \sum_{i=1}^n z_i \bigg ] = \frac{\sigma^2}{n}$$
+where $\sigma^2$ is the population variance, i.e. the variance of $\{z(x,y) \mid (x,y) \in \mathcal{P} \}$. 
+
+The subtly and potential pitfalls of compositing arise in the presence of measurement error, which we now discuss.
+
+
 
 # Sample Preparation
+
+SOC is typically analyzed in a lab, and there are considerable degrees of freedom in how samples are prepared for measurement once there. Labs adopt internal protocols to help eliminate these degrees of freedom, and there exist national and international standards to diminish variation between labs (e.g. [ISO](https://www.iso.org/standard/18782.html), [@burt_kellogg_2014]). Also, the costs of sample preparation comprise (along with measurement) a major bottleneck in field research, limiting the number of samples that can be analyzed.  
+
+The Silver Lab uses a lab protocol like:
+
+1) Collect soil cores.
+2) Air dry samples
+3) Sieve using a 2mm mesh screen
+4) Pick roots 
+5) Pulverize using a SPEX ball grinder
+6) Check for carbonates with HCl
+7) Measure using a Carbo Elantech elemental analyzer (dry combustion)
+
+These steps help ensure that samples are free of water and homogenous. Especially if compositing has been done thorough mixing of equal proportion composites is essential. Steps 3 and 5 are instrumental to this. Dry combustion in an elemental analyzer is the gold standard for measurement of SOC. However, in the high heat of an elemental analyzer carbonates (an inorganic form of carbon) can be oxidized to CO$_2$ and appear as organic carbon. Thus, the application of HCl reveals the presence of carbonates which can throw off SOC measurement. 
+
+Root picking is a potential source of bias in the laboratory. Roots are a major source of SOC but are not considered part of the soil matrix and so are picked out by some labs (e.g. the Silver lab). Root picking is done by humans and highly variable: some people may be very scrupulous and others may not be (anecdotally, I have heard this said in a lab). Especially in an experimental setting, giving one or multiple treatment plots to a scrupulous root picker and the control plots to a less scrupulous root picker could heavily bias treatment effect estimates.
+
+I am not yet sure how to account for and/or model root picking in a software environment.
+
+
 
 # Measurement
 
