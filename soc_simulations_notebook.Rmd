@@ -133,68 +133,53 @@ For our purposes, key features of Silver lab sampling are:
 - Soils are collected using a 7 cm corer, at 4 depths: 0-10 cm, 10-30 cm, 30-50 cm, and 50-100 cm.
 
 
-## Upper bounds for simple random sampling
-
-We can use the *Hoeffding bound* to construct a finite sample confidence interval on the percent carbon estimated using simple random sampling. This bound is finite-sample valid and does not rely on any other assumptions other than the fact that percent carbon is in $[0,1]$. For samples $X_1, X_2, ... X_n$ drawn from a bounded population, the probability that the sample mean is $\epsilon$ far from the population mean is:
-
-$$P(|\bar{X} - \mathbb{E}[X_1]| \geq \epsilon) \leq 2\exp\{-2 n \epsilon^2\} $$
-
-If we would like a 95% confidence interval on the sample mean, then we can set the LHS equal to .05 and rearrange:
-
-\begin{align}
-.05 &\leq 2 \exp\{- 2 n \epsilon^2\}\\ 
-\log(.025) &\leq -2 n \epsilon^2\\
-\frac{\log(.025)}{-2\epsilon^2} &\leq n
-\end{align}
-
-Thus for a 95\% confidence interval with width $\epsilon$ we would need $\frac{\log(.025)}{-2\epsilon^2}$ samples. This is a lot. Below we plot $n$ as a function of $\epsilon$, the desired precision, on the $\log_{10}$ scale.
-
-On the other hand, we could consider the *central limit theorem* and an upper bound on the population variance. Since $X_i \in [0,1]$, we have that $\sigma^2 \leq 1/4$. The central limit theorem gives an asymptotic distribution of the variation of the sample mean from the population mean:
-
-$$\mathbb{P}(|\bar{X} - \mu| > \epsilon) = 2 \bigg (1 - \Phi \big (\frac{\epsilon}{\sigma / \sqrt{n}} \big ) \bigg ) \leq 2 \big (1-\Phi ( 4\epsilon \sqrt{n}) \big )$$
-Therefore if we wish to bound deviations from the mean by $\epsilon$ to occur with probability less than $\alpha$ we can collect $n$ so that:
-
-\begin{align}
-2(1 - \Phi(4 \epsilon \sqrt{n})) &\leq \alpha\\
-&\implies \\
-\Phi(4 \epsilon \sqrt{n}) \geq 1 - \alpha/2\\
-&\implies\\
-n \geq \frac{\Phi^{-1}(1-\alpha/2)^2}{16 \epsilon^2}
-\end{align}
-
-```{r}
-get_n_hoeffding <- function(epsilon, alpha = .05){
-  #compute the hoeffding bound given a level of precision (epsilon) and a level of desired confidence (alpha)
-  n <- log(alpha / 2) / (-2 * epsilon^2) 
-  n
-}
-#population variance is 1/4 in the worst case for pct carbon
-get_n_clt <- function(epsilon, alpha = .05, variance = 1/4){
-  #compute the sample sizes needed using a wald interval
-  n <- (qnorm(1 - alpha/2)^2) / (16 * epsilon^2)
-  n
-}
-
-epsilon_grid <- seq(.01, .1, length.out = 100)
-n_vs_epsilon <- data.frame(n_hoeffding = get_n_hoeffding(epsilon_grid), n_clt = get_n_clt(epsilon_grid), epsilon = epsilon_grid) %>%
-  pivot_longer(cols = c("n_hoeffding","n_clt"))
-
-
-
-ggplot(data = n_vs_epsilon, aes(x = epsilon, y = value, colour = name)) +
-  geom_line() +
-  theme_linedraw() +
-  scale_y_log10() +
-  labs(y = "n", x = "epsilon")
-```
-
 # Compositing
 
 Not every sample taken is measured for %SOC. Instead, soils are thoroughly blended together into a *composite* sample, which is then measured. The idea is to avoid the (heavy) labor costs of measurement, allowing more samples to be taken per plot. Theoretically, we could just composite $n$ soil samples down to 1 sample and measure it 1 time, yielding the sample mean we would get if we had measured all $n$ samples. In practice, this is a problem because of measurement error. We must measure at least a few times in order to get a good estimate of $\mu$ and the variance in the measurement error (if there is bias in measurement we may be out of luck; more on this below).  
 
-In symbols, we take samples $\{z_1,...z_n\}$ 
+
+Given samples $\{z_1,...z_n\}$ we bin them into $k$ groups of size $n/k$ (ideally $k$ should be a factor of $n$). The samples in each group are then physically mixed together to form composite samples $\{s_1, ... s_k\}$. Let $\{c_1,...,c_k\}$ be a set of sets, where each $c_i = \{c_{i1}, c_{i2},..., c_{i (n/k)}\}$ are the indices of the constituent samples of $s_i$. We assume that samples are mixed in equal proportions (*equal proportions compositing*), so that $s_i = \sum_{j \in c_i} \frac{k}{n} z_j$. Although we won't deal with it here, it is possible to get properties of composite samples that have been mixed without equal proportions of the constituent samples and an unbiased estimator with known variance can be recovered [@patil_composite_2011]. Crucially, the scientist still must know the proportions each soil was mixed in. A concern then is haphazardly compositing samples in the field. Compositing should be precise and mixing should be thorough. Additivity is another important assumption we've made, and is generally needed for valid compositing: the amount of SOC in the composited sample should equal the sum of the amount in the constituent samples. This assumption is met for SOC, but may be violated for other soil attributes, for example pH [@allen_review_2010]. 
+
+Under equal proportions compositing the sample mean of the composite samples is an unbiased estimate of $\mu$:
+
+$$\mathbb{E}\bigg [\frac{1}{k} \sum_{i=1}^k s_i  \bigg ] = \mathbb{E}\bigg [\frac{1}{k} \sum_{i=1}^k \sum_{j \in c_i} \frac{k}{n} z_j \bigg ] = \mathbb{E}\bigg [\frac{1}{n} \sum_{i=1}^n z_i  \bigg ] = \mu$$
+Furthermore, because the sample mean of the composite samples is equivalent to the sample mean of the constiutents, it's variance is also 
+
+$$\mathbb{V}\bigg[ \frac{1}{k} \sum_{i=1}^k s_i \bigg ] = \mathbb{V}\bigg [\frac{1}{n} \sum_{i=1}^n z_i \bigg ] = \frac{\sigma^2}{n}$$
+where $\sigma^2$ is the population variance, i.e. the variance of $\{z(x,y) \mid (x,y) \in \mathcal{P} \}$. 
+
+Why not always composite down to one sample and measure once? There are two reasons:
+
+- There is measurement error that is only 0 in expectation (hopefully).
+- For inference we must have an estimate of the population variance.
+
+The first point could be addressed by compositing to 1 sample and measuring it some number of times -- say, 10 -- depending on how large the measurement error is. More on that below. 
+
+The second point is non-negotiable. We need multiple replicates of samples in order to estimate the variance of our sample mean: $\hat{\mathbb{V}}[\frac{1}{n} \sum_{i=1}^n z_i] = \frac{\hat{\sigma}^2}{n}$. With only one measured sample $\hat{\sigma}^2$ is not estimable.
+
+
 
 # Sample Preparation
+
+SOC is typically analyzed in a lab, and there are considerable degrees of freedom in how samples are prepared for measurement once there. Labs adopt internal protocols to help eliminate these degrees of freedom, and there exist national and international standards to diminish variation between labs (e.g. [ISO](https://www.iso.org/standard/18782.html), [@burt_kellogg_2014]). Also, the costs of sample preparation comprise (along with measurement) a major bottleneck in field research, limiting the number of samples that can be analyzed.  
+
+The Silver Lab uses a lab protocol like:
+
+1) Collect soil cores.
+2) Air dry samples
+3) Sieve using a 2mm mesh screen
+4) Pick roots 
+5) Pulverize using a SPEX ball grinder
+6) Check for carbonates with HCl
+7) Measure using a Carbo Elantech elemental analyzer (dry combustion)
+
+These steps help ensure that samples are free of water and homogenous. Especially if compositing has been done thorough mixing of equal proportion composites is essential. Steps 3 and 5 are instrumental to this. Dry combustion in an elemental analyzer is the gold standard for measurement of SOC. However, in the high heat of an elemental analyzer carbonates (an inorganic form of carbon) can be oxidized to CO$_2$ and appear as organic carbon. Thus, the application of HCl reveals the presence of carbonates which can throw off SOC measurement. 
+
+Root picking is a potential source of bias in the laboratory. Roots are a major source of SOC but are not considered part of the soil matrix and so are picked out by some labs (e.g. the Silver lab). Root picking is done by humans and highly variable: some people may be very scrupulous and others may not be (anecdotally, I have heard this said in a lab). Especially in an experimental setting, giving one or multiple treatment plots to a scrupulous root picker and the control plots to a less scrupulous root picker could heavily bias treatment effect estimates.
+
+I am not yet sure how to account for and/or model root picking in a software environment.
+
+
 
 # Measurement
 
@@ -217,7 +202,10 @@ Typical carbon stocks:
 !--->
 
 
-## Empirical Input: The Marin Data
+# Empirical Inputs:
+
+
+### The Marin Data
 
 Simulations will be based off of samples from Marin County collected by the Silver Lab at UC Berkeley.
 
@@ -239,6 +227,16 @@ duplicate_data
 pct_carbon <- duplicate_data$carbon / 100
 hist(pct_carbon, breaks = 30, xlab = "Proportion SOC")
 ```
+
+
+### Maillard's study
+
+A literature search study by Emilie Maillard gave the following measures of location and scale of SOC distributions in grasslands around the world [@maillard_increased_2017]:
+
+- SOC stocks had a range of 4 to 1275 Mg C ha^{-1} with a mean of 65 Mg C ha^{-1}
+- Coefficient of variation ranged from 0.5 to 89\% with a mean of 22\%
+- According to a regression analysis, variation is explainable (somewhat) by the scale of experiments and the depth of samples. Variation increases with depth and with the scale of the area under study. 
+
 
 
 # References 
