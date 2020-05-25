@@ -133,61 +133,6 @@ For our purposes, key features of Silver lab sampling are:
 - Soils are collected using a 7 cm corer, at 4 depths: 0-10 cm, 10-30 cm, 30-50 cm, and 50-100 cm.
 
 
-## Upper bounds for simple random sampling
-
-We can use the *Hoeffding bound* to construct a finite sample confidence interval on the percent carbon estimated using simple random sampling. This bound is finite-sample valid and does not rely on any other assumptions other than the fact that percent carbon is in $[0,1]$. For samples $X_1, X_2, ... X_n$ drawn from a bounded population, the probability that the sample mean is $\epsilon$ far from the population mean is:
-
-$$P(|\bar{X} - \mathbb{E}[X_1]| \geq \epsilon) \leq 2\exp\{-2 n \epsilon^2\} $$
-
-If we would like a 95% confidence interval on the sample mean, then we can set the LHS equal to .05 and rearrange:
-
-\begin{align}
-.05 &\leq 2 \exp\{- 2 n \epsilon^2\}\\ 
-\log(.025) &\leq -2 n \epsilon^2\\
-\frac{\log(.025)}{-2\epsilon^2} &\leq n
-\end{align}
-
-Thus for a 95\% confidence interval with width $\epsilon$ we would need $\frac{\log(.025)}{-2\epsilon^2}$ samples. This is a lot. Below we plot $n$ as a function of $\epsilon$, the desired precision, on the $\log_{10}$ scale.
-
-On the other hand, we could consider the *central limit theorem* and an upper bound on the population variance. Since $X_i \in [0,1]$, we have that $\sigma^2 \leq 1/4$. The central limit theorem gives an asymptotic distribution of the variation of the sample mean from the population mean:
-
-$$\mathbb{P}(|\bar{X} - \mu| > \epsilon) = 2 \bigg (1 - \Phi \big (\frac{\epsilon}{\sigma / \sqrt{n}} \big ) \bigg ) \leq 2 \big (1-\Phi ( 4\epsilon \sqrt{n}) \big )$$
-Therefore if we wish to bound deviations from the mean by $\epsilon$ to occur with probability less than $\alpha$ we can collect $n$ so that:
-
-\begin{align}
-2(1 - \Phi(4 \epsilon \sqrt{n})) &\leq \alpha\\
-&\implies \\
-\Phi(4 \epsilon \sqrt{n}) \geq 1 - \alpha/2\\
-&\implies\\
-n \geq \frac{\Phi^{-1}(1-\alpha/2)^2}{16 \epsilon^2}
-\end{align}
-
-```{r}
-get_n_hoeffding <- function(epsilon, alpha = .05){
-  #compute the hoeffding bound given a level of precision (epsilon) and a level of desired confidence (alpha)
-  n <- log(alpha / 2) / (-2 * epsilon^2) 
-  n
-}
-#population variance is 1/4 in the worst case for pct carbon
-get_n_clt <- function(epsilon, alpha = .05, variance = 1/4){
-  #compute the sample sizes needed using a wald interval
-  n <- (qnorm(1 - alpha/2)^2) / (16 * epsilon^2)
-  n
-}
-
-epsilon_grid <- seq(.01, .1, length.out = 100)
-n_vs_epsilon <- data.frame(n_hoeffding = get_n_hoeffding(epsilon_grid), n_clt = get_n_clt(epsilon_grid), epsilon = epsilon_grid) %>%
-  pivot_longer(cols = c("n_hoeffding","n_clt"))
-
-
-
-ggplot(data = n_vs_epsilon, aes(x = epsilon, y = value, colour = name)) +
-  geom_line() +
-  theme_linedraw() +
-  scale_y_log10() +
-  labs(y = "n", x = "epsilon")
-```
-
 # Compositing
 
 Not every sample taken is measured for %SOC. Instead, soils are thoroughly blended together into a *composite* sample, which is then measured. The idea is to avoid the (heavy) labor costs of measurement, allowing more samples to be taken per plot. Theoretically, we could just composite $n$ soil samples down to 1 sample and measure it 1 time, yielding the sample mean we would get if we had measured all $n$ samples. In practice, this is a problem because of measurement error. We must measure at least a few times in order to get a good estimate of $\mu$ and the variance in the measurement error (if there is bias in measurement we may be out of luck; more on this below).  
@@ -203,7 +148,14 @@ Furthermore, because the sample mean of the composite samples is equivalent to t
 $$\mathbb{V}\bigg[ \frac{1}{k} \sum_{i=1}^k s_i \bigg ] = \mathbb{V}\bigg [\frac{1}{n} \sum_{i=1}^n z_i \bigg ] = \frac{\sigma^2}{n}$$
 where $\sigma^2$ is the population variance, i.e. the variance of $\{z(x,y) \mid (x,y) \in \mathcal{P} \}$. 
 
-The subtly and potential pitfalls of compositing arise in the presence of measurement error, which we now discuss.
+Why not always composite down to one sample and measure once? There are two reasons:
+
+- There is measurement error that is only 0 in expectation (hopefully).
+- For inference we must have an estimate of the population variance.
+
+The first point could be addressed by compositing to 1 sample and measuring it some number of times -- say, 10 -- depending on how large the measurement error is. More on that below. 
+
+The second point is non-negotiable. We need multiple replicates of samples in order to estimate the variance of our sample mean: $\hat{\mathbb{V}}[\frac{1}{n} \sum_{i=1}^n z_i] = \frac{\hat{\sigma}^2}{n}$. With only one measured sample $\hat{\sigma}^2$ is not estimable.
 
 
 
@@ -250,7 +202,10 @@ Typical carbon stocks:
 !--->
 
 
-## Empirical Input: The Marin Data
+# Empirical Inputs:
+
+
+### The Marin Data
 
 Simulations will be based off of samples from Marin County collected by the Silver Lab at UC Berkeley.
 
@@ -272,6 +227,16 @@ duplicate_data
 pct_carbon <- duplicate_data$carbon / 100
 hist(pct_carbon, breaks = 30, xlab = "Proportion SOC")
 ```
+
+
+### Maillard's study
+
+A literature search study by Emilie Maillard gave the following measures of location and scale of SOC distributions in grasslands around the world [@maillard_increased_2017]:
+
+- SOC stocks had a range of 4 to 1275 Mg C ha^{-1} with a mean of 65 Mg C ha^{-1}
+- Coefficient of variation ranged from 0.5 to 89\% with a mean of 22\%
+- According to a regression analysis, variation is explainable (somewhat) by the scale of experiments and the depth of samples. Variation increases with depth and with the scale of the area under study. 
+
 
 
 # References 

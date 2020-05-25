@@ -1,0 +1,86 @@
+---
+title: "Sampling Bounds"
+author: "Jake Spertus"
+output: html_notebook
+---
+```{r knitr setup, message = FALSE, warning = FALSE, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+```
+
+
+Soil organic carbon (SOC) in field studies is often determined by taking samples (cores) from a plot. The surface layer (0-30cm as recommended by the IPCC and FAO) is the required depth for samples, but they may (and should) be taken from deeper as well. Here I catalog some simple bounds on the estimation of the mean SOC concentration (% SOC). Ultimately, the estimand is not the mean %SOC but rather the SOC per unit land (typically tons of SOC per hectare (Mg C h$^{-1}$)), which requires a bulk density estimate, which we won't deal with here.
+
+# Simple random sampling
+
+## Hoeffding Bound
+
+
+We can use the *Hoeffding bound* to construct a finite sample confidence interval on the percent carbon estimated using simple random sampling. This bound is finite-sample valid and does not rely on any other assumptions other than the fact that percent carbon is in $[0,1]$. For samples $X_1, X_2, ... X_n$ drawn from a bounded population, the probability that the sample mean is $\epsilon$ far from the population mean is:
+
+$$P(|\bar{X} - \mathbb{E}[X_1]| \geq \epsilon) \leq 2\exp\{-2 n \epsilon^2\} $$
+
+If we would like a 95% confidence interval on the sample mean, then we can set the LHS equal to .05 and rearrange:
+
+\begin{align}
+.05 &\leq 2 \exp\{- 2 n \epsilon^2\}\\ 
+\log(.025) &\leq -2 n \epsilon^2\\
+\frac{\log(.025)}{-2\epsilon^2} &\leq n
+\end{align}
+
+Thus for a 95\% confidence interval with width $\epsilon$ we would need $\frac{\log(.025)}{-2\epsilon^2}$ samples. This is a lot. Below we plot $n$ as a function of $\epsilon$, the desired precision, on the $\log_{10}$ scale.
+
+
+
+```{r}
+get_n_hoeffding <- function(epsilon, alpha = .05){
+  #compute the hoeffding bound given a level of precision (epsilon) and a level of desired confidence (alpha)
+  n <- log(alpha / 2) / (-2 * epsilon^2) 
+  n
+}
+```
+
+
+
+
+
+## Central Limit Theorem Bound
+
+On the other hand, we could consider the *central limit theorem* and an upper bound on the population variance. Since $X_i \in [0,1]$, we have that $\sigma^2 \leq 1/4$. The central limit theorem gives an asymptotic distribution of the variation of the sample mean from the population mean:
+
+$$\mathbb{P}(|\bar{X} - \mu| > \epsilon) = 2 \bigg (1 - \Phi \big (\frac{\epsilon}{\sigma / \sqrt{n}} \big ) \bigg ) \leq 2 \big (1-\Phi ( 4\epsilon \sqrt{n}) \big )$$
+Therefore if we wish to bound deviations from the mean by $\epsilon$ to occur with probability less than $\alpha$ we can collect $n$ so that:
+
+\begin{align}
+2(1 - \Phi(4 \epsilon \sqrt{n})) &\leq \alpha\\
+&\implies \\
+\Phi(4 \epsilon \sqrt{n}) \geq 1 - \alpha/2\\
+&\implies\\
+n \geq \frac{\Phi^{-1}(1-\alpha/2)^2}{16 \epsilon^2}
+\end{align}
+
+```{r}
+#population variance is 1/4 in the worst case for pct carbon
+get_n_clt <- function(epsilon, alpha = .05, variance = 1/4){
+  #compute the sample sizes needed using a wald interval
+  n <- (qnorm(1 - alpha/2)^2) / (16 * epsilon^2)
+  n
+}
+```
+
+
+## Comparing Bounds
+
+```{r}
+epsilon_grid <- seq(.01, .1, length.out = 100)
+n_vs_epsilon <- data.frame(n_hoeffding = get_n_hoeffding(epsilon_grid), n_clt = get_n_clt(epsilon_grid), epsilon = epsilon_grid) %>%
+  pivot_longer(cols = c("n_hoeffding","n_clt"))
+
+
+
+ggplot(data = n_vs_epsilon, aes(x = epsilon, y = value, colour = name)) +
+  geom_line() +
+  theme_linedraw() +
+  scale_y_log10() +
+  labs(y = "n", x = "epsilon")
+```
