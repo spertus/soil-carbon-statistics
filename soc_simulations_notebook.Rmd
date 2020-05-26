@@ -6,6 +6,8 @@ output: html_notebook
 header_includes:
   -\usepackage{amsmath}
   -\usepackage{amsfonts}
+  -\usepackage{color}
+  -\newcommand{\indep}{\perp \!\!\! \perp}
 bibliography: soilcarbonstatistics.bib
 ---
 
@@ -73,7 +75,7 @@ Points 1 and 2 could be handled naturally using a Beta distribution, but point 3
 In symbols we define $\mathcal{P} \subset \mathbb{R}^2$ as a discrete $I \times J$ grid and generate a random length-$(I\cdot J)$ vector $\boldsymbol{\zeta} \sim \mathcal{N}_{I\cdot J}(\theta, \Sigma)$. Then $Z(x_i, y_j) \equiv \Phi(\zeta_{i\cdot j})$. The nature of realizations $z(x_i, y_j)$ depend on the parameters $\theta$ and $\Sigma$. 
 
 - $\theta$ determines where realizations will be centered. For example we may have 3\% SOC on average in a rangeland plot, giving $\theta = \Phi^{-1}(.03) \approx -1.9$. $\theta$ can also exhibit a trend in $(x_i, y_j)$. In this case we will write $\theta(x_i,y_j)$. If there is a linear trend we might write $\theta(x_i,y_j) \equiv \beta_0 + \beta_x x_i + \beta_y y_j$. This might happen if the plot lies on a slope, for example, wherein ridges tend to have less carbon than valleys. 
-- $\Sigma$ determines the variability of $z(x_i, y_j)$ and how similar close points are to each other. 
+- $\Sigma$ determines the variability of $z(x_i, y_j)$ and how similar close points are to each other. \textcolor{red}{Flesh this out more...}
 
 
 
@@ -166,7 +168,7 @@ SOC is typically analyzed in a lab, and there are considerable degrees of freedo
 The Silver Lab uses a lab protocol like:
 
 1) Collect soil cores.
-2) Air dry samples
+2) Air dry samples in open plastic bags
 3) Sieve using a 2mm mesh screen
 4) Pick roots 
 5) Pulverize using a SPEX ball grinder
@@ -175,7 +177,7 @@ The Silver Lab uses a lab protocol like:
 
 These steps help ensure that samples are free of water and homogenous. Especially if compositing has been done thorough mixing of equal proportion composites is essential. Steps 3 and 5 are instrumental to this. Dry combustion in an elemental analyzer is the gold standard for measurement of SOC. However, in the high heat of an elemental analyzer carbonates (an inorganic form of carbon) can be oxidized to CO$_2$ and appear as organic carbon. Thus, the application of HCl reveals the presence of carbonates which can throw off SOC measurement. 
 
-Root picking is a potential source of bias in the laboratory. Roots are a major source of SOC but are not considered part of the soil matrix and so are picked out by some labs (e.g. the Silver lab). Root picking is done by humans and highly variable: some people may be very scrupulous and others may not be (anecdotally, I have heard this said in a lab). Especially in an experimental setting, giving one or multiple treatment plots to a scrupulous root picker and the control plots to a less scrupulous root picker could heavily bias treatment effect estimates.
+Root picking is a potential source of bias within and across labs. Not all labs root pick and, unlike 2mm sieving, it is not a widely held standard when defining and assessing SOC. Roots are a major source of SOC but are not considered part of the soil matrix and so are picked out by some labs (e.g. the Silver lab). Root picking is done by humans and highly variable: some people may be very scrupulous and others may not be (anecdotally, I have heard this said in a lab). Especially in an experimental setting, giving one or multiple treatment plots to a scrupulous root picker and the control plots to a less scrupulous root picker could heavily bias treatment effect estimates.
 
 I am not yet sure how to account for and/or model root picking in a software environment.
 
@@ -183,11 +185,42 @@ I am not yet sure how to account for and/or model root picking in a software env
 
 # Measurement
 
-Once samples have been taken, error in the assay itself remains a concern. The Silver lab takes duplicate measurements until two runs are within 10% of each other (this often happens after the first two runs of any given sample). These percent differences are computed as:
+Measurement error is a potentially major source of uncertainty in the analysis of SOC. A core can be assayed for %SOC in 4 main ways in a laboratory [@fao_measuring_2019]:
 
-$$\delta = 100 * \bigg | \frac{x_1 - x_2}{\frac{1}{2}(x_1 + x_2)} \bigg |$$
+1) Wet digestion
+2) Loss-on-ignition (LOI)
+3) Spectroscopy
+4) *Dry combustion in an elemental analyzer (DC-EA)*
+
+I will focus on DC-EA since it is the gold standard and is in use in the Silver lab. First, a brief rundown of the other methods.
 
 
+Wet digestion uses chemicals to oxidize and measure SOC. It is cheap and fast and is in common use worldwide. It is innacurate: only about ~75\% of SOC (with wide variation) is oxidized, so correction factors must be used (typically 1.33). It is generally not recommended [@fao_measuring_2019]. LOI is cheap but measures soil organic matter (SOM), not SOC. Typically, SOC represents between 43 adn 58\% of SOM, and these numbers are used as correction factors. LOI is just the difference between soil mass at 105 degrees C (so that water is boiled off) and 550 degrees C (so that SOM is oxidized). LOI typically overestimates the amount of SOM. It is difficult to standardize (especially across soil types) and therefore error prone. On the plus side, large sample masses can be analyzed (unlike in an elemental analyzer) and LOI is fairly cheap and widely accessible. In spectroscopic analysis, light is shone on the soil and its composition (including SOC) is revealed by the properties of the reflected light (typically in the visible, near infrared, or mid infrared spectra). SOC is predicted from spectral output, and an error is associated with the prediction. The label (i.e. the groundtruth \%SOC) is given by a standard method, for example wet digestion [@viscarra_rossel_visible_2006]. These may be used for rapid determination of SOC in large quantities / sample sizes. 
+
+DC-EA is considered the gold standard for measurement. DC-EA measures %SOC burning a soil sample so that all the SOC is oxidized to CO$_2$, which is then measured. The EA takes in an aliquot of well-mixed soil that is placed into a tiny tin vessel. The mass of the aliquot depends on the machine but is typically very small, from 8 mg to a few grams [@fao_measuring_2019]. On the Silver lab's Carlo Elantech EA this is like 22 mg and must be measured extremely precisely (down to .001 mg, a microgram). EAs that can take larger samples may be less prone to error from tiny errors in the weight of the combusted aliquot. The little aliquot is dropped in its tin container into a combustion chamber that pipes in pure oxygen and burns the sample at $\approx 1000$ degrees celsius. This turns all the SOC into CO$_2$, which is then measured using gas chromatography. 
+
+Although DC-EA is regarded as the best available method for quantification of %SOC, it is still prone to measurement error. The measurement error is likely driven by errors in the mass of the aliquot. 
+
+Suppose we have $k$ (composite) samples with *true* %SOC content $\{s_1, ... s_k\}$ and let $\{s_1^*, ..., s^*_k \}$ be the *measured* value of our samples. Also suppose there are random measurement errors $\{\delta_1, ... , \delta_k \}$ that could be applied to each of our samples. There are three basic scenarios:
+
+1) **No measurement error**: $s_i^* = s_i$
+2) **Additive measurement error**: $s_i^* = s_i + \delta_i$
+3) **Multiplicative measurement error**: $s_i^* = s_i \delta_i$
+
+Under additive measurement error we need $\mathbb{E}[\delta_i] = 0$ for unbiasedness. Under multiplicative error we need $\mathbb{E}[\delta_i] = 1$ and $\delta_i \indep s_i$ (technically we just need $\mbox{Cov}(\delta_i, s_i) = 0$). I believe multiplicative measurement error is more reasonable because errors are likely to enter through errors in the mass, which is itself multiplicative in the determination of %SOC from a chromatographic reading.
+
+#### EcoCore and measurement error
+
+EcoCore analytic services reports a measurement error from DC-EA as a 2.5\% coefficient of variation assuming a mean %SOC of 2.5%. 
+
+
+#### The Silver lab and measurement error
+
+The Silver lab takes duplicate measurements until two runs are within 10% of each other. These percent differences are computed as:
+
+$$\delta = 100 * \bigg | \frac{s_1 - s_2}{\frac{1}{2}(s_1 + s_2)} \bigg |$$
+
+Therefore the measurement error of their samples is bounded by $\pm 10\%$. This is the interval I will use as a default in my simulations.
 
 # Bulk Density
 
@@ -233,7 +266,7 @@ hist(pct_carbon, breaks = 30, xlab = "Proportion SOC")
 
 A literature search study by Emilie Maillard gave the following measures of location and scale of SOC distributions in grasslands around the world [@maillard_increased_2017]:
 
-- SOC stocks had a range of 4 to 1275 Mg C ha^{-1} with a mean of 65 Mg C ha^{-1}
+- SOC stocks had a range of 4 to 1275 Mg C ha$^{-1}$ with a mean of 65 Mg C ha$^{-1}$
 - Coefficient of variation ranged from 0.5 to 89\% with a mean of 22\%
 - According to a regression analysis, variation is explainable (somewhat) by the scale of experiments and the depth of samples. Variation increases with depth and with the scale of the area under study. 
 
