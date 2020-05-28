@@ -127,13 +127,19 @@ boxplot(z ~ depth, data = surface_depth)
 
 # Sampling 
 
-For our purposes, key features of Silver lab sampling are:
+We draw samples from a simulated surface using either simple random sampling or systematic random sampling. 
 
-- Plots are 60 by 25 meters.
-- Samples are taken along a transect with $n = 9$ samples per plot (sometimes $n=5$ samples per plot). It is not clear if these are randomized at all or merely start at one corner, however I believe the sampling falls under the category of systematic random sampling, i.e. the initial location is random (see figure from Allen et al below).
-- Occasionally, plots are stratified and multiple transects will be taken (e.g. 3 transects with 3 samples each)
-- Soils are collected using a 7 cm corer, at 4 depths: 0-10 cm, 10-30 cm, 30-50 cm, and 50-100 cm.
+For simple random sampling pick $n$ sampling locations by drawing $X_i$ uniformly with replacement from $\{1,...,I\}$ and $Y_i$ uniformly with replacement from $\{1,...,J\}$. This picks out true samples $z(X_i, Y_i)$, where $z(X_i, Y_i)$ is random because $X_i$ and $Y_i$ are randomly chosen (not because $z(\cdot, \cdot)$ is a random fucntion). The data are realizations $z(x_i, y_i) \equiv z_i$.
 
+For transect sampling, an initial we pick an initial $X_i$ from the left or right hand corner $X_i \sim \mbox{U}\{1,...a_{\mbox{limit}},b_{\mbox{limit}},...,I \}$ and an initial $Y_i$ from a band along the bottom of the plot $Y_i \sim \mbox{U}\{1,...c_{\mbox{limit}}\}$. The limits of the initial draw are chosen so that a regularly spaced transect can accomodate $n$ data points equally spaced across the diagonal of the plot. The rest of the points are then determined with no randomness by stepping along increments of the transect. Thus the sampling points and the samples SOC values $z(X_1,Y_1),...,z(X_n,Y_n)$ are random but not independent. 
+
+For realizations $z(x_i,y_i)$ at the surface (topsoil), we have realizations at depth $z(x_i, y_i, d_j) \equiv z_i(d_j) = z(x_i,y_i) \cdot \exp(\gamma d_j)$, where again there is no randomness in $d_j$ (it is a deterministic grid).
+
+```{r}
+samples <- collect_sample(surface = surface_depth, design = "simple random sample", n_samp = 30)
+
+topsoil_samples <- samples %>% filter(depth == 0) %>% pull(z)
+```
 
 # Compositing
 
@@ -160,6 +166,10 @@ The first point could be addressed by compositing to 1 sample and measuring it s
 The second point is non-negotiable. We need multiple replicates of samples in order to estimate the variance of our sample mean: $\hat{\mathbb{V}}[\frac{1}{n} \sum_{i=1}^n z_i] = \frac{\hat{\sigma}^2}{n}$. With only one measured sample $\hat{\sigma}^2$ is not estimable.
 
 
+```{r}
+composited_samples <- composite_samples(topsoil_samples, k = 5)
+```
+
 
 # Sample Preparation
 
@@ -179,7 +189,7 @@ These steps help ensure that samples are free of water and homogenous. Especiall
 
 Root picking is a potential source of bias within and across labs. Not all labs root pick and, unlike 2mm sieving, it is not a widely held standard when defining and assessing SOC. Roots are a major source of SOC but are not considered part of the soil matrix and so are picked out by some labs (e.g. the Silver lab). Root picking is done by humans and highly variable: some people may be very scrupulous and others may not be (anecdotally, I have heard this said in a lab). Especially in an experimental setting, giving one or multiple treatment plots to a scrupulous root picker and the control plots to a less scrupulous root picker could heavily bias treatment effect estimates.
 
-I am not yet sure how to account for and/or model root picking in a software environment.
+I am not yet sure how to account for and/or model root picking in the software.
 
 
 
@@ -207,11 +217,44 @@ Suppose we have $k$ (composite) samples with *true* %SOC content $\{s_1, ... s_k
 2) **Additive measurement error**: $s_i^* = s_i + \delta_i$
 3) **Multiplicative measurement error**: $s_i^* = s_i \delta_i$
 
-Under additive measurement error we need $\mathbb{E}[\delta_i] = 0$ for unbiasedness. Under multiplicative error we need $\mathbb{E}[\delta_i] = 1$ and $\delta_i \indep s_i$ (technically we just need $\mbox{Cov}(\delta_i, s_i) = 0$). I believe multiplicative measurement error is more reasonable because errors are likely to enter through errors in the mass, which is itself multiplicative in the determination of %SOC from a chromatographic reading.
+Under additive measurement error we need $\mathbb{E}[\delta_i] = 0$ for unbiasedness:
+
+$$\mathbb{E}[s_i^*] =  \mathbb{E}[s_i + \delta_i] = \mathbb{E}[s_i] + \mathbb{E}[\delta_i] = \mu$$
+
+Under multiplicative error we need $\mathbb{E}[\delta_i] = 1$ and $\delta_i \indep s_i$ (technically we just need $\mbox{Cov}(\delta_i, s_i) = 0$): 
+
+$$\mathbb{E}[s_i^*] = \mathbb{E}[s_i\delta_i] = \mathbb{E}[s_i]\mathbb{E}[\delta_i] = \mu$$
+
+
+I believe multiplicative measurement error is more reasonable because errors are likely to enter through errors in the mass, which is itself multiplicative in the determination of %SOC from a chromatographic reading. Also, multiplicative errors cannot yield negative SOC as long as $\delta_i \in \mathbb{R}_{\geq0}$. They could yield %SOC $> 1$, but for the range of %SOC and measurement error we are considering this won't happen.  
+
+
+## Simulating Measurement error
+
+We want to be able to simulate corrupting samples with measurement error. I would like to be able to simulate errors $\delta_i$ so that $\mathbb{E}[\delta_i] = 1$ or $\mathbb{E}[\delta_i] = 0$. I also want to fix the variance $\sigma_\delta^2$ and bounds $[a_\delta, b_\delta]$ of the distribution (note that it must be that $\sigma_\delta^2 \leq \frac{1}{4} (b_\delta - a_\delta)^2$). I will accomplish this by simulating $\delta_i$ from a centered and scaled beta distribution that is constrained to be symmetric. 
+
+Here's how we will generate these samples given the parameters:
+
+1) Draw $\delta^*_i \sim \mathcal{B}(\alpha,\alpha)$ where $\alpha = \left ( \frac{(a_\delta - b_\delta)^2}{8 \sigma_\delta^2} - \frac{1}{2} \right )$ 
+
+2) Take 
+$$\delta_i = \left (\delta_i^* - \frac{1}{2} \right ) |a_\delta - b_\delta| + \mathbb{E}[\delta_i]$$
+
+For example if we want an error centered at 1 with bounds $[.8,1.2]$ and standard deviation $\sigma_\delta = .05$ then $\alpha = .4^2 / (8 * .05^2) - 1/2 = 7.5$ and $\delta_i = (\delta_i^* - 1/2)(.4) + 1$
+
+```{r}
+#measure once
+measured_composite_samples <- perturb_measurements(true_samples = composited_samples, error_type = "multiplicative", error_bounds = c(.8, 1.2), error_sd = .05)
+
+#measure_multiple_times (replicate the assay)
+measured_composite_samples <- perturb_measurements(true_samples = composited_samples, error_type = "multiplicative", error_bounds = c(.8,1.2), error_sd = .05, replicates = 3) 
+
+
+```
 
 #### EcoCore and measurement error
 
-EcoCore analytic services reports a measurement error from DC-EA as a 2.5\% coefficient of variation assuming a mean %SOC of 2.5%. 
+[EcoCore analytic services](https://ecocore.nrel.colostate.edu/ecocore-elemental-analysis.html) reports a measurement error from DC-EA as a 2.5\% coefficient of variation assuming a mean %SOC of 2.5%. 
 
 
 #### The Silver lab and measurement error
@@ -222,8 +265,14 @@ $$\delta = 100 * \bigg | \frac{s_1 - s_2}{\frac{1}{2}(s_1 + s_2)} \bigg |$$
 
 Therefore the measurement error of their samples is bounded by $\pm 10\%$. This is the interval I will use as a default in my simulations.
 
-# Bulk Density
 
+# Estimation and Inference
+
+Recall that our overall goal is to estimate $\mu = \int_\mathcal{P} z(x,y,d) d\mathcal{P}$ using our measurements $\{s_i^*\}_{i=1}^k$. 
+
+
+
+# Bulk Density
 
 <!---
 The total Carbon in a plot of land, in Megagrams Carbon per hectare (Mg C / ha), is computed from both the percent carbon and the bulk density (a measure of the density of the soil). The bulk density is itself difficult to sample and compute. For the time being we will treat this as fixed and known. From the Silver lab report for California's Fourth Climate Change Assessment, average bulk density across a number of Californian sites was about 1.2 grams per cubic centimeter (g / cm$^3$), which is the number I will use.
