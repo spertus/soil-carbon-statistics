@@ -104,18 +104,15 @@ collect_sample <- function(surface, design = "transect", n_samp = 9){
     }
     grid <- data.frame("x" = x_grid, "y" = y_grid)
   } else if(design == "simple random sample"){
-    y_samples <- sample(1:max(surface$y), size = n_samp, replace = FALSE)
-    x_samples <- sample(1:max(surface$x), size = n_samp, replace = FALSE)
+    y_samples <- sample(1:max(surface$y), size = n_samp, replace = TRUE)
+    x_samples <- sample(1:max(surface$x), size = n_samp, replace = TRUE)
     grid <- data.frame("x" = x_samples, "y" = y_samples)
   } else{
     stop("need to specify a valid sampling design")
   }
   
   true_samples <- surface %>% 
-    inner_join(grid, by = c("x","y")) %>% 
-    pull(z)
-    
-  true_samples
+    inner_join(grid, by = c("x","y")) 
 }
 
 
@@ -143,24 +140,35 @@ composite_samples <- function(samples, k = 5){
 
 
 ########### function to perturb measurements of samples ##########
-perturbed_measurements <- function(true_samples, error_type, error_bounds){
-  #adds independent, uniform measurement error to samples
+perturb_measurements <- function(true_samples, error_type = "multiplicative", error_bounds, error_sd, replicates = 1){
+  #corrupts samples with independent, symmetric, beta distributed measurement error 
   #inputs:
     #true_samples: true pct carbon (unknown) to be measured with error
     #error_type: how should the error perturb the true vale?
       #"additive": the errors are just added to the true values (unbiased implies centered at 0)
       #"multiplicative": the true values are dilated by the errors (unbiased implies centered at 1)
-    #error_bounds: a length-2 vector specifying the lower and upper bounds of the (uniform error)
+    #error_bounds: a length-2 vector specifying the lower and upper bounds of the error, the mean of these (halfway between the left and right bound) is the expected value of the measurement error
+    #replicates: the number of times to measure each sample (duplicate, triplicate, etc)
+  #output: 
+    #the measured samples, a dataframe with column for sample #, replicate, and measurement value
+  if(error_sd^2 > (1/4)*(error_bounds[2] - error_bounds[1])^2){
+    stop("error variance is too big given the error bounds!")
+  }
+  alpha <- (error_bounds[1] - error_bounds[2])^2 / (8 * error_sd^2) - 1/2
+  delta_star <- rbeta(length(true_samples)*replicates, shape1 = alpha, shape2 = alpha)
+  delta <- (delta_star - 1/2) * abs(error_bounds[1] - error_bounds[2]) + mean(error_bounds)
+  samples_frame <- expand.grid("sample" = rep(1:length(true_samples)), "replicate" = rep(1:replicates))
   
-  error <- runif(n = true_samples, min = error_bounds[1], max = error_bounds[2])
   if(error_type == "multiplicative"){
-    measured_samples <- true_samples * error
+    measured_samples <- rep(true_samples, each = replicates) * delta
   } else if(error_type == "additive"){
-    measured_samples <- true_samples + error
+    measured_samples <- rep(true_samples, each = replicates) + delta
   } else{
     stop("input a valid error_type")
   }
-  measured_samples
+  measured_samples_frame <- samples_frame %>% 
+    mutate(measurement = measured_samples)
+  measured_samples_frame 
 }
 
 
