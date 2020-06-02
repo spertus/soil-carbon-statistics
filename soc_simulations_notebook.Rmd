@@ -158,12 +158,12 @@ where $\sigma^2$ is the population variance, i.e. the variance of $\{z(x,y) \mid
 
 Why not always composite down to one sample and measure once? There are two reasons:
 
-- There is measurement error that is only 0 in expectation (hopefully).
+- There is measurement error that is (hopefully) unbiased but will be variable.
 - For inference we must have an estimate of the population variance.
 
 The first point could be addressed by compositing to 1 sample and measuring it some number of times -- say, 10 -- depending on how large the measurement error is. More on that below. 
 
-The second point is non-negotiable. We need multiple replicates of samples in order to estimate the variance of our sample mean: $\hat{\mathbb{V}}[\frac{1}{n} \sum_{i=1}^n z_i] = \frac{\hat{\sigma}^2}{n}$. With only one measured sample $\hat{\sigma}^2$ is not estimable.
+The second point is non-negotiable. We need multiple measured samples from different locations on a plot in order to estimate the variance of our sample mean: $\hat{\mathbb{V}}[\frac{1}{n} \sum_{i=1}^n z_i] = \frac{\hat{\sigma}^2}{n}$. With only one measured sample $\hat{\sigma}^2$ is not estimable.
 
 
 ```{r}
@@ -248,8 +248,6 @@ measured_composite_samples <- perturb_measurements(true_samples = composited_sam
 
 #measure_multiple_times (replicate the assay)
 measured_composite_samples <- perturb_measurements(true_samples = composited_samples, error_type = "multiplicative", error_bounds = c(.8,1.2), error_sd = .05, replicates = 3) 
-
-
 ```
 
 #### EcoCore and measurement error
@@ -268,11 +266,61 @@ Therefore the measurement error of their samples is bounded by $\pm 10\%$. This 
 
 # Estimation and Inference
 
-Recall that our overall goal is to estimate $\mu = \int_\mathcal{P} z(x,y,d) d\mathcal{P}$ using our measurements $\{s_i^*\}_{i=1}^k$. 
+Recall that our overall goal is to estimate $\mu = \int_\mathcal{P} z(x,y,d) d\mathcal{P}$ using our measurements $\{s_i^*\}_{i=1}^k$. The sample mean of the measured composite samples is an unbiased estimator of $\mu$:
+\begin{align}
+\mathbb{E}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ] &=  
+\mathbb{E}\left [\frac{1}{k} \sum_{i=1}^k s_i\delta_i \right ]\\ 
+&=  \mathbb{E}\left [\frac{1}{k} \sum_{i=1}^k \left [ \sum_{j \in c_i} \frac{k}{n} z_j \right ] \delta_i \right ]\\
+&= \frac{1}{k} \sum_{i=1}^k \left [ \sum_{j \in c_i} \frac{k}{n}\mathbb{E}[z_j] \right ] \mathbb{E}[\delta_i]\\
+&= \frac{1}{k} \sum_{i=1}^k \left [ \sum_{j \in c_i} \frac{k}{n}\mu \right ] \\
+&= \frac{1}{k} \sum_{i=1}^k \mu \\
+&= \mu 
+\end{align}
 
+Furthermore, its variance is:
 
+\begin{align}
+\mathbb{V}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ] &= \frac{1}{k^2} \sum_{i=1}^k \mathbb{V}[s_i^*]\\
+&=  \frac{1}{k^2} \sum_{i=1}^k \mathbb{V}[s_i \delta_i]\\
+&= \frac{1}{k^2}  \sum_{i=1}^k \left ( \mathbb{V}[s_i] \mathbb{V}[\delta_i] + \mathbb{E}[s_i]^2 \mathbb{V}[\delta_i] + \mathbb{E}[\delta_i]^2 \mathbb{V}[s_i] \right )\\
+&= \frac{1}{k^2}  \sum_{i=1}^k \left ( \mathbb{V}[s_i] \sigma_\delta^2 + \mu^2 \sigma_\delta^2 + \mathbb{E}[\delta_i]^2 \mathbb{V}[s_i] \right )\\
+&= \frac{1}{k^2}  \sum_{i=1}^k \left ( \mathbb{V} \left [\sum_{j\in c_i} \frac{k}{n} z_i \right ] \sigma_\delta^2 + \mu^2 \sigma_\delta^2 + \mathbb{V}\left [\sum_{j\in c_i} \frac{k}{n} z_i \right ] \right )\\
+&= \frac{1}{k^2}  \sum_{i=1}^k \left ( \left [ \sum_{j\in c_i} \frac{k^2}{n^2} \mathbb{V}[z_i] \right ] \sigma_\delta^2 + \mu^2 \sigma_\delta^2 + \left [ \sum_{j\in c_i} \frac{k^2}{n^2} \mathbb{V}[z_i] \right ] \right )\\
+&= \frac{1}{k^2}  \sum_{i=1}^k \left ( \frac{k}{n} \sigma^2 \sigma_\delta^2 + \mu^2 \sigma_\delta^2 +  \frac{k}{n} \sigma^2\right )\\
+&= \frac{1}{k} \left ( \frac{k}{n} \sigma^2 \sigma_\delta^2 + \mu^2 \sigma_\delta^2 +  \frac{k}{n} \sigma^2\right ) \\ 
+&=  \frac{\sigma^2 (1 + \sigma_\delta^2) }{n}  + \frac{\mu^2 \sigma_\delta^2}{k}\\ 
+\end{align}
+
+First of all, if there is no measurement error than the variance of composited samples is just equal to $\sigma^2 / n$, i.e. the usual variance of a sample mean. Furthermore, the variance can be reduced in two ways: either by collecting more total samples (which reduces the first component) or by doing less compositing and thereby measuring more samples (which reduces the second component). 
+
+In order to construct a confidence interval for our measured sample mean $\bar{s}^* = \frac{1}{k} \sum_{i=1}^k s_i^*$ we have to have an estimate of it's variance. That is, we want $\hat{\mathbb{V}}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ]$. A plug-in estimator is:
+
+$$\hat{\mathbb{V}}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ] = \frac{\hat{\sigma}^2 (1 + \hat{\sigma}_\delta^2)}{n} + \frac{\hat{\mu}^2 \hat{\sigma}_\delta^2}{k}$$
+
+How can we estimate or at least bound $\sigma^2$ and $\sigma_\delta^2$? 
+
+<!---
+Consider:
+
+\begin{align}
+\frac{1}{k-1} \sum_{i=1}^k (s_i^* - \bar{s}^*)^2 &= \frac{1}{k-1} \sum_{i=1}^k  \left(  \frac{k\delta_i}{n} \sum_{j \in c_i} z_j  - \sum_{l=1}^k   \frac{\delta_l}{n} \sum_{j \in c_l} z_j \right )^2\\
+&= \frac{1}{k-1} \sum_{i=1}^k  \left(  \frac{k\delta_i}{n} \sum_{j \in c_i} z_j  - \left (\frac{\delta_i}{n} \sum_{j \in c_i} z_j + \sum_{l\neq i}   \frac{\delta_l}{n} \sum_{j \in c_l} z_j \right ) \right )^2 \\ 
+&= \frac{1}{k-1} \sum_{i=1}^k  \left(  \frac{(k-1)\delta_i}{n} \sum_{j \in c_i} z_j  - \sum_{l\neq i}   \frac{\delta_l}{n} \sum_{j \in c_l} z_j \right )^2 \\ 
+\end{align}
+!--->
 
 # Bulk Density
+
+Soil bulk density is the mass per unit volume of the soil. It reflects the structure of the soil, including porosity and solids, and depends on the proportions of minerals in the soil, organic matter content, chemical composition, etc. These in turn reflect soil genesis, interaction of soil components, land use, management, etc. It's typically specified expressed in Mg m$^{-3}$ or equivalently in g cm$^{-3}$. Analyes should be in triplicate and account for/record the water status at the time of measurement [@fao_measuring_2019], e.g. whether stocks were computed shortly after a rain when the soil is wet and bulk density relatively higher. Further, bulk density should be measured on the *same core that %SOC is measured on* [@fao_measuring_2019].
+
+Measurement methods
+
+- **Undisturbed (intact) core method**: collect a known volume of soil using a metal ring pressed into the soil and determining the weight after drying. The core must be kept intact, which is difficult if the soil is too dry.
+- **Excavation method**: excavate some quantity of soil, dry and weight it. Then determine its volume by filling it with sand of known volume per unit mass. 
+- **Pedotransfer functions (PTFs)**: PTFs are not a measurement method per se. They are predictions of BD based on more easily measurable properties, like soil clay content and SOC content. They can lead to high uncertainty and errors in prediction need to be taken into account.
+
+
+
 
 <!---
 The total Carbon in a plot of land, in Megagrams Carbon per hectare (Mg C / ha), is computed from both the percent carbon and the bulk density (a measure of the density of the soil). The bulk density is itself difficult to sample and compute. For the time being we will treat this as fixed and known. From the Silver lab report for California's Fourth Climate Change Assessment, average bulk density across a number of Californian sites was about 1.2 grams per cubic centimeter (g / cm$^3$), which is the number I will use.
