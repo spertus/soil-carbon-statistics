@@ -49,7 +49,7 @@ Other sampling mechanisms (e.g. stratified sampling) can also satisfy unbiasedne
 
 ### Depth
 
-In reality, %SOC is a defined in 3-dimensions because soil has depth. For sequestration research in particular depth is an important consideration. We will let $d$ denote depth and set $d=0$ to be the soil surface so that it is always defined relatively (as opposed to say, altitude). With depth taken into account, $\mathcal{P} \subset \mathcal{R}^3$ and typically $\mathcal{P} = [a,b] \times [c,d] \times [e,f]$ with $|e - f| = 1$ meter. $z(x,y,d)$ is the %SOC at position $(x,y)$ and depth $d$. The parameter of interest (with apologies for overloading $d$) is:
+In reality, %SOC is a defined in 3-dimensions because soil has depth. For sequestration research in particular depth is an important consideration. We will let $d$ denote depth and set $d=0$ to be the soil surface so that it is always defined relatively (as opposed to say, altitude). With depth taken into account, $\mathcal{P} \subset \mathbb{R}^3$ and typically $\mathcal{P} = [a,b] \times [c,d] \times [e,f]$ with $|e - f| = 1$ meter. $z(x,y,d)$ is the %SOC at position $(x,y)$ and depth $d$. The parameter of interest (with apologies for overloading $d$) is:
 
 $$\mu = \int_\mathcal{P} z(x,y,d) d\mathcal{P} = \int_a^b \int_c^d \int_e^f z(x,y,d) ~dd ~dy ~dx$$
 
@@ -291,13 +291,67 @@ Furthermore, its variance is:
 &=  \frac{\sigma^2 (1 + \sigma_\delta^2) }{n}  + \frac{\mu^2 \sigma_\delta^2}{k}\\ 
 \end{align}
 
-First of all, if there is no measurement error than the variance of composited samples is just equal to $\sigma^2 / n$, i.e. the usual variance of a sample mean. Furthermore, the variance can be reduced in two ways: either by collecting more total samples (which reduces the first component) or by doing less compositing and thereby measuring more samples (which reduces the second component). 
+First of all, if there is no measurement error than the variance of composited samples is just equal to $\sigma^2 / n$, i.e. the usual variance of a sample mean. Furthermore, the variance can be reduced in two ways: either by collecting more total samples (which reduces the first component) or by doing less compositing and thereby measuring more samples (which reduces the second component). If we do no compositing, and measure every sample we collect separately, then the variance reduces to $\frac{\sigma^2 + \sigma^2 \sigma_\delta^2 + \mu^2 \sigma_\delta^2}{n}$. Thus, if we do not measure all $n$ samples but instead composite and measure $k$ samples, then we incure a penalty of $\frac{(n-k)}{nk} \mu^2 \sigma_\delta^2$ in terms of increased variance. If $\mu^2$ or $\sigma_\delta^2$ is small compared to $\sigma^2$, this will be relatively minor. It will also be small if $k$ is close to $n$ or $n$ and $k$ are large. 
 
-In order to construct a confidence interval for our measured sample mean $\bar{s}^* = \frac{1}{k} \sum_{i=1}^k s_i^*$ we have to have an estimate of it's variance. That is, we want $\hat{\mathbb{V}}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ]$. A plug-in estimator is:
+
+Let's consider an example where we fix $\mu$, $\sigma^2$, and $\sigma_\delta^2$ based on the Marin carbon survey data from the Silver lab (see below). In one plot (sc4), we had $\hat{\mu} \approx .04$ as the average %SOC in topsoil (0-10cm), the estimated plot variance was $\hat{\sigma}^2 = 4.2 \times 10^{-4}$ and $\hat{\sigma}_\delta^2 = 1.02 \times 10^{-4}$ is the estimated measurement variance computed by taking a median of the variance of duplicate measurements. Given $n$ samples composited down to $k$, we have a variance of 
+
+$$\mathbb{V}[\bar{s}^*] = \frac{(4.2 \times 10^{-4}) (1 + 1.02 \times 10^{-4})}{n} + \frac{.04^2 \times (1.02 \times 10^{-4})}{k} \approx \frac{4.2005\times10^{-4}}{n} + \frac{1.63\times10^{-7}}{k}$$
+
+In this example, the first numerator is about 70 times larger than the second numerator so $n$ must be about 70 times larger than $k$ before measuring more samples (increasing $k$) outweighs taking more initial samples (increasing $n$) in terms of contributing to the variance of our estimator.   
+
+### Simulation experiment
+
+We can run a Monte Carlo simulation experiment to see how the actual variance of our estimator stacks up against the theoretical variance above. Let's take $n=100$ and consider $k \in \{1,10,100\}$.
+
+```{r simulate measurement error, include = TRUE, echo = TRUE}
+#put parameters on the same order as observed in Silver lab data 
+#it's a stationary surface (no y_trend)
+#the below parameters give a population variance of about sigma^2 = 3.8e-5 and mean mu = 0.04, as desired
+sim_surface <- simulate_truth(size = c(250, 600), nugget= 4e-4, sill = 4e-3, intercept = .04, y_trend = FALSE)
+plot_surface(sim_surface)
+
+run_simulations <- function(surface, k){
+  samples <- collect_sample(surface = surface, design = "simple random sample", n_samp = 100) %>% pull(z)
+  
+  composites_list <- lapply(k, composite_samples, samples = samples)
+  
+  measured_samples_list <- lapply(composites_list, perturb_measurements, error_type = "multiplicative", error_bounds = c(.8, 1.2), error_sd = sqrt(1.3e-6)) %>%
+    lapply(pull, "measurement")
+  
+  means_list <- lapply(measured_samples_list, mean)
+  means <- unlist(means_list)
+  names(means) <- k
+  
+  means
+}
+
+
+
+replicates <- replicate(n = 2000, run_simulations(surface = sim_surface, k = c(1,10,100))) %>%
+  t() %>%
+  as_tibble() 
+
+replicates_long <- replicates %>% 
+  pivot_longer(cols = everything(), names_to = "k", values_to = "estimate")
+
+replicates_plot <- ggplot(data = replicates_long, aes(x = estimate)) + 
+  geom_histogram() +
+  facet_grid(~ k)
+
+replicate_variance <- replicates_long %>%
+  group_by(k) %>%
+  summarize(variance = var(estimate))
+replicate_variance
+```
+
+## Estimating the variance
+
+If only estimating the mean mattered, then our work above implies that we should do a lot of compositing and relatively little measurement. However, if we want to do inference we need to estimate the variance of the sample mean as well, and this is likely to require more measurements. That is, we want $\hat{\mathbb{V}}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ]$. A plug-in estimator is:
 
 $$\hat{\mathbb{V}}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ] = \frac{\hat{\sigma}^2 (1 + \hat{\sigma}_\delta^2)}{n} + \frac{\hat{\mu}^2 \hat{\sigma}_\delta^2}{k}$$
 
-How can we estimate or at least bound $\sigma^2$ and $\sigma_\delta^2$? 
+**Question:** How can we estimate or at least bound $\sigma^2$ and $\sigma_\delta^2$ using composite samples? 
 
 <!---
 Consider:
@@ -311,7 +365,7 @@ Consider:
 
 # Bulk Density
 
-Soil bulk density is the mass per unit volume of the soil. It reflects the structure of the soil, including porosity and solids, and depends on the proportions of minerals in the soil, organic matter content, chemical composition, etc. These in turn reflect soil genesis, interaction of soil components, land use, management, etc. It's typically specified expressed in Mg m$^{-3}$ or equivalently in g cm$^{-3}$. Analyes should be in triplicate and account for/record the water status at the time of measurement [@fao_measuring_2019], e.g. whether stocks were computed shortly after a rain when the soil is wet and bulk density relatively higher. Further, bulk density should be measured on the *same core that %SOC is measured on* [@fao_measuring_2019].
+Soil bulk density is the mass per unit volume of the soil. It reflects the structure of the soil, including porosity and solids, and depends on the proportions of minerals in the soil, organic matter content, chemical composition, etc. These in turn reflect soil genesis, interaction of soil components, land use, management, etc. It's typically specified expressed in Mg m$^{-3}$ or equivalently in g cm$^{-3}$. Analyses should be in triplicate and account for/record the water status at the time of measurement [@fao_measuring_2019], e.g. whether stocks were computed shortly after a rain when the soil is wet and bulk density relatively higher. Further, bulk density should be measured on the *same core that %SOC is measured on* [@fao_measuring_2019].
 
 Measurement methods
 
@@ -344,19 +398,39 @@ duplicate_data <- read_csv("mcp_duplicates.csv")
 #drop samples that were rerun fewer or more than 2 times
 no_dups <- names(which(table(duplicate_data$sample_name) < 2))
 #also drop runs of atropine standards
+#only keep top soil samples
 duplicate_data <- duplicate_data %>%
   filter(!(sample_name %in% no_dups)) %>%
   filter(!(substr(sample_name, 1, 4) %in% c('atro','blan','Blan','dumm','Dumm'))) %>%
+  filter(str_ends(sample_name, "0-10")) %>% 
+  mutate(carbon = carbon / 100, nitrogen = nitrogen / 100) %>%
+  mutate(plot = str_split(sample_name, "-", simplify = T)[,1]) %>%
+  mutate(plot = str_replace(plot, " ", "")) %>%
   group_by(sample_name) %>%
-  filter(rank(time) <= 2)
+  filter(rank(time) <= 2) 
 
-duplicate_data
+plot_mean <- duplicate_data %>% 
+  summarize(mu = mean(carbon))
+
+plot_variance <- duplicate_data %>%
+  group_by(plot) %>%
+  summarize(plot_variance = var(carbon)) %>%
+  ungroup() 
+
+measurement_variance <- duplicate_data %>%
+  group_by(sample_name) %>%
+  summarize(plot = first(plot), variance = var(carbon)) %>%
+  ungroup() %>%
+  group_by(plot) %>%
+  summarize(median_measurement_error = median(variance))
+
+combined_variance <- plot_variance %>%
+  inner_join(measurement_variance, by = "plot")
+
+plot_vs_measurement_variance_plot <- ggplot(combined_variance, aes(x = plot_variance, y = median_measurement_error)) +
+  geom_point() 
 ```
 
-```{r pct carbon}
-pct_carbon <- duplicate_data$carbon / 100
-hist(pct_carbon, breaks = 30, xlab = "Proportion SOC")
-```
 
 
 ### Maillard's study
