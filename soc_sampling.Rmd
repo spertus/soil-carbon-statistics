@@ -1,0 +1,129 @@
+---
+title: "SOC Sampling"
+author: "Jake Spertus"
+date: "June 9th, 2020"
+output: html_notebook
+header_includes:
+  -\usepackage{amsmath}
+  -\usepackage{amsfonts}
+  -\usepackage{color}
+  -\newcommand{\indep}{\perp \!\!\! \perp}
+bibliography: soilcarbonstatistics.bib
+---
+```{r knitr setup, message = FALSE, warning = FALSE, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r packages, message = FALSE, results = FALSE}
+library(tidyverse)
+source("sim_functions.R")
+```
+
+
+# Goals
+
+
+
+# Setup and Notation
+
+To begin we will consider %SOC as a two-dimensional surface defined over plots $\mathcal{P} \subset \mathbb{R}^2$, where $\mathbb{R}^2$ is a vector space with the usual Euclidean norm $\|u\| = \sqrt{u_1^2 + u_2^2}$ and inner product $\langle u,v \rangle = u_1v_1 + u_2v_2$. Typically, $\mathcal{P} \equiv [a,b]\times[c,d]$, a rectangular plot. For example in [@ryals_impacts_2014] we have a $25 \times 60$ meter plot so that $|a-b| = 25$ and $|c-d| = 60$. A typical element of $\mathcal{P}$ is an ordered pair $(x,y)$, which denotes the position of a point in the plot. Since we typically will consider a single plot, we can define (0,0) to be the lower left hand corner of the plot, so that points $(x,y)$ are relative to the position of the plot itself in $\mathbb{R}^2$. WLOG, we'll typically also take the orientation of the plot to be such that the $y$ direction indicates North/South (latitude) and the $x$ direction indicates East/West (longitude). For example, $(1,2)$ indicates a point 1 meter to the east and 2 meters to the north of the origin. 
+
+Given any point $(x,y)$ there is an associated concentration of soil carbon (%SOC), which we will denote by $z(x,y)$. Note that %SOC is not truly defined at a precise point $(x,y)$ - there is considerable variance at ever smaller scales: a tiny piece of root may be 100\% carbon, while a patch of sand may be 0\% carbon. $z(x,y)$ is better conceptualized as an average over a small window centered at $(x,y)$. In a design-based framework (as we are considering here), $z(x,y)$ is a fixed, unknown number. Typically the parameter of interest is:
+
+$$\mu \equiv \int_\mathcal{P} z(x,y) d\mathcal{P}  = \int_a^b \int_c^d z(x,y)~ dy ~dx$$
+
+This is the "population average" %SOC over the plot $\mathcal{P}$. We wish to estimate $\mu$ using data. 
+
+In field studies, data take the form of finite samples determined at specific values of $x$ and $y$: $\{z(x_1,y_1), z(x_2, y_2), ... z(x_n, y_n) \}$ often we'll denote the data $\{z_1, z_2, ... z_n\} \equiv \{z_i\}_{i=1}^n$ when the locations themselves are not super important. 
+
+
+# Simple random sampling
+
+### Hoeffding Bound
+
+We can use the *Hoeffding bound* to construct a finite sample confidence interval on the percent carbon estimated using simple random sampling. This bound is finite-sample valid and does not rely on any other assumptions other than the fact that percent carbon is in $[0,1]$. For samples $Z_1, Z_2, ... Z_n$ drawn from a bounded population, the probability that the sample mean is $\epsilon$ far from the population mean is:
+
+$$P(|\bar{Z} - \mathbb{E}[Z_1]| \geq \epsilon) \leq 2\exp\{-2 n \epsilon^2\} $$
+
+If we would like a 95% confidence interval on the sample mean, then we can set the LHS equal to .05 and rearrange:
+
+\begin{align}
+.05 &\leq 2 \exp\{- 2 n \epsilon^2\}\\ 
+\log(.025) &\leq -2 n \epsilon^2\\
+\frac{\log(.025)}{-2\epsilon^2} &\leq n
+\end{align}
+
+Thus for a 95\% confidence interval with width $\epsilon$ we would need $\frac{\log(.025)}{-2\epsilon^2}$ samples. This is a lot. Below we plot $n$ as a function of $\epsilon$, the desired precision, on the $\log_{10}$ scale.
+
+
+
+```{r}
+get_n_hoeffding <- function(epsilon, alpha = .05){
+  #compute the hoeffding bound given a level of precision (epsilon) and a level of desired confidence (alpha)
+  n <- log(alpha / 2) / (-2 * epsilon^2) 
+  n
+}
+```
+
+
+
+
+
+### Central Limit Theorem Bound
+
+On the other hand, we could consider the *central limit theorem* and an upper bound on the population variance. Since $Z_i \in [0,1]$, we have that $\sigma^2 \leq 1/4$. The central limit theorem gives an asymptotic distribution of the variation of the sample mean from the population mean:
+
+$$\mathbb{P}(|\bar{Z} - \mu| > \epsilon) = 2 \bigg (1 - \Phi \big (\frac{\epsilon}{\sigma / \sqrt{n}} \big ) \bigg ) \leq 2 \big (1-\Phi ( 4\epsilon \sqrt{n}) \big )$$
+Therefore if we wish to bound deviations from the mean by $\epsilon$ to occur with probability less than $\alpha$ we can collect $n$ so that:
+
+\begin{align}
+2(1 - \Phi(4 \epsilon \sqrt{n})) &\leq \alpha\\
+&\implies \\
+\Phi(4 \epsilon \sqrt{n}) \geq 1 - \alpha/2\\
+&\implies\\
+n \geq \frac{\Phi^{-1}(1-\alpha/2)^2}{16 \epsilon^2}
+\end{align}
+
+```{r}
+#population variance is 1/4 in the worst case for pct carbon
+get_n_clt <- function(epsilon, alpha = .05, variance = 1/4){
+  #compute the sample sizes needed using a wald interval
+  n <- (qnorm(1 - alpha/2)^2) / (16 * epsilon^2)
+  n
+}
+```
+
+
+### Comparing Bounds
+
+```{r}
+epsilon_grid <- seq(.01, .1, length.out = 100)
+n_vs_epsilon <- data.frame(n_hoeffding = get_n_hoeffding(epsilon_grid), n_clt = get_n_clt(epsilon_grid), epsilon = epsilon_grid) %>%
+  pivot_longer(cols = c("n_hoeffding","n_clt"))
+
+
+
+ggplot(data = n_vs_epsilon, aes(x = epsilon, y = value, colour = name)) +
+  geom_line() +
+  theme_linedraw() +
+  scale_y_log10() +
+  labs(y = "n", x = "epsilon")
+```
+
+
+
+# Stratified Sampling
+
+Stratified sampling should in general be much more efficient than simple random sampling whenever heterogeneity can be reduced by stratification. 
+
+As a preliminary example, consider an extreme case where half of a plot is 0\% SOC and half of a plot is 100\% SOC. This would be like if the Sahara and a peat bog were right next to each other except more extreme (peat is not more than 45\% carbon). The plot $\mathcal{P}$ can be partioned into areas $\mathcal{P}_0 = \{(x_i,y_i) \in \mathcal{P} \mid z(x_i,y_i) = 0\}$ and $\mathcal{P}_1 = \{(x_i,y_i) \in \mathcal{P} \mid z(x_i,y_i) = 1\}$. The variance of a single point drawn by simple random sampling is the population variance:
+\begin{align*}
+\mathbb{V}[Z_i] &= \int_{\mathcal{P}} (Z_i - \mathbb{E}[Z_i])^2 d\mathcal{P}\\
+&= \int_{\mathcal{P}_0} (Z_i - 1/2)^2 d\mathcal{P}_0 + \int_{\mathcal{P}_1} (Z_i - 1/2)^2 d\mathcal{P}_1\\ 
+&= \int_{\mathcal{P}_0} 1/4 ~ d\mathcal{P}_0 + \int_{\mathcal{P}_1} 1/4 ~ d\mathcal{P}_1\\
+&= 1/8 + 1/8\\ 
+&= 1/4
+\end{align*}
+
+If these values are uniformly distributed throughout $\mathcal{P}$ there is nothing to be done. But suppose they are distributed so that the right half of the plot is all $Z_i = 1$ and the left half of the plot is all so that $Z_i = 0$. Then the variance within these halves is 0, and a single random sample from each half suffices to completely describe the %SOC there. 
+
