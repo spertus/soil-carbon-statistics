@@ -1,0 +1,177 @@
+---
+title: "SOC Measurement"
+author: "Jake Spertus"
+date: "June 9th, 2020"
+output: html_notebook
+header_includes:
+  -\usepackage{amsmath}
+  -\usepackage{amsfonts}
+  -\usepackage{color}
+  -\newcommand{\indep}{\perp \!\!\! \perp}
+bibliography: soilcarbonstatistics.bib
+---
+```{r knitr setup, message = FALSE, warning = FALSE, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r packages, message = FALSE, results = FALSE}
+library(tidyverse)
+source("sim_functions.R")
+```
+
+# Notation
+
+To begin we will consider %SOC as a two-dimensional surface defined over plots $\mathcal{P} \subset \mathbb{R}^2$, where $\mathbb{R}^2$ is a vector space with the usual Euclidean norm $\|u\| = \sqrt{u_1^2 + u_2^2}$ and inner product $\langle u,v \rangle = u_1v_1 + u_2v_2$. Typically, $\mathcal{P} \equiv [a,b]\times[c,d]$, a rectangular plot. For example in [@ryals_impacts_2014] we have a $25 \times 60$ meter plot so that $|a-b| = 25$ and $|c-d| = 60$. A typical element of $\mathcal{P}$ is an ordered pair $(x,y)$, which denotes the position of a point in the plot. Since we typically will consider a single plot, we can define (0,0) to be the lower left hand corner of the plot, so that points $(x,y)$ are relative to the position of the plot itself in $\mathbb{R}^2$. WLOG, we'll typically also take the orientation of the plot to be such that the $y$ direction indicates North/South (latitude) and the $x$ direction indicates East/West (longitude). For example, $(1,2)$ indicates a point 1 meter to the east and 2 meters to the north of the origin. 
+
+Given any point $(x,y)$ there is an associated concentration of soil carbon (%SOC), which we will denote by $z(x,y)$. Note that %SOC is not truly defined at a precise point $(x,y)$ - there is considerable variance at ever smaller scales: a tiny piece of root may be 100\% carbon, while a patch of sand may be 0\% carbon. $z(x,y)$ is better conceptualized as an average over a small window centered at $(x,y)$. In a design-based framework (as we are considering here), $z(x,y)$ is a fixed, unknown number. Typically the parameter of interest is:
+
+$$\mu \equiv \int_\mathcal{P} z(x,y) d\mathcal{P}  = \int_a^b \int_c^d z(x,y)~ dy ~dx$$
+
+This is the "population average" %SOC over the plot $\mathcal{P}$. We wish to estimate $\mu$ using data. In field studies, data take the form of finite samples determined at specific values of $x$ and $y$: $\{z(x_1,y_1), z(x_2, y_2), ... z(x_n, y_n) \}$ often we'll denote the data $\{z_1, z_2, ... z_n\} \equiv \{z_i\}_{i=1}^n$ when the locations themselves are not super important. 
+
+The properties of the data $\{z_i\}_{i=1}^n$ and estimators based on them depend on how the sampling locations $(x_1,y_1),...,(x_n,y_n)$ were chosen. For example, we can easily get an unbiased estimator by simple random sampling, choosing $x_i \sim U[a,b]$ and $y_i \sim U[c,d]$ independently where $U[a,b]$ denotes the uniform distribution on $[a,b]$. Chosen in this way we have an unbiased sample mean:
+
+$$\mathbb{E}\bigg [\frac{1}{n} \sum_{i=1}^n z_i \bigg ] = \mu$$
+
+Other sampling mechanisms (e.g. stratified sampling) can also satisfy unbiasedness and may have lower variance, which is very important since collecting samples is expensive. 
+
+
+
+# Compositing
+
+Not every sample taken is measured for %SOC. Instead, soils are thoroughly blended together into a *composite* sample, which is then measured. The idea is to avoid the (heavy) labor costs of measurement, allowing more samples to be taken per plot. Theoretically, we could just composite $n$ soil samples down to 1 sample and measure it 1 time, yielding the sample mean we would get if we had measured all $n$ samples. In practice, this is a problem because of measurement error. We must measure at least a few times in order to get a good estimate of $\mu$ and the variance in the measurement error (if there is bias in measurement we may be out of luck; more on this below).  
+
+
+Given samples $\{z_1,...z_n\}$ we bin them into $k$ groups of size $n/k$ (ideally $k$ should be a factor of $n$). The samples in each group are then physically mixed together to form composite samples $\{s_1, ... s_k\}$. Let $\{c_1,...,c_k\}$ be a set of sets, where each $c_i = \{c_{i1}, c_{i2},..., c_{i (n/k)}\}$ are the indices of the constituent samples of $s_i$. We assume that samples are mixed in equal proportions (*equal proportions compositing*), so that $s_i = \sum_{j \in c_i} \frac{k}{n} z_j$. Although we won't deal with it here, it is possible to get properties of composite samples that have been mixed without equal proportions of the constituent samples and an unbiased estimator with known variance can be recovered [@patil_composite_2011]. Crucially, the scientist still must know the proportions each soil was mixed in. A concern then is haphazardly compositing samples in the field. Compositing should be precise and mixing should be thorough. Additivity is another important assumption we've made, and is generally needed for valid compositing: the amount of SOC in the composited sample should equal the sum of the amount in the constituent samples. This assumption is met for SOC, but may be violated for other soil attributes, for example pH [@allen_review_2010]. 
+
+Under equal proportions compositing the sample mean of the composite samples is an unbiased estimate of $\mu$:
+
+$$\mathbb{E}\bigg [\frac{1}{k} \sum_{i=1}^k s_i  \bigg ] = \mathbb{E}\bigg [\frac{1}{k} \sum_{i=1}^k \sum_{j \in c_i} \frac{k}{n} z_j \bigg ] = \mathbb{E}\bigg [\frac{1}{n} \sum_{i=1}^n z_i  \bigg ] = \mu$$
+Furthermore, because the sample mean of the composite samples is equivalent to the sample mean of the constiutents, it's variance is also 
+
+$$\mathbb{V}\bigg[ \frac{1}{k} \sum_{i=1}^k s_i \bigg ] = \mathbb{V}\bigg [\frac{1}{n} \sum_{i=1}^n z_i \bigg ] = \frac{\sigma^2}{n}$$
+where $\sigma^2$ is the population variance, i.e. the variance of $\{z(x,y) \mid (x,y) \in \mathcal{P} \}$. 
+
+Why not always composite down to one sample and measure once? There are two reasons:
+
+- There is measurement error that is (hopefully) unbiased but will be variable.
+- For inference we must have an estimate of the population variance.
+
+The first point could be addressed by compositing to 1 sample and measuring it some number of times -- say, 10 -- depending on how large the measurement error is. More on that below. 
+
+The second point is non-negotiable. We need multiple measured samples from different locations on a plot in order to estimate the variance of our sample mean: $\hat{\mathbb{V}}[\frac{1}{n} \sum_{i=1}^n z_i] = \frac{\hat{\sigma}^2}{n}$. With only one measured sample $\hat{\sigma}^2$ is not estimable.
+
+
+# Sample Preparation
+
+SOC is typically analyzed in a lab, and there are considerable degrees of freedom in how samples are prepared for measurement once there. Labs adopt internal protocols to help eliminate these degrees of freedom, and there exist national and international standards to diminish variation between labs (e.g. [ISO](https://www.iso.org/standard/18782.html), [@burt_kellogg_2014]). Also, the costs of sample preparation comprise (along with measurement) a major bottleneck in field research, limiting the number of samples that can be analyzed.  
+
+The Silver Lab uses a lab protocol like:
+
+1) Collect soil cores.
+2) Air dry samples in open plastic bags
+3) Sieve using a 2mm mesh screen
+4) Pick roots 
+5) Pulverize using a SPEX ball grinder
+6) Check for carbonates with HCl
+7) Measure using a Carbo Elantech elemental analyzer (dry combustion)
+
+These steps help ensure that samples are free of water and homogenous. Especially if compositing has been done thorough mixing of equal proportion composites is essential. Steps 3 and 5 are instrumental to this. Dry combustion in an elemental analyzer is the gold standard for measurement of SOC. However, in the high heat of an elemental analyzer carbonates (an inorganic form of carbon) can be oxidized to CO$_2$ and appear as organic carbon. Thus, the application of HCl reveals the presence of carbonates which can throw off SOC measurement. 
+
+Root picking is a potential source of bias within and across labs. Not all labs root pick and, unlike 2mm sieving, it is not a widely held standard when defining and assessing SOC. Roots are a major source of SOC but are not considered part of the soil matrix and so are picked out by some labs (e.g. the Silver lab). Root picking is done by humans and highly variable: some people may be very scrupulous and others may not be (anecdotally, I have heard this said in a lab). Especially in an experimental setting, giving one or multiple treatment plots to a scrupulous root picker and the control plots to a less scrupulous root picker could heavily bias treatment effect estimates.
+
+I am not yet sure how to account for and/or model root picking in the software.
+
+
+# Measurement
+
+Measurement error is a potentially major source of uncertainty in the analysis of SOC. A core can be assayed for %SOC in 4 main ways in a laboratory [@fao_measuring_2019]:
+
+1) Wet digestion
+2) Loss-on-ignition (LOI)
+3) Spectroscopy
+4) *Dry combustion in an elemental analyzer (DC-EA)*
+
+I will focus on DC-EA since it is the gold standard and is in use in the Silver lab. First, a brief rundown of the other methods.
+
+
+Wet digestion uses chemicals to oxidize and measure SOC. It is cheap and fast and is in common use worldwide. It is innacurate: only about ~75\% of SOC (with wide variation) is oxidized, so correction factors must be used (typically 1.33). It is generally not recommended [@fao_measuring_2019]. LOI is cheap but measures soil organic matter (SOM), not SOC. Typically, SOC represents between 43 adn 58\% of SOM, and these numbers are used as correction factors. LOI is just the difference between soil mass at 105 degrees C (so that water is boiled off) and 550 degrees C (so that SOM is oxidized). LOI typically overestimates the amount of SOM. It is difficult to standardize (especially across soil types) and therefore error prone. On the plus side, large sample masses can be analyzed (unlike in an elemental analyzer) and LOI is fairly cheap and widely accessible. In spectroscopic analysis, light is shone on the soil and its composition (including SOC) is revealed by the properties of the reflected light (typically in the visible, near infrared, or mid infrared spectra). SOC is predicted from spectral output, and an error is associated with the prediction. The label (i.e. the groundtruth \%SOC) is given by a standard method, for example wet digestion [@viscarra_rossel_visible_2006]. These may be used for rapid determination of SOC in large quantities / sample sizes. 
+
+DC-EA is considered the gold standard for measurement. DC-EA measures %SOC burning a soil sample so that all the SOC is oxidized to CO$_2$, which is then measured. The EA takes in an aliquot of well-mixed soil that is placed into a tiny tin vessel. The mass of the aliquot depends on the machine but is typically very small, from 8 mg to a few grams [@fao_measuring_2019]. On the Silver lab's Carlo Elantech EA this is like 22 mg and must be measured extremely precisely (down to .001 mg, a microgram). EAs that can take larger samples may be less prone to error from tiny errors in the weight of the combusted aliquot. The little aliquot is dropped in its tin container into a combustion chamber that pipes in pure oxygen and burns the sample at $\approx 1000$ degrees celsius. This turns all the SOC into CO$_2$, which is then measured using gas chromatography. 
+
+Although DC-EA is regarded as the best available method for quantification of %SOC, it is still prone to measurement error. The measurement error is likely driven by errors in the mass of the aliquot. 
+
+Suppose we have $k$ (composite) samples with *true* %SOC content $\{s_1, ... s_k\}$ and let $\{s_1^*, ..., s^*_k \}$ be the *measured* value of our samples. Also suppose there are random measurement errors $\{\delta_1, ... , \delta_k \}$ that could be applied to each of our samples. There are three basic scenarios:
+
+1) **No measurement error**: $s_i^* = s_i$
+2) **Additive measurement error**: $s_i^* = s_i + \delta_i$
+3) **Multiplicative measurement error**: $s_i^* = s_i \delta_i$
+
+Under additive measurement error we need $\mathbb{E}[\delta_i] = 0$ for unbiasedness:
+
+$$\mathbb{E}[s_i^*] =  \mathbb{E}[s_i + \delta_i] = \mathbb{E}[s_i] + \mathbb{E}[\delta_i] = \mu$$
+
+Under multiplicative error we need $\mathbb{E}[\delta_i] = 1$ and $\delta_i \indep s_i$ (technically we just need $\mbox{Cov}(\delta_i, s_i) = 0$): 
+
+$$\mathbb{E}[s_i^*] = \mathbb{E}[s_i\delta_i] = \mathbb{E}[s_i]\mathbb{E}[\delta_i] = \mu$$
+
+
+I believe multiplicative measurement error is more reasonable because errors are likely to enter through errors in the mass, which is itself multiplicative in the determination of %SOC from a chromatographic reading. Also, multiplicative errors cannot yield negative SOC as long as $\delta_i \in \mathbb{R}_{\geq0}$. They could yield %SOC $> 1$, but for the range of %SOC and measurement error we are considering this won't happen.  
+
+
+# Estimation and Inference
+
+Recall that our overall goal is to estimate $\mu = \int_\mathcal{P} z(x,y,d) d\mathcal{P}$ using our measurements $\{s_i^*\}_{i=1}^k$. The sample mean of the measured composite samples is an unbiased estimator of $\mu$:
+\begin{align}
+\mathbb{E}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ] &=  
+\mathbb{E}\left [\frac{1}{k} \sum_{i=1}^k s_i\delta_i \right ]\\ 
+&=  \mathbb{E}\left [\frac{1}{k} \sum_{i=1}^k \left [ \sum_{j \in c_i} \frac{k}{n} z_j \right ] \delta_i \right ]\\
+&= \frac{1}{k} \sum_{i=1}^k \left [ \sum_{j \in c_i} \frac{k}{n}\mathbb{E}[z_j] \right ] \mathbb{E}[\delta_i]\\
+&= \frac{1}{k} \sum_{i=1}^k \left [ \sum_{j \in c_i} \frac{k}{n}\mu \right ] \\
+&= \frac{1}{k} \sum_{i=1}^k \mu \\
+&= \mu 
+\end{align}
+
+Furthermore, its variance is:
+
+\begin{align}
+\mathbb{V}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ] &= \frac{1}{k^2} \sum_{i=1}^k \mathbb{V}[s_i^*]\\
+&=  \frac{1}{k^2} \sum_{i=1}^k \mathbb{V}[s_i \delta_i]\\
+&= \frac{1}{k^2}  \sum_{i=1}^k \left ( \mathbb{V}[s_i] \mathbb{V}[\delta_i] + \mathbb{E}[s_i]^2 \mathbb{V}[\delta_i] + \mathbb{E}[\delta_i]^2 \mathbb{V}[s_i] \right )\\
+&= \frac{1}{k^2}  \sum_{i=1}^k \left ( \mathbb{V}[s_i] \sigma_\delta^2 + \mu^2 \sigma_\delta^2 + \mathbb{E}[\delta_i]^2 \mathbb{V}[s_i] \right )\\
+&= \frac{1}{k^2}  \sum_{i=1}^k \left ( \mathbb{V} \left [\sum_{j\in c_i} \frac{k}{n} z_i \right ] \sigma_\delta^2 + \mu^2 \sigma_\delta^2 + \mathbb{V}\left [\sum_{j\in c_i} \frac{k}{n} z_i \right ] \right )\\
+&= \frac{1}{k^2}  \sum_{i=1}^k \left ( \left [ \sum_{j\in c_i} \frac{k^2}{n^2} \mathbb{V}[z_i] \right ] \sigma_\delta^2 + \mu^2 \sigma_\delta^2 + \left [ \sum_{j\in c_i} \frac{k^2}{n^2} \mathbb{V}[z_i] \right ] \right )\\
+&= \frac{1}{k^2}  \sum_{i=1}^k \left ( \frac{k}{n} \sigma^2 \sigma_\delta^2 + \mu^2 \sigma_\delta^2 +  \frac{k}{n} \sigma^2\right )\\
+&= \frac{1}{k} \left ( \frac{k}{n} \sigma^2 \sigma_\delta^2 + \mu^2 \sigma_\delta^2 +  \frac{k}{n} \sigma^2\right ) \\ 
+&=  \frac{\sigma^2 (1 + \sigma_\delta^2) }{n}  + \frac{\mu^2 \sigma_\delta^2}{k}\\ 
+\end{align}
+
+First of all, if there is no measurement error than the variance of composited samples is just equal to $\sigma^2 / n$, i.e. the usual variance of a sample mean. Furthermore, the variance can be reduced in two ways: either by collecting more total samples (which reduces the first component) or by doing less compositing and thereby measuring more samples (which reduces the second component). If we do no compositing, and measure every sample we collect separately, then the variance reduces to $\frac{\sigma^2 + \sigma^2 \sigma_\delta^2 + \mu^2 \sigma_\delta^2}{n}$. Thus, if we do not measure all $n$ samples but instead composite and measure $k$ samples, then we incure a penalty of $\frac{(n-k)}{nk} \mu^2 \sigma_\delta^2$ in terms of increased variance. If $\mu^2$ or $\sigma_\delta^2$ is small compared to $\sigma^2$, this will be relatively minor. It will also be small if $k$ is close to $n$ or $n$ and $k$ are large. 
+
+
+
+## Estimating the variance
+
+If only estimating the mean mattered, then our work above implies that we should do a lot of compositing and relatively little measurement. However, if we want to do inference we need to estimate the variance of the sample mean as well, and this is likely to require more measurements. That is, we want $\hat{\mathbb{V}}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ]$. A plug-in estimator is:
+
+$$\hat{\mathbb{V}}\left [\frac{1}{k} \sum_{i=1}^k s_i^* \right ] = \frac{\hat{\sigma}^2 (1 + \hat{\sigma}_\delta^2)}{n} + \frac{\hat{\mu}^2 \hat{\sigma}_\delta^2}{k}$$
+
+**Question:** How can we estimate or at least bound $\sigma^2$ and $\sigma_\delta^2$ using composite samples? 
+
+
+
+
+
+# Bulk Density
+
+Soil bulk density is the mass per unit volume of the soil. It reflects the structure of the soil, including porosity and solids, and depends on the proportions of minerals in the soil, organic matter content, chemical composition, etc. These in turn reflect soil genesis, interaction of soil components, land use, management, etc. It's typically specified expressed in Mg m$^{-3}$ or equivalently in g cm$^{-3}$. Analyses should be in triplicate and account for/record the water status at the time of measurement [@fao_measuring_2019], e.g. whether stocks were computed shortly after a rain when the soil is wet and bulk density relatively higher. Further, bulk density should be measured on the *same core that %SOC is measured on* [@fao_measuring_2019].
+
+Measurement methods
+
+- **Undisturbed (intact) core method**: collect a known volume of soil using a metal ring pressed into the soil and determining the weight after drying. The core must be kept intact, which is difficult if the soil is too dry.
+- **Excavation method**: excavate some quantity of soil, dry and weight it. Then determine its volume by filling it with sand of known volume per unit mass. 
+- **Pedotransfer functions (PTFs)**: PTFs are not a measurement method per se. They are predictions of BD based on more easily measurable properties, like soil clay content and SOC content. They can lead to high uncertainty and errors in prediction need to be taken into account.
+
+
+
+
