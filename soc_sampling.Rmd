@@ -37,79 +37,22 @@ This is the "population average" %SOC over the plot $\mathcal{P}$. We wish to es
 In field studies, data take the form of finite samples determined at specific values of $x$ and $y$: $\{z(x_1,y_1), z(x_2, y_2), ... z(x_n, y_n) \}$ often we'll denote the data $\{z_1, z_2, ... z_n\} \equiv \{z_i\}_{i=1}^n$ when the locations themselves are not super important. 
 
 
+We first generate a two-dimensional surface representing top soil [0-10cm], that will serve throughout as a "ground truth." Different sampling designs can be visualized and analyzed using this ground truth.
+
+```{r surface}
+surface <- simulate_truth(size = c(250,600), nugget = .005, sill = .02, range = 40, intercept = .005, y_trend = TRUE, max_mean = .1)
+```
+
+
 # Simple random sampling
 
-### Hoeffding Bound
 
-We can use the *Hoeffding bound* to construct a finite sample confidence interval on the percent carbon estimated using simple random sampling. This bound is finite-sample valid and does not rely on any other assumptions other than the fact that percent carbon is in $[0,1]$. For samples $Z_1, Z_2, ... Z_n$ drawn from a bounded population, the probability that the sample mean is $\epsilon$ far from the population mean is:
-
-$$P(|\bar{Z} - \mathbb{E}[Z_1]| \geq \epsilon) \leq 2\exp\{-2 n \epsilon^2\} $$
-
-If we would like a 95% confidence interval on the sample mean, then we can set the LHS equal to .05 and rearrange:
-
-\begin{align}
-.05 &\leq 2 \exp\{- 2 n \epsilon^2\}\\ 
-\log(.025) &\leq -2 n \epsilon^2\\
-\frac{\log(.025)}{-2\epsilon^2} &\leq n
-\end{align}
-
-Thus for a 95\% confidence interval with width $\epsilon$ we would need $\frac{\log(.025)}{-2\epsilon^2}$ samples. This is a lot. Below we plot $n$ as a function of $\epsilon$, the desired precision, on the $\log_{10}$ scale.
-
-
+I plot an example of a simple random sample taken from our surface here:
 
 ```{r}
-get_n_hoeffding <- function(epsilon, alpha = .05){
-  #compute the hoeffding bound given a level of precision (epsilon) and a level of desired confidence (alpha)
-  n <- log(alpha / 2) / (-2 * epsilon^2) 
-  n
-}
+SRS <- collect_sample(surface = surface, design = "simple random sample", n_samp = 30)
+plot_surface_samples(surface = surface, samples = SRS)
 ```
-
-
-
-
-
-### Central Limit Theorem Bound
-
-On the other hand, we could consider the *central limit theorem* and an upper bound on the population variance. Since $Z_i \in [0,1]$, we have that $\sigma^2 \leq 1/4$. The central limit theorem gives an asymptotic distribution of the variation of the sample mean from the population mean:
-
-$$\mathbb{P}(|\bar{Z} - \mu| > \epsilon) = 2 \bigg (1 - \Phi \big (\frac{\epsilon}{\sigma / \sqrt{n}} \big ) \bigg ) \leq 2 \big (1-\Phi ( 4\epsilon \sqrt{n}) \big )$$
-Therefore if we wish to bound deviations from the mean by $\epsilon$ to occur with probability less than $\alpha$ we can collect $n$ so that:
-
-\begin{align}
-2(1 - \Phi(4 \epsilon \sqrt{n})) &\leq \alpha\\
-&\implies \\
-\Phi(4 \epsilon \sqrt{n}) \geq 1 - \alpha/2\\
-&\implies\\
-n \geq \frac{\Phi^{-1}(1-\alpha/2)^2}{16 \epsilon^2}
-\end{align}
-
-```{r}
-#population variance is 1/4 in the worst case for pct carbon
-get_n_clt <- function(epsilon, alpha = .05, variance = 1/4){
-  #compute the sample sizes needed using a wald interval
-  n <- (qnorm(1 - alpha/2)^2) / (16 * epsilon^2)
-  n
-}
-```
-
-
-### Comparing Bounds
-
-```{r}
-epsilon_grid <- seq(.01, .1, length.out = 100)
-n_vs_epsilon <- data.frame(n_hoeffding = get_n_hoeffding(epsilon_grid), n_clt = get_n_clt(epsilon_grid), epsilon = epsilon_grid) %>%
-  pivot_longer(cols = c("n_hoeffding","n_clt"))
-
-
-
-ggplot(data = n_vs_epsilon, aes(x = epsilon, y = value, colour = name)) +
-  geom_line() +
-  theme_linedraw() +
-  scale_y_log10() +
-  labs(y = "n", x = "epsilon")
-```
-
 
 
 # Stratified Sampling
@@ -126,4 +69,123 @@ As a preliminary example, consider an extreme case where half of a plot is 0\% S
 \end{align*}
 
 If these values are uniformly distributed throughout $\mathcal{P}$ there is nothing to be done. But suppose they are distributed so that the right half of the plot is all $Z_i = 1$ and the left half of the plot is all so that $Z_i = 0$. Then the variance within these halves is 0, and a single random sample from each half suffices to completely describe the %SOC there. 
+
+```{r stratified random sample}
+stratified_sample <- collect_sample(surface = surface, design = "stratified random sample", n_samp = 30, n_strata = 10)
+plot_surface_samples(surface = surface, samples = stratified_sample)
+```
+
+# Transect Sampling
+
+```{r transect sample}
+transect_sample <- collect_sample(surface = surface, design = "transect", n_samp = 30)
+plot_surface_samples(surface = surface, samples = transect_sample)
+```
+
+
+# Simulations 
+
+```{r compare sampling methods with simulations}
+run_simulation <- function(surface, sample_size){
+  transect_sample <- collect_sample(surface = surface, design = "transect", n_samp = sample_size)
+  stratified_sample <- collect_sample(surface = surface, design = "stratified random sample", n_samp = sample_size, n_strata = sample_size/3)
+  simple_random_sample <- collect_sample(surface = surface, design = "simple random sample", n_samp = sample_size)
+  
+  transect_estimate <- mean(transect_sample$z)
+  stratified_estimate <- mean(stratified_sample$z)
+  simple_random_estimate <- mean(simple_random_sample$z)
+  
+  c("simple_random_estimate" = simple_random_estimate, "stratified" = stratified_estimate, "transect" = transect_estimate)
+}
+
+simulations <- replicate(2000, run_simulation(surface = surface, sample_size = 30)) %>% 
+  t()
+
+get_results <- function(surface, sims){
+  bias <- colMeans(sims) - mean(surface$z)
+  variance <-  apply(sims, 2, var)
+  RMSE <- sqrt((colMeans(as.matrix(sims) - mean(surface$z))^2))
+  rbind("bias" = bias, "variance" = variance, "RMSE" = RMSE)
+}
+
+results <- get_results(surface = surface, sims = simulations)
+round(results*100, 5)
+```
+
+
+
+
+
+<!--
+### Hoeffding Bound
+
+We can use the *Hoeffding bound* to construct a finite sample confidence interval on the percent carbon estimated using simple random sampling. This bound is finite-sample valid and does not rely on any other assumptions other than the fact that percent carbon is in $[0,1]$. For samples $Z_1, Z_2, ... Z_n$ drawn from a bounded population, the probability that the sample mean is $\epsilon$ far from the population mean is:
+
+$$P(|\bar{Z} - \mathbb{E}[Z_1]| \geq \epsilon) \leq 2\exp\{-2 n \epsilon^2\} $$
+
+If we would like a 95% confidence interval on the sample mean, then we can set the LHS equal to .05 and rearrange:
+
+\begin{align}
+.05 &\leq 2 \exp\{- 2 n \epsilon^2\}\\ 
+\log(.025) &\leq -2 n \epsilon^2\\
+\frac{\log(.025)}{-2\epsilon^2} &\leq n
+\end{align}
+
+Thus for a 95\% confidence interval with width $\epsilon$ we would need $\frac{\log(.025)}{-2\epsilon^2}$ samples. This is a lot. Below we plot $n$ as a function of $\epsilon$, the desired precision, on the $\log_{10}$ scale.
+
+-->
+
+```{r, include = FALSE}
+get_n_hoeffding <- function(epsilon, alpha = .05){
+  #compute the hoeffding bound given a level of precision (epsilon) and a level of desired confidence (alpha)
+  n <- log(alpha / 2) / (-2 * epsilon^2) 
+  n
+}
+```
+
+
+
+
+<!--
+### Central Limit Theorem Bound
+
+On the other hand, we could consider the *central limit theorem* and an upper bound on the population variance. Since $Z_i \in [0,1]$, we have that $\sigma^2 \leq 1/4$. The central limit theorem gives an asymptotic distribution of the variation of the sample mean from the population mean:
+
+$$\mathbb{P}(|\bar{Z} - \mu| > \epsilon) = 2 \bigg (1 - \Phi \big (\frac{\epsilon}{\sigma / \sqrt{n}} \big ) \bigg ) \leq 2 \big (1-\Phi ( 4\epsilon \sqrt{n}) \big )$$
+Therefore if we wish to bound deviations from the mean by $\epsilon$ to occur with probability less than $\alpha$ we can collect $n$ so that:
+
+\begin{align}
+2(1 - \Phi(4 \epsilon \sqrt{n})) &\leq \alpha\\
+&\implies \\
+\Phi(4 \epsilon \sqrt{n}) \geq 1 - \alpha/2\\
+&\implies\\
+n \geq \frac{\Phi^{-1}(1-\alpha/2)^2}{16 \epsilon^2}
+\end{align}
+
+-->
+
+```{r, include = FALSE}
+#population variance is 1/4 in the worst case for pct carbon
+get_n_clt <- function(epsilon, alpha = .05, variance = 1/4){
+  #compute the sample sizes needed using a wald interval
+  n <- (qnorm(1 - alpha/2)^2) / (16 * epsilon^2)
+  n
+}
+```
+
+
+```{r, include = FALSE}
+epsilon_grid <- seq(.01, .1, length.out = 100)
+n_vs_epsilon <- data.frame(n_hoeffding = get_n_hoeffding(epsilon_grid), n_clt = get_n_clt(epsilon_grid), epsilon = epsilon_grid) %>%
+  pivot_longer(cols = c("n_hoeffding","n_clt"))
+
+
+
+ggplot(data = n_vs_epsilon, aes(x = epsilon, y = value, colour = name)) +
+  geom_line() +
+  theme_linedraw() +
+  scale_y_log10() +
+  labs(y = "n", x = "epsilon")
+```
+
 
