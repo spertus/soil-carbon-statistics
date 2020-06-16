@@ -95,21 +95,49 @@ run_simulation <- function(surface, sample_size){
   stratified_estimate <- mean(stratified_sample$z)
   simple_random_estimate <- mean(simple_random_sample$z)
   
-  c("simple_random_estimate" = simple_random_estimate, "stratified" = stratified_estimate, "transect" = transect_estimate)
+  strata_size <- table(stratified_sample$strata)[1]
+  num_strata <- sample_size / strata_size
+  
+  #this will be a conservative estimate of the transect variance. Yate's balanced differences may be sharper.
+  variance_transect <- var(transect_sample$z) / sample_size
+  variance_stratified <- sum(tapply(stratified_sample$z, stratified_sample$strata, var) / strata_size) / num_strata^2
+  variance_SRS <- var(simple_random_sample$z) / sample_size
+ 
+  
+  data.frame("estimate" = c("point", "variance"), "SRS" = c(simple_random_estimate, variance_SRS), "stratified" = c(stratified_estimate, variance_stratified), "transect" = c(transect_estimate, variance_transect))
 }
 
-simulations <- replicate(2000, run_simulation(surface = surface, sample_size = 30)) %>% 
-  t()
+simulations <- replicate(2000, run_simulation(surface = surface, sample_size = 30), simplify = FALSE) %>%
+  map(pivot_longer, cols = c("SRS", "stratified", "transect"), names_to = "method") %>%
+  reduce(bind_rows)
+  
 
 get_results <- function(surface, sims){
-  bias <- colMeans(sims) - mean(surface$z)
-  variance <-  apply(sims, 2, var)
-  RMSE <- sqrt((colMeans(as.matrix(sims) - mean(surface$z))^2))
-  rbind("bias" = bias, "variance" = variance, "RMSE" = RMSE)
+  bias <- sims %>%
+    filter(estimate == "point") %>%
+    group_by(method) %>%
+    summarize(bias = mean(value - mean(surface$z))) 
+  true_variance <- sims %>%
+    filter(estimate == "point") %>%
+    group_by(method) %>%
+    summarize(true_variance = var(value)) %>%
+    select(true_variance)
+  true_RMSE <- sims %>%
+    filter(estimate == "point") %>%
+    group_by(method) %>%
+    summarize(RMSE = sqrt(sum((value - mean(surface$z))^2))) %>%
+    select(RMSE)
+  estimated_variance <- sims %>%
+    filter(estimate == "variance") %>%
+    group_by(method) %>%
+    summarize(estimated_variance = mean(value)) %>%
+    select(estimated_variance)
+  
+ bind_cols(bias, true_variance, estimated_variance, true_RMSE)
 }
 
 results <- get_results(surface = surface, sims = simulations)
-round(results*100, 5)
+results %>% mutate_at(vars(c("bias","true_variance","estimated_variance","RMSE")), function(x){round(x*100, 4)})
 ```
 
 
