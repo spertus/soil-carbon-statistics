@@ -1,0 +1,35 @@
+---
+title: "SOC Power Analysis"
+author: "Jake Spertus"
+date: "June 19th, 2020"
+output: html_notebook
+header_includes:
+  -\usepackage{amsmath}
+  -\usepackage{amsfonts}
+  -\usepackage{color}
+  -\newcommand{\indep}{\perp \!\!\! \perp}
+bibliography: soilcarbonstatistics.bib
+---
+```{r knitr setup, message = FALSE, warning = FALSE, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r packages, message = FALSE, results = FALSE}
+library(tidyverse)
+source("sim_functions.R")
+```
+
+
+```{r}
+#simulate 10 control and treatment plots
+#surfaces <- replicate(10, simulate_truth(size = c(250,600), nugget = .005, sill = .02, range = 40, intercept = .03, y_trend = FALSE), simplify = FALSE)
+#save(surfaces, file = "simulated_surfaces")
+load("simulated_surfaces")
+
+true_samples <- surfaces %>% 
+  map(collect_sample, design = "simple random sample", n_samp = 30)
+composited_samples <- true_samples %>%
+  map(function(sample_frame){composite_samples(sample_frame$z, k = 5)})
+measured_samples <- composited_samples %>%
+  map(perturb_measurements(true_samples = ., error_type = "multiplicative", error_bounds = c(.8,1.2), error_sd = .005))
+```
