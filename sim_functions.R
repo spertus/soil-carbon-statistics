@@ -78,14 +78,14 @@ add_depth_samples <- function(surface, increments = 4, decrease = "exponential",
 }
 
 ########## function to draw a stratified sample from a vector ##########
-stratified_sample <- function(population_vector, within_strata_sample_size, strata_endpoints){
+get_stratified_sample <- function(population_vector, within_strata_sample_size, strata_endpoints){
   #inputs:
-    #population_vector: a vector of numbers to be sampled
-    #within_strata_sample_size: how many samples to draw from each strata? Either a single number (equal sample sizes) or a vector of length(strata_endpoints) + 1
-    #strata_endpoints: the endpoints of the strata in terms of the entries (not indices) of the population_vector. 
-      #The smallest entry is non-inclusive, e.g. if you want to include 1 the smallest endpoint should be 0.
+  #population_vector: a vector of numbers to be sampled
+  #within_strata_sample_size: how many samples to draw from each strata? Either a single number (equal sample sizes) or a vector of length(strata_endpoints) + 1
+  #strata_endpoints: the endpoints of the strata in terms of the entries (not indices) of the population_vector. 
+  #The smallest entry is non-inclusive, e.g. if you want to include 1 the smallest endpoint should be 0.
   #outputs:
-    #a vector of samples, the names of the entries indicate the strata
+  #a vector of samples, the names of the entries indicate the strata
   strata <- cut(population_vector, strata_endpoints)
   if(anyNA(strata)){
     stop("Not all elements of population_vector are in a strata! strata_endpoints do not make a partition. Note that left strata endpoint is non-inclusive.")
@@ -132,7 +132,7 @@ collect_sample <- function(surface, design = "transect", n_samp = 9, n_strata = 
     x_samples <- sample(1:max(surface$x), size = n_samp, replace = TRUE)
     if((n_samp %% n_strata) != 0){stop("sample size is not a multiple of the number of strata -> unequal sampling across strata (not currently supported)")}
     strata_endpoints <- round(seq(0, max(surface$y), length.out = n_strata + 1))
-    y_samples <- stratified_sample(1:max(surface$y), within_strata_sample_size = n_samp / n_strata, strata_endpoints = strata_endpoints)
+    y_samples <- get_stratified_sample(1:max(surface$y), within_strata_sample_size = n_samp / n_strata, strata_endpoints = strata_endpoints)
     
     grid <- data.frame("x" = x_samples, "y" = y_samples, "strata" = names(y_samples))
   } else{
@@ -205,6 +205,24 @@ perturb_measurements <- function(true_samples, error_type = "multiplicative", er
   measured_samples_frame <- samples_frame %>% 
     mutate(measurement = measured_samples)
   measured_samples_frame 
+}
+
+
+################ function to bundle measured samples taken from a number of treatment and control plots ################
+bundle_samples <- function(measured_samples, treatment_indicator, time = NULL, composite_size = 1){
+  #inputs: 
+    #measured samples: a list of data frames. Each entry is samples as output by collect_sample(), composite_samples(), or perturb_measurements()
+    #treatment_indicator: a binary vector of length length(measured_samples), each entry indicates whether the plot is in the treatment (1) or control (0) group
+    #time: an optional argument specifying the time of measurement of each sample. If there is no time it's simply excluded. Comparing differences is likely to be considerably more powerful then a cross-sectional analysis, (e.g. not measuring at baseline)
+    #composite_size: a vector of length 1 (if all composites are of the same size) or of length length(measured_samples) indicating the number of samples per composite sample in each measured plot. 
+  #outputs: 
+    #a dataframe of samples with columns for composited sample number, number of samples in composite, plot number, treatment indicator, and time (if given)
+}
+
+
+
+run_ANOVA(samples){
+  
 }
 
 
