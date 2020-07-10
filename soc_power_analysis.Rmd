@@ -19,17 +19,42 @@ library(tidyverse)
 source("sim_functions.R")
 ```
 
+```{r plot mean estimation}
+surface <- simulate_truth(size = c(250,600), nugget = .005, sill = .02, range = 40, intercept = .03, y_trend = FALSE)
+true_mean <- mean(surface$z)
 
-```{r}
+run_simulation <- function(surface){
+  true_samples <- collect_sample(surface = surface,  design = "stratified random sample", n_samp = 9, n_strata = 3)
+  composited_samples <- composite_samples(true_samples, k = 3)
+  measured_samples <- measure_samples(composited_samples, error_bounds = c(.9,1.1), error_sd = 0, replicates = 1)
+  estimates <- estimate_plot_carbon(plot_samples = measured_samples)
+  as.matrix(estimates)
+}
+
+simulations <- matrix(0, nrow = 1000, ncol = 4)
+for(i in 1:1000){
+  simulations[i,] <- run_simulation(surface)
+}
+
+bias <- mean(simulations[,1]) - true_mean
+true_variance <- var(simulations[,1])
+estimated_variance <- mean(simulations[,2])
+covers <- (true_mean >= simulations[,3]) & (true_mean <= simulations[,4])
+coverage <- mean(covers)
+```
+
+
+```{r experiment simulation}
 #simulate 10 control and treatment plots
 #surfaces <- replicate(10, simulate_truth(size = c(250,600), nugget = .005, sill = .02, range = 40, intercept = .03, y_trend = FALSE), simplify = FALSE)
 #save(surfaces, file = "simulated_surfaces")
 load("simulated_surfaces")
 
 true_samples <- surfaces %>% 
-  map(collect_sample, design = "simple random sample", n_samp = 30)
+  map(collect_sample, design = "stratified random sample", n_samp = 9, n_strata = 3)
 composited_samples <- true_samples %>%
-  map(function(sample_frame){composite_samples(sample_frame$z, k = 5)})
+  map(function(sample_frame){composite_samples(sample_frame, k = 3)})
 measured_samples <- composited_samples %>%
-  map(perturb_measurements(true_samples = ., error_type = "multiplicative", error_bounds = c(.8,1.2), error_sd = .005))
+  map(function(x){measure_samples(true_samples = x, error_type = "multiplicative", error_bounds = c(.8,1.2), error_sd = 0, replicates = 2)})
+bundled_samples <- bundle_samples(samples = measured_samples, treatment_indicator = rep(c(1,0), each = 5))
 ```

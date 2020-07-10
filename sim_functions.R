@@ -123,11 +123,11 @@ collect_sample <- function(surface, design = "transect", n_samp = 9, n_strata = 
     if(sample(c(TRUE, FALSE), size = 1)){
       x_grid <- rev(x_grid)
     }
-    grid <- data.frame("x" = x_grid, "y" = y_grid)
+    grid <- data.frame("x" = x_grid, "y" = y_grid, "strata" = paste("(", min(surface$y), ",", max(surface$y), "]", sep = ""))
   } else if(design == "simple random sample"){
     y_samples <- sample(1:max(surface$y), size = n_samp, replace = TRUE)
     x_samples <- sample(1:max(surface$x), size = n_samp, replace = TRUE)
-    grid <- data.frame("x" = x_samples, "y" = y_samples)
+    grid <- data.frame("x" = x_samples, "y" = y_samples, "strata" = paste("(", min(surface$y), ",", max(surface$y), "]", sep = ""))
   } else if(design == "stratified random sample"){
     x_samples <- sample(1:max(surface$x), size = n_samp, replace = TRUE)
     if((n_samp %% n_strata) != 0){stop("sample size is not a multiple of the number of strata -> unequal sampling across strata (not currently supported)")}
@@ -159,27 +159,27 @@ composite_samples <- function(samples, k = 5){
   #groupings are determined by samples, with n/k samples in each group (except for possibly the last, see below)
   #if (length(samples) %% k) != 0, then the last group will accomodate all the additional samples
   #input:
-    #samples: a length-n vector of samples from the plot
-    #k: the number of samples we want out ("composite from n down to k")
-  #output: the composite samples. a named vector of length k, names give number of composites in each group (last group may have more and this needs to be accounted for).
+    #samples: a dataframe of samples from a plot, as output by collect_sample()
+    #k: the number of samples we want out ("composite from n down to k") per strata. For simple or transect sampling, this is the total number of samples we want out.
+  #output: a dataframe of composite samples.
+  strata_size <- table(samples$strata)[1]
+  num_strata <- nrow(samples) / strata_size
+  if((strata_size %% k) != 0){stop("n is not divisible by k!")}
+  index <- rep(1:k, num_strata)
   
-  index <- rep(1:k, each = floor(length(samples)/k))
-  
-  if((length(samples)) %% k != 0){
-    warning("n is not divisible by k! Remainder is composited with the last group.")
-    index <- c(index, rep(k, times = (length(samples) %% k)))
-  }
-  composites <- tapply(X = samples, INDEX = index, FUN = mean)
-  names(composites) <- table(index)
-  composites
+  composite_frame <- samples %>%
+    mutate(composite_group = index) %>%
+    group_by(strata, composite_group) %>%
+    summarize(composite_size = n(), z = mean(z))
 }
 
 
-########### function to perturb measurements of samples ##########
-perturb_measurements <- function(true_samples, error_type = "multiplicative", error_bounds, error_sd, replicates = 1){
+########### function to measureme samples with optional error ##########
+measure_samples <- function(true_samples, error_type = "multiplicative", error_bounds, error_sd, replicates = 1){
   #corrupts samples with independent, symmetric, beta distributed measurement error 
+  #to measure samples without error, set error_sd = 0
   #inputs:
-    #true_samples: true pct carbon (unknown) to be measured with error
+    #true_samples: dataframe of samples as output by composite_samples
     #error_type: how should the error perturb the true vale?
       #"additive": the errors are just added to the true values (unbiased implies centered at 0)
       #"multiplicative": the true values are dilated by the errors (unbiased implies centered at 1)
@@ -191,40 +191,136 @@ perturb_measurements <- function(true_samples, error_type = "multiplicative", er
     stop("error variance is too big given the error bounds!")
   }
   alpha <- (error_bounds[1] - error_bounds[2])^2 / (8 * error_sd^2) - 1/2
-  delta_star <- rbeta(length(true_samples)*replicates, shape1 = alpha, shape2 = alpha)
+  delta_star <- rbeta(nrow(true_samples)*replicates, shape1 = alpha, shape2 = alpha)
   delta <- (delta_star - 1/2) * abs(error_bounds[1] - error_bounds[2]) + mean(error_bounds)
-  samples_frame <- expand.grid("sample" = rep(1:length(true_samples)), "replicate" = rep(1:replicates))
+  samples_frame <- expand.grid("sample" = rep(1:nrow(true_samples)), "measurement_replicate" = rep(1:replicates))
   
   if(error_type == "multiplicative"){
-    measured_samples <- rep(true_samples, each = replicates) * delta
+    measured_samples <- rep(true_samples$z, replicates) * delta
   } else if(error_type == "additive"){
-    measured_samples <- rep(true_samples, each = replicates) + delta
+    measured_samples <- rep(true_samples$z, replicates) + delta
   } else{
     stop("input a valid error_type")
   }
   measured_samples_frame <- samples_frame %>% 
-    mutate(measurement = measured_samples)
+    mutate(measurement = measured_samples) %>%
+    mutate(composite_size = rep(true_samples$composite_size, replicates)) %>%
+    mutate(strata = rep(true_samples$strata, replicates))
   measured_samples_frame 
 }
 
 
 ################ function to bundle measured samples taken from a number of treatment and control plots ################
-bundle_samples <- function(measured_samples, treatment_indicator, time = NULL, composite_size = 1){
+bundle_samples <- function(samples, treatment_indicator, time = NULL){
   #inputs: 
-    #measured samples: a list of data frames. Each entry is samples as output by collect_sample(), composite_samples(), or perturb_measurements()
+    #measured samples: a list of data frames. Each entry is samples as output by perturb_measurements()
     #treatment_indicator: a binary vector of length length(measured_samples), each entry indicates whether the plot is in the treatment (1) or control (0) group
     #time: an optional argument specifying the time of measurement of each sample. If there is no time it's simply excluded. Comparing differences is likely to be considerably more powerful then a cross-sectional analysis, (e.g. not measuring at baseline)
-    #composite_size: a vector of length 1 (if all composites are of the same size) or of length length(measured_samples) indicating the number of samples per composite sample in each measured plot. 
   #outputs: 
     #a dataframe of samples with columns for composited sample number, number of samples in composite, plot number, treatment indicator, and time (if given)
-}
-
-
-
-run_ANOVA(samples){
+  num_replicates <- length(samples[treatment_indicator == 1])
+  replicates_frame <- data.frame(treatment = treatment_indicator, plot = 1:num_replicates)
   
+  sample_frame <- samples %>%
+    reduce(bind_rows) %>% 
+    mutate(plot = rep(replicates_frame$plot, each = nrow(samples[[1]]))) %>%
+    mutate(treatment = rep(replicates_frame$treatment, each = nrow(samples[[1]]))) 
+  sample_frame
 }
 
+
+
+
+############# estimation: mean, variance, confidence interval for individual plot total ###############
+estimate_plot_carbon <- function(plot_samples, confidence_level = .95){
+  #goal is to estimate the mean, variance, and a confidence interval for the plot (population) average given any kind of sampling scheme
+  #inputs: 
+    #plot_samples: a dataframe with samples as output by measure_samples()
+    #confidence_level: a desired confidence level to construct an approximate confidence interval using CLT
+  #outputs:
+    #mean, variance, and confidence interval for plot population mean SOC concentration
+  alpha <- 1-confidence_level
+  plot_mean <- plot_samples %>%
+    group_by(sample) %>% 
+    summarize(strata = first(strata), measurement_mean = mean(measurement)) %>%
+    group_by(strata) %>%
+    summarize(strata_mean = mean(measurement_mean), strata_variance = var(measurement_mean)) %>%
+    summarize(plot_mean = mean(strata_mean), plot_variance = 1/n()^2 * sum(strata_variance)) %>%
+    mutate(lower_CI = plot_mean + qnorm(alpha/2)*sqrt(plot_variance), upper_CI = plot_mean + qnorm(1-alpha/2)*sqrt(plot_variance))
+  plot_mean
+}
+
+
+
+########### run stratification ANOVA #############
+#run an analysis of a stratification (how succesful was the stratification?)
+#Reference: page 81 of Lark and Webster "Field sampling for environmental science..."
+analyze_stratification <- function(plot_samples){
+  #report the intraclass correlation and relative variance of a stratified samples
+  #a succesful stratification has intraclass correlation near 1 and relative variance near 0
+  #inputs: 
+    #plot_samples: a dataframe of samples as output by measure_samples()
+  #outputs:
+    #a dataframe with one row, columns are intraclass correlation and relative variance
+  
+  
+  #as a first step, take mean across measurement replicates
+  plot_samples <- plot_samples %>%
+    group_by(sample) %>%
+    summarize(strata = first(strata), measurement_mean = mean(measurement))
+  
+  within_strata_variance <- plot_samples %>%
+    group_by(strata) %>%
+    summarize(strata_sum_squares = sum((measurement_mean - mean(measurement_mean))^2), strata_DOF = n() - 1) %>%
+    summarize(within_strata_variance = sum(strata_sum_squares) / sum(strata_DOF)) %>%
+    pull(within_strata_variance)
+  
+  total_variance <- plot_samples %>%
+    summarize(total_variance = var(measurement_mean)) %>%
+    pull(total_variance)
+  
+  B <- plot_samples %>%
+    group_by(strata) %>%
+    summarize(strata_mean = mean(measurement_mean), strata_size = n()) %>%
+    summarize(B = (1 / (n() - 1)) * sum(strata_size * (strata_mean - mean(strata_mean))^2)) %>%
+    pull(B)
+  
+  n_w_star <- plot_samples %>%
+    group_by(strata) %>%
+    summarize(strata_size = n()) %>%
+    summarize(K = n(), N = sum(strata_size), sum_size_squared = sum(strata_size^2)) %>%
+    mutate(n_w_star = (1/(K-1)) * (N - sum_size_squared / N)) %>%
+    pull(n_w_star)
+  
+  between_strata_variance <- (B - within_strata_variance) / n_w_star
+  
+  intraclass_correlation <- between_strata_variance / (within_strata_variance + between_strata_variance)
+  
+  relative_variance <- within_strata_variance / total_variance
+  
+  data.frame(intraclass_correlation = intraclass_correlation, relative_variance = relative_variance)
+}
+
+
+########### estimate treatment effect and confidence interval ###########
+run_ANOVA <- function(samples){
+  measurement_avg_samples <- samples %>%
+    group_by(sample, plot, treatment) %>% 
+    summarize(measurement_mean = mean(measurement))
+  
+  #mean squares
+  between_treatment <- measurement_avg_samples %>% 
+    group_by(treatment) %>%
+    summarize(treatment_mean = mean(measurement_mean)) %>%
+    summarize(between_treatment_SS = var(treatment_mean)) %>%
+    pull(between_treatment_SS)
+  
+  between_plots <- measurement_avg_samples %>%
+    group_by(plot, treatment) %>%
+    summarize(plot_mean = mean(measurement_mean)) #FINISH
+  
+  #need cores within plots
+}
 
 
 
