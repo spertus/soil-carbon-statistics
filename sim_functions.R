@@ -219,7 +219,7 @@ bundle_samples <- function(samples, treatment_indicator, time = NULL){
   #outputs: 
     #a dataframe of samples with columns for composited sample number, number of samples in composite, plot number, treatment indicator, and time (if given)
   num_replicates <- length(samples[treatment_indicator == 1])
-  replicates_frame <- data.frame(treatment = treatment_indicator, plot = 1:num_replicates)
+  replicates_frame <- data.frame(treatment = treatment_indicator, plot = 1:length(samples))
   
   sample_frame <- samples %>%
     reduce(bind_rows) %>% 
@@ -303,24 +303,111 @@ analyze_stratification <- function(plot_samples){
 
 
 ########### estimate treatment effect and confidence interval ###########
+#still in development
 run_ANOVA <- function(samples){
+  #analyze an experiment at a given time point using ANOVA (normal theory inference)
+  #input:
+    #samples: a dataframe of samples as output by bundle_samples()
+  #output:
+    #a dataframe with an estimated treatment effect, standard error, p-value, and confidence interval. 
   measurement_avg_samples <- samples %>%
     group_by(sample, plot, treatment) %>% 
-    summarize(measurement_mean = mean(measurement))
+    summarize(measurement_mean = mean(measurement)) %>%
+    ungroup() %>%
+    mutate(plot = as_factor(plot), treatment = as_factor(treatment))
   
   #mean squares
-  between_treatment <- measurement_avg_samples %>% 
+  # between_treatment <- measurement_avg_samples %>% 
+  #   group_by(treatment) %>%
+  #   summarize(treatment_mean = mean(measurement_mean)) %>%
+  #   summarize(between_treatment_MS = var(treatment_mean), DF = n() - 1)
+  # 
+  # between_plots <- measurement_avg_samples %>%
+  #   group_by(plot, treatment) %>%
+  #   summarize(plot_mean = mean(measurement_mean)) %>%
+  #   group_by(treatment) %>%
+  #   summarize(between_plot_variance = var(plot_mean), DF_plot = n() - 1) %>%
+  #   summarize(between_plot_MS = mean(between_plot_variance), DF = sum(DF_plot))
+  # 
+  # within_plots <- measurement_avg_samples %>%
+  #   group_by(plot, treatment) %>%
+  #   summarize(core_variance = var(measurement_mean)) %>%
+  #   summarize(within_plot_MS = mean(core_variance), DF = n())
+  
+  linear_model <- lm(measurement_mean ~ plot + treatment, data = measurement_avg_samples)
+}
+
+############### randomization inference ###############
+
+shuffle_treatment_assignment <- function(samples){
+  #auxiliary function for permutation test: shuffle plots in a dataframe
+  #inputs:
+    #samples: a dataframe of samples as output by bundle_samples()
+  #outputs:
+    #the same dataframe with the treatment indicator shuffled
+  shuffled_plots_treatment <- samples %>% 
+    select(plot, treatment) %>%
+    distinct() %>%
+    mutate(treatment = sample(treatment, size = length(treatment), replace = FALSE))
+  
+  shuffled_samples <- samples %>%
+    select(-treatment) %>%
+    inner_join(shuffled_plots_treatment, by = "plot")
+  
+  shuffled_samples
+}
+
+get_difference_in_means <- function(samples){
+  #function for permutation test. Given a dataframe compute difference in means between trt and control
+  #inputs:
+    #samples: a dataframe of samples as output by bundle_samples()
+  #outputs:
+    #the difference in means between treatment and control plots (averaged over plots and cores)
+  difference_in_means <- samples %>%
     group_by(treatment) %>%
-    summarize(treatment_mean = mean(measurement_mean)) %>%
-    summarize(between_treatment_SS = var(treatment_mean)) %>%
-    pull(between_treatment_SS)
-  
-  between_plots <- measurement_avg_samples %>%
-    group_by(plot, treatment) %>%
-    summarize(plot_mean = mean(measurement_mean)) #FINISH
-  
-  #need cores within plots
+    summarize(trt_mean = mean(measurement_mean)) %>%
+    pivot_wider(names_from = treatment, values_from = trt_mean) %>%
+    mutate(difference_in_means = `1` - `0`) %>%
+    pull(difference_in_means)
+}
+
+bootstrap_cores <- function(samples){
+  #function to bootstrap samples from plots
+  #inputs:
+    #samples: a dataframe of samples as output by bundle_samples()
+  #outputs:
+    #a bootstrapped dataframe, bootstraps are done within plots
+  bootstrapped_samples <- samples %>% 
+    group_by(plot, strata) %>%
+    sample_frac(size = 1, replace = TRUE) %>% 
+    ungroup()
+  bootstrapped_samples
 }
 
 
+run_permutation_analysis <- function(samples, B = 1000, bootstrap_cores = FALSE, plot = FALSE){
+  #take average over measurement for now
+  measurement_avg_samples <- samples %>%
+    group_by(sample, plot, treatment, strata) %>% 
+    summarize(measurement_mean = mean(measurement)) %>%
+    ungroup() %>%
+    mutate(plot = as_factor(plot), treatment = as_factor(treatment))
+  
+  #observed value of test statistic
+  difference_in_means <- get_difference_in_means(measurement_avg_samples)
+  
+  #permutation distribution
+  if(!bootstrap_cores){
+    permutation_distribution <- replicate(n = B, expr = get_difference_in_means(shuffle_treatment_assignment(measurement_avg_samples)))
+  } else {
+    permutation_distribution <- replicate(n = B, expr = get_difference_in_means(shuffle_treatment_assignment(bootstrap_cores(measurement_avg_samples))))
+  }
+  
+  if(plot = TRUE){
+    hist(permutation_distribution, breaks = 30, xlim = c(min(permutation_distribution, difference_in_means), max(permutation_distribution, difference_in_means)))
+    lines(c(difference_in_means, difference_in_means), c(0,B), lwd = 3, col = "red")
+  }
+  
+  data.frame(difference_in_means = difference_in_means, p_value = 1 - mean(permutation_distribution < abs(difference_in_means) & permutation_distribution > -abs(difference_in_means)))
+}
 
