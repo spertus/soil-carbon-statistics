@@ -303,38 +303,35 @@ analyze_stratification <- function(plot_samples){
 
 
 ########### estimate treatment effect and confidence interval ###########
-#still in development
-run_ANOVA <- function(samples){
+run_ANOVA <- function(samples, include_plot_variance = TRUE, detail = FALSE){
   #analyze an experiment at a given time point using ANOVA (normal theory inference)
   #input:
     #samples: a dataframe of samples as output by bundle_samples()
+    #include_plot_variance: a boolean. If TRUE, return full ANOVA accounting for multiple samples within plots. If FALSE, conduct inference on plot means
+    #detail: if FALSE, return only the F-statistic (e.g. for simulations). If TRUE, return full linear model output (e.g. for data analysis)
   #output:
-    #a dataframe with an estimated treatment effect, standard error, p-value, and confidence interval. 
+    #either a full linear model (lm class) or the F-statistic from a linear model
   measurement_avg_samples <- samples %>%
     group_by(sample, plot, treatment) %>% 
     summarize(measurement_mean = mean(measurement)) %>%
     ungroup() %>%
     mutate(plot = as_factor(plot), treatment = as_factor(treatment))
   
-  #mean squares
-  # between_treatment <- measurement_avg_samples %>% 
-  #   group_by(treatment) %>%
-  #   summarize(treatment_mean = mean(measurement_mean)) %>%
-  #   summarize(between_treatment_MS = var(treatment_mean), DF = n() - 1)
-  # 
-  # between_plots <- measurement_avg_samples %>%
-  #   group_by(plot, treatment) %>%
-  #   summarize(plot_mean = mean(measurement_mean)) %>%
-  #   group_by(treatment) %>%
-  #   summarize(between_plot_variance = var(plot_mean), DF_plot = n() - 1) %>%
-  #   summarize(between_plot_MS = mean(between_plot_variance), DF = sum(DF_plot))
-  # 
-  # within_plots <- measurement_avg_samples %>%
-  #   group_by(plot, treatment) %>%
-  #   summarize(core_variance = var(measurement_mean)) %>%
-  #   summarize(within_plot_MS = mean(core_variance), DF = n())
-  
-  linear_model <- lm(measurement_mean ~ plot + treatment, data = measurement_avg_samples)
+  if(include_plot_variance){
+    linear_model <- aov(measurement_mean ~ treatment + Error(plot), data = measurement_avg_samples)
+    p_value <- summary(linear_model)[["Error: plot"]][[1]][["Pr(>F)"]][1] 
+  } else {
+    measurement_plot_avg_samples <- measurement_avg_samples %>%
+      group_by(plot, treatment) %>%
+      summarize(measurement_plot_mean = mean(measurement_mean))
+    linear_model <- lm(measurement_plot_mean ~ treatment, data = measurement_plot_avg_samples)
+    p_value <- anova(linear_model)[["Pr(>F)"]][1]
+  }
+  if(detail){
+    linear_model
+  } else {
+    p_value
+  }    
 }
 
 ############### randomization inference ###############
@@ -376,7 +373,7 @@ bootstrap_cores <- function(samples){
   #inputs:
     #samples: a dataframe of samples as output by bundle_samples()
   #outputs:
-    #a bootstrapped dataframe, bootstraps are done within plots
+    #a bootstrapped dataframe, bootstraps are done within strata
   bootstrapped_samples <- samples %>% 
     group_by(plot, strata) %>%
     sample_frac(size = 1, replace = TRUE) %>% 
@@ -403,11 +400,12 @@ run_permutation_analysis <- function(samples, B = 1000, bootstrap_cores = FALSE,
     permutation_distribution <- replicate(n = B, expr = get_difference_in_means(shuffle_treatment_assignment(bootstrap_cores(measurement_avg_samples))))
   }
   
-  if(plot = TRUE){
+  if(plot == TRUE){
     hist(permutation_distribution, breaks = 30, xlim = c(min(permutation_distribution, difference_in_means), max(permutation_distribution, difference_in_means)))
     lines(c(difference_in_means, difference_in_means), c(0,B), lwd = 3, col = "red")
   }
   
-  data.frame(difference_in_means = difference_in_means, p_value = 1 - mean(permutation_distribution < abs(difference_in_means) & permutation_distribution > -abs(difference_in_means)))
+  #p-value for two sided test
+  data.frame(difference_in_means = difference_in_means, p_value = 1 - mean(abs(permutation_distribution) > abs(difference_in_means)))
 }
 
