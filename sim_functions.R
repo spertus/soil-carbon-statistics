@@ -303,38 +303,35 @@ analyze_stratification <- function(plot_samples){
 
 
 ########### estimate treatment effect and confidence interval ###########
-#still in development
-run_ANOVA <- function(samples){
+run_ANOVA <- function(samples, include_plot_variance = TRUE, detail = FALSE){
   #analyze an experiment at a given time point using ANOVA (normal theory inference)
   #input:
     #samples: a dataframe of samples as output by bundle_samples()
+    #include_plot_variance: a boolean. If TRUE, return full ANOVA accounting for multiple samples within plots. If FALSE, conduct inference on plot means
+    #detail: if FALSE, return only the F-statistic (e.g. for simulations). If TRUE, return full linear model output (e.g. for data analysis)
   #output:
-    #a dataframe with an estimated treatment effect, standard error, p-value, and confidence interval. 
+    #either a full linear model (lm class) or the F-statistic from a linear model
   measurement_avg_samples <- samples %>%
     group_by(sample, plot, treatment) %>% 
     summarize(measurement_mean = mean(measurement)) %>%
     ungroup() %>%
     mutate(plot = as_factor(plot), treatment = as_factor(treatment))
   
-  #mean squares
-  # between_treatment <- measurement_avg_samples %>% 
-  #   group_by(treatment) %>%
-  #   summarize(treatment_mean = mean(measurement_mean)) %>%
-  #   summarize(between_treatment_MS = var(treatment_mean), DF = n() - 1)
-  # 
-  # between_plots <- measurement_avg_samples %>%
-  #   group_by(plot, treatment) %>%
-  #   summarize(plot_mean = mean(measurement_mean)) %>%
-  #   group_by(treatment) %>%
-  #   summarize(between_plot_variance = var(plot_mean), DF_plot = n() - 1) %>%
-  #   summarize(between_plot_MS = mean(between_plot_variance), DF = sum(DF_plot))
-  # 
-  # within_plots <- measurement_avg_samples %>%
-  #   group_by(plot, treatment) %>%
-  #   summarize(core_variance = var(measurement_mean)) %>%
-  #   summarize(within_plot_MS = mean(core_variance), DF = n())
-  
-  linear_model <- lm(measurement_mean ~ plot + treatment, data = measurement_avg_samples)
+  if(include_plot_variance){
+    linear_model <- aov(measurement_mean ~ treatment + Error(plot), data = measurement_avg_samples)
+    p_value <- summary(linear_model)[["Error: plot"]][[1]][["Pr(>F)"]][1] 
+  } else {
+    measurement_plot_avg_samples <- measurement_avg_samples %>%
+      group_by(plot, treatment) %>%
+      summarize(measurement_plot_mean = mean(measurement_mean))
+    linear_model <- lm(measurement_plot_mean ~ treatment, data = measurement_plot_avg_samples)
+    p_value <- anova(linear_model)[["Pr(>F)"]][1]
+  }
+  if(detail){
+    linear_model
+  } else {
+    p_value
+  }    
 }
 
 ############### randomization inference ###############
@@ -376,7 +373,7 @@ bootstrap_cores <- function(samples){
   #inputs:
     #samples: a dataframe of samples as output by bundle_samples()
   #outputs:
-    #a bootstrapped dataframe, bootstraps are done within plots
+    #a bootstrapped dataframe, bootstraps are done within strata
   bootstrapped_samples <- samples %>% 
     group_by(plot, strata) %>%
     sample_frac(size = 1, replace = TRUE) %>% 
@@ -403,11 +400,56 @@ run_permutation_analysis <- function(samples, B = 1000, bootstrap_cores = FALSE,
     permutation_distribution <- replicate(n = B, expr = get_difference_in_means(shuffle_treatment_assignment(bootstrap_cores(measurement_avg_samples))))
   }
   
-  if(plot = TRUE){
+  if(plot == TRUE){
     hist(permutation_distribution, breaks = 30, xlim = c(min(permutation_distribution, difference_in_means), max(permutation_distribution, difference_in_means)))
     lines(c(difference_in_means, difference_in_means), c(0,B), lwd = 3, col = "red")
   }
   
-  data.frame(difference_in_means = difference_in_means, p_value = 1 - mean(permutation_distribution < abs(difference_in_means) & permutation_distribution > -abs(difference_in_means)))
+  #p-value for two sided test
+  data.frame(difference_in_means = difference_in_means, p_value = 1 - mean(abs(permutation_distribution) > abs(difference_in_means)))
 }
+
+
+################ optimization of samples over budget ###############
+get_variance <- function(n, k, sigma_p, mu, sigma_delta){
+  #function to get the variance given parameters. sample size (n), number of measured samples (k), plot heterogeneity (sigma_p), measurement variance (sigma_delta), and average carbon concentration in a plot (mu)
+  #input: 
+    #n: sample size
+    #k: number of measured samples (after compositing)
+    #sigma_p: plot heterogeneity (standard deviation of carbon concentration)
+    #mu: average concentration of carbon in the plot
+    #sigma_delta: measurement variance
+  #output:
+    #the theoretical variance of the empirical mean of k equally and perfectly composited samples (composited from n total samples) measured with multiplicative error
+    
+  variance <- sigma_p^2 * (1 + sigma_delta^2) / n + mu^2 * sigma_delta^2 / k
+  variance
+}
+
+
+get_optimum <- function(sigma_p, sigma_delta, mu, cost_c, cost_M, B){
+  #solve optimization problem (in closed form, by lagrange multiplier) for simple random sampling and a fixed measurement method that determines sigma_delta
+  #input: 
+    #sigma_p: the plot variance
+    #mu: the average carbon concentration in the plot
+    #sigma_delta: the variance of the (multiplicative) measurement error
+    #cost_c: the cost of collecting a single core (sample) from the plot
+    #cost_M: the cost of measuring a single (composited) sample from the plot
+    #B: the total budget for sampling and measurement
+  #output:
+    #a list with 4 elements: 
+      #n_star: the optimum number of samples to take from the field
+      #k_star: the optimum number of samples to measure after compositing
+      #total_cost: the total cost of collecting n_star and measuring k_star samples (if not equal to B, we have a problem)
+      #optimum_variance: the variance attained when n_star samples are collected and k_star are measured (given parameters sigma_p, sigma_delta, and mu)
+  n_star <- (B * sigma_p * sqrt(1 + sigma_delta^2)) / (sigma_p * sqrt((1 + sigma_delta^2) * cost_c) + mu * sigma_delta * sqrt(cost_M))
+  k_star <- B * mu * sigma_delta / ((sigma_p * sqrt((1 + sigma_delta^2) * cost_c) + mu * sigma_delta * sqrt(cost_M)) * sqrt(cost_M))
+  optimum_variance <- get_variance(n = n_star, k = k_star, sigma_p = sigma_p, sigma_delta = sigma_delta, mu = mu)
+  
+  list(n = n_star, k = k_star, total_cost = n_star * cost_c + k_star * cost_M, optimum_variance = optimum_variance)
+}
+
+
+
+
 
