@@ -409,3 +409,47 @@ run_permutation_analysis <- function(samples, B = 1000, bootstrap_cores = FALSE,
   data.frame(difference_in_means = difference_in_means, p_value = 1 - mean(abs(permutation_distribution) > abs(difference_in_means)))
 }
 
+
+################ optimization of samples over budget ###############
+get_variance <- function(n, k, sigma_p, mu, sigma_delta){
+  #function to get the variance given parameters. sample size (n), number of measured samples (k), plot heterogeneity (sigma_p), measurement variance (sigma_delta), and average carbon concentration in a plot (mu)
+  #input: 
+    #n: sample size
+    #k: number of measured samples (after compositing)
+    #sigma_p: plot heterogeneity (standard deviation of carbon concentration)
+    #mu: average concentration of carbon in the plot
+    #sigma_delta: measurement variance
+  #output:
+    #the theoretical variance of the empirical mean of k equally and perfectly composited samples (composited from n total samples) measured with multiplicative error
+    
+  variance <- sigma_p^2 * (1 + sigma_delta^2) / n + mu^2 * sigma_delta^2 / k
+  variance
+}
+
+
+get_optimum <- function(sigma_p, sigma_delta, mu, cost_c, cost_M, B){
+  #solve optimization problem (in closed form, by lagrange multiplier) for simple random sampling and a fixed measurement method that determines sigma_delta
+  #input: 
+    #sigma_p: the plot variance
+    #mu: the average carbon concentration in the plot
+    #sigma_delta: the variance of the (multiplicative) measurement error
+    #cost_c: the cost of collecting a single core (sample) from the plot
+    #cost_M: the cost of measuring a single (composited) sample from the plot
+    #B: the total budget for sampling and measurement
+  #output:
+    #a list with 4 elements: 
+      #n_star: the optimum number of samples to take from the field
+      #k_star: the optimum number of samples to measure after compositing
+      #total_cost: the total cost of collecting n_star and measuring k_star samples (if not equal to B, we have a problem)
+      #optimum_variance: the variance attained when n_star samples are collected and k_star are measured (given parameters sigma_p, sigma_delta, and mu)
+  n_star <- (B * sigma_p * sqrt(1 + sigma_delta^2)) / (sigma_p * sqrt((1 + sigma_delta^2) * cost_c) + mu * sigma_delta * sqrt(cost_M))
+  k_star <- B * mu * sigma_delta / ((sigma_p * sqrt((1 + sigma_delta^2) * cost_c) + mu * sigma_delta * sqrt(cost_M)) * sqrt(cost_M))
+  optimum_variance <- get_variance(n = n_star, k = k_star, sigma_p = sigma_p, sigma_delta = sigma_delta, mu = mu)
+  
+  list(n = n_star, k = k_star, total_cost = n_star * cost_c + k_star * cost_M, optimum_variance = optimum_variance)
+}
+
+
+
+
+
