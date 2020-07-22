@@ -427,7 +427,7 @@ get_variance <- function(n, k, sigma_p, mu, sigma_delta){
 }
 
 
-get_optimum <- function(sigma_p, sigma_delta, mu, cost_c, cost_M, B){
+get_minimum_error <- function(sigma_p, sigma_delta, mu, cost_c, cost_M, B, k_floor = NULL){
   #solve optimization problem (in closed form, by lagrange multiplier) for simple random sampling and a fixed measurement method that determines sigma_delta
   #input: 
     #sigma_p: the plot variance
@@ -436,20 +436,43 @@ get_optimum <- function(sigma_p, sigma_delta, mu, cost_c, cost_M, B){
     #cost_c: the cost of collecting a single core (sample) from the plot
     #cost_M: the cost of measuring a single (composited) sample from the plot
     #B: the total budget for sampling and measurement
+    #k_floor: optionally set a floor on the number of measurements k
   #output:
-    #a list with 4 elements: 
+    #a dataframe with 4 elements: 
       #n_star: the optimum number of samples to take from the field
       #k_star: the optimum number of samples to measure after compositing
       #total_cost: the total cost of collecting n_star and measuring k_star samples (if not equal to B, we have a problem)
       #optimum_variance: the variance attained when n_star samples are collected and k_star are measured (given parameters sigma_p, sigma_delta, and mu)
-  n_star <- (B * sigma_p * sqrt(1 + sigma_delta^2)) / (sigma_p * sqrt((1 + sigma_delta^2) * cost_c) + mu * sigma_delta * sqrt(cost_M))
-  k_star <- B * mu * sigma_delta / ((sigma_p * sqrt((1 + sigma_delta^2) * cost_c) + mu * sigma_delta * sqrt(cost_M)) * sqrt(cost_M))
+  n_star <- (B * sigma_p * sqrt(1 + sigma_delta^2)) / (sigma_p * sqrt((1 + sigma_delta^2)) * cost_c + mu * sigma_delta * sqrt(cost_M * cost_c))
+  
+  k_star <- B * mu * sigma_delta / ((sigma_p * sqrt((1 + sigma_delta^2) * cost_c * cost_M)  + mu * sigma_delta * cost_M))
+  
   optimum_variance <- get_variance(n = n_star, k = k_star, sigma_p = sigma_p, sigma_delta = sigma_delta, mu = mu)
   
-  list(n = n_star, k = k_star, total_cost = n_star * cost_c + k_star * cost_M, optimum_variance = optimum_variance)
+  data.frame(n = n_star, k = k_star, total_cost = n_star * cost_c + k_star * cost_M, optimum_variance = optimum_variance)
 }
 
 
+get_minimum_cost <- function(sigma_p, sigma_delta, mu, cost_c, cost_M, V, k_floor = NULL){
+  #given a fixed precision (variance) that we would like to achieve, what is the minimum total cost of the design input. 
+  #input: 
+    #sigma_p: the plot variance
+    #mu: the average carbon concentration in the plot
+    #sigma_delta: the variance of the (multiplicative) measurement error
+    #cost_c: the cost of collecting a single core (sample) from the plot
+    #cost_M: the cost of measuring a single (composited) sample from the plot
+    #V: the maximum tolerable variance
+    #k_floor: optionally set a floor on the number of measurements k
+  #output:
+    #a dataframe with columns for the optimal n and k, the variance attained (which is currently subject to minor floating point errors and so not exactly equal to V), and the minimum cost to attain that variance
+  n_star <- (sigma_p^2 * (1+sigma_delta^2)) / (V * (1 - mu * sigma_delta / (sigma_p * sqrt(1+sigma_delta^2) * sqrt(cost_c / cost_M))) )
+  k_star <- (sigma_p * mu * sigma_delta * sqrt(1 + sigma_delta^2) * sqrt(cost_c / cost_M) + mu^2 * sigma_delta^2) / V
+  
+  variance <- sigma_p^2 * (1+sigma_delta^2) / n_star + mu^2 * sigma_delta^2 / k_star
+  minimum_cost <- n_star * cost_c + k_star * cost_M
+  
+  data.frame(n = n_star, k = k_star, variance = variance, minimum_cost = minimum_cost)
+}
 
 
 
