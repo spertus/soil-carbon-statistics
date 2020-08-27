@@ -471,6 +471,26 @@ get_optimal_composite_size <- function(sigma_p, sigma_delta, mu, cost_c, cost_P,
   optimal_composite_size
 }
 
+get_relative_efficiency <- function(sigma_p, mu, cost_c, sigma_delta_1, cost_P_1, cost_M_1, sigma_delta_2, cost_P_2, cost_M_2){
+  #input: 
+    #sigma_p: the plot variance
+    #mu: the average carbon concentration in the plot
+    #cost_c: the cost of collecting a single core (sample) from the plot
+    #sigma_delta_1: the measurement error variance of method 1
+    #cost_P_1: the sample prep cost of method 1
+    #cost_M_1: the measurement cost of method 1
+    #sigma_delta_2: the measurement error variance of method 2
+    #cost_P_2: the sample prep cost of method 2
+    #cost_M_2: the measurement cost of method 2
+  #output:
+    #a scalar, the relative efficiency of measurement 1 over measurement 2
+  numerator <- sigma_p * sqrt((1 + sigma_delta_1) * cost_c) + mu * sigma_delta_1 * sqrt(cost_P_1 + cost_M_1)
+  denominator <- sigma_p * sqrt((1 + sigma_delta_2) * cost_c) + mu * sigma_delta_2 * sqrt(cost_P_2 + cost_M_2)
+  numerator / denominator
+}
+
+
+#NEEDS WORK!
 get_minimum_cost <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_M, V, k_floor = NULL){
   #given a fixed precision (variance) that we would like to achieve, what is the minimum total cost of the design input. 
   #input: 
