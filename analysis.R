@@ -114,6 +114,7 @@ B_grid <- expand.grid(B = 270:5000, cost_c = c(cost_c_low, cost_c_medium, cost_c
 #Vos estimates .20$ per LOI measurement and 2.35 for DC-EA
 #root-mean squared predictive error (basically the measurement variance) is ~0.68% for LOI (when predicting DC-EA)
 
+
 ############# optimal composite sizes (topsoil) ############
 optimal_composite_dcea_top <- get_optimal_composite_size(sigma_p = sigma_p_top, mu = mu_top, sigma_delta = sigma_delta_dcea, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_dcea, cost_M = cost_M_dcea)
 optimal_composite_loi_top <- get_optimal_composite_size(sigma_p = sigma_p_top, mu = mu_top, sigma_delta = sigma_delta_loi_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_loi, cost_M = cost_M_loi)
@@ -246,4 +247,4 @@ optimal_cost_plot <- ggplot(optimal_costs, aes(x = sqrt(V), y = minimum_cost, co
   scale_x_continuous(breaks = c(.1,seq(0.25, 2.0, by = 0.25))) +
   theme_bw() +
   theme(text = element_text(size = 16)) 
-  
+ 

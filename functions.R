@@ -414,6 +414,7 @@ get_variance <- function(n, k, sigma_p, mu, sigma_delta){
 }
 
 
+
 get_minimum_error <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_M, B, measurement_error = TRUE){
   #solve optimization problem (in closed form, by lagrange multiplier) for simple random sampling and a fixed measurement method that determines sigma_delta
   #input: 
