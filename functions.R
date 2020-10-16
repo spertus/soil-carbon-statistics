@@ -368,19 +368,6 @@ get_difference_in_means <- function(samples){
     pull(difference_in_means)
 }
 
-bootstrap_cores <- function(samples){
-  #function to bootstrap samples from plots
-  #inputs:
-    #samples: a dataframe of samples as output by bundle_samples()
-  #outputs:
-    #a bootstrapped dataframe, bootstraps are done within strata
-  bootstrapped_samples <- samples %>% 
-    group_by(plot, strata) %>%
-    sample_frac(size = 1, replace = TRUE) %>% 
-    ungroup()
-  bootstrapped_samples
-}
-
 
 run_permutation_analysis <- function(samples, B = 1000, bootstrap_cores = FALSE, plot = FALSE){
   #take average over measurement for now
@@ -427,7 +414,8 @@ get_variance <- function(n, k, sigma_p, mu, sigma_delta){
 }
 
 
-get_minimum_error <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_M, B, k_floor = NULL){
+
+get_minimum_error <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_M, B, measurement_error = TRUE){
   #solve optimization problem (in closed form, by lagrange multiplier) for simple random sampling and a fixed measurement method that determines sigma_delta
   #input: 
     #sigma_p: the plot variance
@@ -445,9 +433,36 @@ get_minimum_error <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cos
       #k_star: the optimum number of samples to measure after compositing
       #total_cost: the total cost of collecting n_star and measuring k_star samples (if not equal to B, we have a problem)
       #optimum_variance: the variance attained when n_star samples are collected and k_star are measured (given parameters sigma_p, sigma_delta, and mu)
-  n_star <- (B - C_0) * sigma_p * sqrt(1 + sigma_delta^2) / (sigma_p * sqrt((1 + sigma_delta^2)) * cost_c + mu * sigma_delta * sqrt((cost_P + cost_M) * cost_c))
   
-  k_star <- (B - C_0) * mu * sigma_delta / ((sigma_p * sqrt((1 + sigma_delta^2) * cost_c * (cost_P + cost_M))  + mu * sigma_delta * (cost_P + cost_M)))
+  #if there is no measurement error and cost of measurement, the solution is very simple
+  if(!measurement_error){
+    cost_P <- 0
+    cost_M <- 0
+    sigma_delta <- 0
+    n_star <- (B - C_0) / cost_c
+    k_star <- n_star #this doesnt actually matter if there is no measurement error or cost of measurement
+    
+    
+  } else {
+    #proceed to compute optimization solution
+    n_star <- (B - C_0) * sigma_p * sqrt(1 + sigma_delta^2) / (sigma_p * sqrt((1 + sigma_delta^2)) * cost_c + mu * sigma_delta * sqrt((cost_P + cost_M) * cost_c))
+    k_star <- (B - C_0) * mu * sigma_delta / ((sigma_p * sqrt((1 + sigma_delta^2) * cost_c * (cost_P + cost_M))  + mu * sigma_delta * (cost_P + cost_M)))
+    
+    #check boundary conditions and correct if violated
+    n_star[which(k_star < 1)] <- ((B - C_0 - cost_P - cost_M) / cost_c)[which(k_star < 1)]
+    k_star[which(k_star < 1)] <- 1
+    k_star_greater_nstar <- which(k_star > n_star)
+    n_star[k_star_greater_nstar] <- ((B - C_0) / (cost_c + cost_P + cost_M))[k_star_greater_nstar]
+    k_star[k_star_greater_nstar] <- ((B - C_0) / (cost_c + cost_P + cost_M))[k_star_greater_nstar]
+    
+    #stop if there's not enough money to do at least one sample and measurement
+    max_cost_P <- max(cost_P)
+    max_cost_M <- max(cost_M)
+    max_cost_c <- max(cost_c)
+    if(any(n_star < 1 | k_star < 1)){
+      stop(paste("Not enough budget to do at least one sample and measurement! Increase minimum budget to at least", C_0 + max_cost_c + max_cost_M + max_cost_P))
+    }
+  }
   
   optimum_variance <- get_variance(n = n_star, k = k_star, sigma_p = sigma_p, sigma_delta = sigma_delta, mu = mu)
   
