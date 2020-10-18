@@ -505,3 +505,27 @@ get_relative_efficiency <- function(sigma_p, mu, cost_c, sigma_delta_1, cost_P_1
   denominator <- sigma_p * sqrt((1 + sigma_delta_2) * cost_c) + mu * sigma_delta_2 * sqrt(cost_P_2 + cost_M_2)
   numerator / denominator
 }
+
+
+
+get_minimum_cost <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_M, V){
+  #given a fixed precision (variance) that we would like to achieve, what is the minimum total cost of the design input. 
+  #input: 
+  #sigma_p: the plot variance
+  #mu: the average carbon concentration in the plot
+  #sigma_delta: the variance of the (multiplicative) measurement error
+  #C_0: fixed cost of the survey 
+  #cost_c: the cost of collecting a single core (sample) from the plot
+  #cost_P: the cost of prepping a single (composited) sample
+  #cost_M: the cost of measuring a single (composited) sample from the plot after prep
+  #V: the maximum tolerable variance
+  #output:
+  #a dataframe with columns for the optimal n and k, the variance attained (which is currently subject to minor floating point errors and so not exactly equal to V), and the minimum cost to attain that variance
+  n_star <- (sigma_p^2 * (1+sigma_delta^2)) / (V * (1 - 1/(sqrt(cost_c * sigma_p^2 * (1 + sigma_delta^2) / (cost_P + cost_M)) + 1)))
+  k_star <- (sqrt(cost_c * sigma_p^2 * (1 + sigma_delta^2) / (cost_P + cost_M)) + 1) * (mu^2 * sigma_delta^2 / V)
+  
+  variance <- sigma_p^2 * (1+sigma_delta^2) / n_star + mu^2 * sigma_delta^2 / k_star
+  minimum_cost <- C_0 + n_star * cost_c + k_star * (cost_P + cost_M)
+  
+  data.frame(n = n_star, k = k_star, variance = variance, minimum_cost = minimum_cost)
+}

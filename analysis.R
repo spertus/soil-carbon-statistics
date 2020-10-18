@@ -220,16 +220,12 @@ RE_table <- RE_matrix %>%
 
 
 ######## minimum cost for a given variance #######
-V_grid <- expand.grid(V = seq(.05, 1, by = .01)^2, cost_c = c(cost_c_low, cost_c_medium, cost_c_high))
+V_grid <- expand.grid(V = seq(.05, 2, by = .01)^2, cost_c = c(cost_c_low, cost_c_medium, cost_c_high))
 
 optimal_costs_dcea_top <- get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_dcea, cost_M = cost_M_dcea, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
   mutate(M = "DC-EA at 24.00 USD")
 
-
-optimal_costs_dcea_top_alternate <- get_minimum_cost_alternate(sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_dcea, cost_M = cost_M_dcea, V = V_grid$V) %>%
-  bind_cols(V_grid) %>%
-  mutate(M = "DC-EA at 24.00 USD")
 
 optimal_costs_loi_top <- get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_loi_top, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_loi, cost_M = cost_M_loi, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
@@ -242,8 +238,8 @@ optimal_costs_mirs_top <-  get_minimum_cost(sigma_p = sigma_p_top, sigma_delta =
 optimal_costs <- bind_rows(optimal_costs_dcea_top, optimal_costs_loi_top, optimal_costs_mirs_top) %>%
   mutate(composite_size = n/k)
 
-optimal_cost_plot <- ggplot(optimal_costs, aes(x = sqrt(V), y = minimum_cost, color = as_factor(cost_c))) +
-  facet_grid(~ M) +
+optimal_cost_plot <- ggplot(optimal_costs, aes(x = sqrt(V), y = minimum_cost, color = as_factor(M))) +
+  facet_grid(~ cost_c) +
   geom_line(size = 1.5) +
   coord_cartesian(xlim = c(.1,1.5), ylim = c(0,5000)) +
   geom_hline(yintercept = 0) +
