@@ -1,0 +1,280 @@
+---
+title: "Permutation Tests for an Agricultural Experiment"
+author: "Jacob Spertus"
+date: "`r Sys.Date()`"
+output: html_document
+header-includes:
+  -\usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+
+```{r, message = FALSE}
+library(tidyverse)
+library(permuter)
+set.seed(100)
+```
+
+# Introduction
+
+This notebook demonstrates the application of permutation tests to soil science experiments. Permutation tests allow for finite-sample exact inference with minimal assumptions, which are generally justified by the experimental design. We first replicate [Tautges et al 2019](https://onlinelibrary.wiley.com/doi/abs/10.1111/gcb.14762), which demonstrated the importance of measuring soil organic carbon (SOC) up to 2 meter in order to accurately quantify SOC stocks. 
+
+
+We first load in the original data received from co-author Jessica Chiartas.
+
+```{r initial data handling}
+#read in data
+data <- read_csv("../Data/Tautges_LTAR_data.csv") %>%
+  filter(depthcode != 6) %>% #this is originally where whole profile data was stored
+  mutate(Plot = gsub("_", "-", Plot)) %>%
+  filter(Treatment != "CWT") #CWT was removed and not reported
+
+
+#compute whole profile stock and concentration data
+#can compare to results in the original csv 
+#computation of whole profile results is off? (see e.g. figure 2...)
+#it seems concentration was computed for whole profile based on a straight mean (not a mean weighted by length)
+#whole profile stock is not a straight sum of the other quantities?
+wp_data <- data %>%
+  group_by(year, Plot, Treatment, block) %>%
+  summarize(percC = mean(percC), TotC = sum(TotC_Mgha), clay = mean(clay), percN = mean(percN)) %>%
+  mutate(depthcode = 6)
+
+data
+```
+
+We run a few initial checks to confirm the data matches the general experimental design:
+
+```{r}
+#nine cropping systems (treatments)
+unique(data$Treatment)
+
+#from Jessica Chiartas:
+#OMT = ORG; CMT = CONV; LMT = CONV+WCC; IWC = IWF; IWF = IWF+N; RWC = RWF; RWF = RWF+N; RWL = RWF+WCC.
+#CWT got dropped in the paper
+#fertilizer=1 => poulty manure; fertilizer=3 => 168 kg/ha synthetic nitrogen; fertilizer=0 => none; fertilizer=2 => winter cover crop (WCC)
+#Irrigation=2 => furrow; Irrigation=0 => None; Irrigation=1 => sprinkler
+
+#each treatment is replicated 6 times (twice per block)
+replicates_per_block <- data %>% 
+  group_by(block, Treatment) %>% 
+  summarize(reps_per_block = n_distinct(Plot))
+
+#table 2: initial SOC concentrations and bulk densities (no pH)
+table_2 <- data %>%
+  filter(year == 1993) %>%
+  group_by(Lower_Depth) %>%
+  summarize(C_concentration = mean(percC)*10, C_to_N = mean(percC / percN), BD = mean(`Bulk Density`), clay = mean(clay))
+```
+
+# Problems with parametric inference
+
+The original paper estimated and tested for changes in SOC concentration and stocks, and compared changes across treatments (difference-in-differences). Inference for concentration and stock change was conducted using $t$-tests, which assume that data are randomly drawn from normal distributions with equal variance or else that there are enough replications for asymptotics to justify approximately correct inference. 
+
+There is no physical reason to believe that average SOC concentrations or stocks (across plots) are normally distributed, and asympotics are also unlikely to help. The average SOC in plot $i$ is $\mu_i$ and is estimated using $n_i$ uniform independent random samples $\{S_{ij}\}_{j=1}^{n_i}$ drawn from the plot. If the number of *samples* $n_i$ is large, then plot averages $\bar{S}_i = \frac{1}{n_i} \sum_{j=1}^{n_i}$ are approximately normally distributed $\bar{S}_i \sim \mathcal{N}(\mu_i, \sigma^2_{i} / n_i)$ where $\sigma^2_i$ is the population (plot) variance for plot $i$. Nevertheless, this does not justify the use of normal approximations for within treatment averages, unless the number of *plots* assigned to a particular treatment is large. This is often not true for agricultural experiments, and in Tautges et al there were only 6 plots assigned to each treatment.  Confidence intervals and $p$-values based on $t$-tests, more generally on ANOVA, are thus not justified by the design of the experiment. 
+
+
+```{r}
+# recompute differences between stocks and concentrations within plots and profiles
+change_data <- data %>%
+  dplyr::select(year, depthcode, block, Plot, Treatment, TotC = TotC_Mgha, percC, percN, clay) %>%
+  bind_rows(wp_data) %>%
+  pivot_wider(values_from = c(TotC, percC, clay, percN), names_from = year) %>%
+  mutate(TotC_diff = TotC_2012 - TotC_1993, percC_diff = percC_2012 - percC_1993, clay_diff = clay_2012 - clay_1993,percN_diff = percN_2012 - percN_1993, block = as_factor(block))
+
+# replicate figure 2
+change_data_corn <- change_data %>%
+  filter(Treatment %in% c("OMT","CMT","LMT")) %>%
+  group_by(Treatment, depthcode) %>%
+  summarize(mean_concentration = mean(percC_diff), se_concentration = sqrt(var(percC_diff)/n()), mean_total = mean(TotC_diff), se_total = sqrt(var(TotC_diff)/n()), sample_size = n()) %>%
+  pivot_longer(c("mean_concentration", "mean_total", "se_concentration", "se_total"), values_to = "value") %>%
+  separate(name, into = c("statistic", "type"), sep = "_") %>%
+  pivot_wider(names_from = "statistic", values_from = "value")
+
+figure_2 <- ggplot(change_data_corn, aes(x = depthcode, y = mean, group = Treatment, fill = Treatment)) +
+  geom_col(position = position_dodge()) +
+  geom_errorbar(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se), position = position_dodge(1), width = 0.2) +
+  scale_x_reverse() +
+  coord_flip() +
+  facet_grid(~ type, scales = "free")
+figure_2
+
+# replicate figure 3
+change_data_wheat <- change_data %>%
+  filter(Treatment %in% c("OMT","CMT","LMT")) %>%
+  group_by(Treatment, depthcode) %>%
+  summarize(mean_concentration = mean(percC_diff), se_concentration = sqrt(var(percC_diff)/n()), mean_total = mean(TotC_diff), se_total = sqrt(var(TotC_diff)/n()), sample_size = n()) %>%
+  pivot_longer(c("mean_concentration", "mean_total", "se_concentration", "se_total"), values_to = "value") %>%
+  separate(name, into = c("statistic", "type"), sep = "_") %>%
+  pivot_wider(names_from = "statistic", values_from = "value")
+
+figure_3 <- ggplot(change_data_wheat, aes(x = depthcode, y = mean, group = Treatment, fill = Treatment)) +
+  geom_col(position = position_dodge()) +
+  geom_errorbar(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se), position = position_dodge(1), width = 0.2) +
+  scale_x_reverse() +
+  coord_flip() +
+  facet_grid(~ type, scales = "free")
+figure_3
+```
+
+
+# Parametric Inference
+Here we conduct hypothesis tests of 0 change from 1993 to 2012 based on paired $t$-test, where pairs are individual plots.
+
+```{r}
+#concentration
+
+#I suspect they used a paired t.test (see esp results for OMT aka ORG and LMT aka CONV+WCC)
+#I can't get the exact right p-value for OMT, depthcode = 2 (15-30cm), which should be .006
+paired_t_test_concentration_results <- change_data %>%
+  group_by(depthcode, Treatment) %>%
+  summarize(point_estimate = mean(percC_2012 - percC_1993), test_stat = sqrt(n()) * mean(percC_2012 - percC_1993) / sd(percC_2012 - percC_1993), size = n()) %>%
+  mutate(parametric_p_value = 2*(1 - pt(abs(test_stat), df = size - 1)))
+
+
+#stock
+
+# 2.59 mg C / ha reported for 15-30cm ORG at top of page 7 is a typo? I estimate 2.42 Mg C / ha, p-value of .04 (not .01)
+paired_t_test_stock_results <- change_data %>%
+  group_by(depthcode, Treatment) %>%
+  summarize(point_estimate = mean(TotC_2012 - TotC_1993), test_stat = sqrt(n()) * mean(TotC_2012 - TotC_1993) / sd(TotC_2012 - TotC_1993), size = n()) %>%
+  mutate(parametric_p_value = 2*(1 - pt(abs(test_stat), df = size - 1)))
+```
+
+
+# Permutation $p$-values
+
+
+We run permutation tests of the hypothesis that there is no difference in SOC concentrations or stocks between 1993 and 2012. Formally, let $Y_{j,1993}$ denote the SOC concentration (or stock) for plot $j$ in 1993 and $Y_{j,2012}$ denote the same in 2012. The null hypothesis is that $Y_{j,1993} \overset{d}{=} Y_{j,2012}$, that concentrations (or stocks) in 1993 are equal in distribution to concentrations (or stocks) in 2012 for every plot. Intuitively, we are positing that under the null the label "1993" or "2012" is irrelevant, we expect about the same in any given year. We can simulate exactly from this distribution using a permutation test. Specifically for some large number of iterations $B$, we can randomly switch the labels within each plot, which amounts to randomly switching the sign of the observed difference for each plot, and then compute and store a value of a test statistic. The difference-in-means aligns nicely with the $t$-test. Let $T$ denote the value of the test statistic computed on the original data, and $\{T_b\}_{b=1}^B$ be the set of test statistics drawn from the permutation distribution. The $p$-value is computed as $(\#\{|T_b| > T\} + 1)/ (B+1)$ valid at level $\alpha$ for any test statistic, but the power of the test depends on the choice of statistic.
+
+The function `one_sample()` computes the permutation distribution based on sign-flips (here leading to a paired comparison), and `t2p()` computes a $p$-value given the permutation distribution and original test statistic.
+
+```{r}
+B <- 10000
+#using permuter, check for paired differences
+pt_stock_change <- change_data %>%
+  group_by(Treatment, depthcode) %>%
+  summarize(diff_in_means = mean(TotC_diff), perm_p_value = t2p(tst = mean(TotC_diff), distr = one_sample(x = TotC_diff, reps = B), alternative = c("two-sided")))
+
+pt_concentration_change <- change_data %>%
+  group_by(Treatment, depthcode) %>%
+  summarize(diff_in_means = mean(percC_diff), perm_p_value = t2p(tst = mean(percC_diff), distr = one_sample(x = percC_diff, reps = B), alternative = c("two-sided")))
+```
+
+We compute many tests, stratified by plots and profiles, which we now plot compared to results from the $t$-test.
+
+```{r}
+#compare permutation p-values to parameteric p-values
+joined_concentration_change_pvalues <- pt_concentration_change %>%
+  left_join(paired_t_test_concentration_results, by = c("Treatment", "depthcode")) %>%
+  select(Treatment, depthcode, diff_in_means, perm_p_value, parametric_p_value)
+
+joined_stock_change_pvalues <- pt_stock_change %>%
+  left_join(paired_t_test_stock_results, by = c("Treatment", "depthcode")) %>%
+  select(Treatment, depthcode, diff_in_means, perm_p_value, parametric_p_value)
+
+#scatter plot of permutation pvalues against parametric pvalues for whole profile
+concentration_change_pvalue_plot <- ggplot(joined_concentration_change_pvalues %>% filter(depthcode == 6), aes(x = parametric_p_value, y = perm_p_value, label = Treatment)) + 
+  geom_text(size = 3) +
+  geom_hline(yintercept = 0.05, color = "red", linetype = "dashed") +
+  geom_vline(xintercept = 0.05, color = "red", linetype = "dashed") 
+concentration_change_pvalue_plot
+
+stock_change_pvalue_plot <- ggplot(joined_stock_change_pvalues %>% filter(depthcode == 6), aes(x = parametric_p_value, y = perm_p_value, label = Treatment)) + 
+  geom_text(size = 3) +
+  geom_hline(yintercept = 0.05, color = "red", linetype = "dashed") +
+  geom_vline(xintercept = 0.05, color = "red", linetype = "dashed") 
+stock_change_pvalue_plot
+```
+
+# FDR Control
+
+Many tests were done to look for possible changes within profiles and treatments, a total of $6 \times 8 = 48$. Running multiple hypothesis tests in this way will lead to many false discoveries: nulls hypotheses that are rejected when they are in fact true. Specifically, we may conclude just by chance that some treatments effect the SOC in some soil layers even if they really don't. A correction to the signifance level $\alpha$ allows us to control the false discovery rate (FDR), the expected number of false discoveries that we declare, by applying a correction to the level for each $p$-value. Te Benjamini-Hochberg procedure (which assumes independent $p$-values) and the Benjamini-Yekutieli procedure (which does not) for FDR control are implemented below.
+
+```{r}
+# FDR control by Benjamini-Hochberg
+# Are the tests independent? Probably not. If a treatment changes one plot or depth it is likely to effect another similarly. The B-H procedure may still be valid. 
+#the Benjamini-Yekutieli procedure is valid under arbitrary dependence
+#assume FDR control at 0.1 level
+level <- 0.1
+m <- nrow(pt_concentration_change)
+pt_concentration_change <- pt_concentration_change %>%
+  ungroup() %>%
+  arrange(perm_p_value) %>%
+  mutate(p_value_order = rank(perm_p_value)) %>%
+  mutate(bh_threshold = (1:m * level) / m) %>%
+  mutate(by_threshold = (1:m * level) / (m * sum(1/1:m)))
+  
+#no test rejects under BH or BY
+FDR_plot <- ggplot(pt_concentration_change, aes(y = perm_p_value, x = p_value_order)) +
+  geom_point() +
+  geom_hline(yintercept = level, linetype = "dashed", color = "red") +
+  geom_hline(yintercept = level / m, linetype = "dashed", color = "blue") +
+  geom_line(aes(x = p_value_order, y = bh_threshold), linetype = "dashed", color = "forestgreen")
+FDR_plot
+```
+
+# Nonparametric Combination of Tests
+
+So far we have individually checked whether treatments affect SOC stocks or concentrations. More generally, we may be interested in whether treatments affect some fairly large number of soil properties (e.g. nitrogen, texture, pH, aggregate stability, etc). The usual approach is to test treatment effects on each property separately, perhaps with some multiplicity correction, attempting to identify which properties are effected. 
+
+Let $k \in \{1,...,K\}$ index properties (e.g. SOC stock, SOC concentration, aggregate stability, etc). $X_j \in \{1,..,G\}$ denotes the (randomly assigned) treatment of plot $j$, and $y_{jk}(X_j)$ denotes the observed change (from baseline) in property $k$ for plot $j$ on treatment $X_j$. $x_j$ is the realized treatment of plot $j$, so $y_{jk}(x_j)$ is the observed difference in property $k$ for plot $j$. $y_k(X_j)$ refers to the distribution of $y_{jk}(X_j)$ over plots, and $\boldsymbol{y}(X_j)$ refers to the multivariate distribution of the $K$-length vector of properties $y_k(X_j)$. 
+
+There is an individual null hypothesis for each property. Namely, the individual nulls are $H_{0k}: y_{k}(X_1) \overset{d}{=} y_{k}(X_2) \overset{d}{=} ... \overset{d}{=} y_{k}(X_G)$ for all $j$, i.e. treatments all have the same effect on property $k$. The individual null could, for example, be analyzed using the $F$-statistic extracted from a linear regression of $y_{jk}(x_j)$ on indicators $x_j$. In R syntax `anova(lm(y_k ~ treatment))` where `y_k` is the length $J$ vector of outcomes and `treatment` is a factor containing the treatment levels for all $J$ plots.
+
+The *omnibus*, *intersection*, or *global* null posits that treatments affect none of the properties:
+
+$$H_0 : \boldsymbol{y}(X_1) \overset{d}{=} \boldsymbol{y}(X_2) \overset{d}{=} ... \overset{d}{=} \boldsymbol{y}(X_G) ~~\implies~~ \bigcap_{k=1}^K H_{0k}$$
+
+A parametric approach to testing this null is [MANOVA](https://en.wikipedia.org/wiki/Multivariate_analysis_of_variance) with normality assumptions.
+
+The nonparametric combination of tests (NPC) method provides a way to test the global null with minimal assumptions. NPC can be done using a two-step algorithm. The null distribution of each element of $\boldsymbol{y}$ is simulated by permuting the treatment labels for each plot. For concreteness, the observed test statistic is computed from $\{\boldsymbol{y}_j(x_j)\}_{j=1}^J$, i.e. the originally observed values. In each permuted dataset, a test statistic is applied to $\boldsymbol{y}_{j}(X^*_j)$ where $X_^*j$ is drawn randomly according to the distribution of treatments $X_j$ that was used to randomize the plots. Note that permutations are *not* performed for each element $y_{kj}$ separately: the vector of outcomes for each plot stays together. 
+
+The permuted values in the first step are used to make $K$ $p$-values, one for each outcome. These are then combined using an eponymous ``combining function" (e.g. [Fisher's combining function](https://en.wikipedia.org/wiki/Fisher%27s_method)). Assuming valid tests under the null and independence of tests (a longshot), the distribution of this test statistic attained by combining $p$-values is known at least approximately. If we wish to be fully nonparametric and to not assume independence, we can get a valid $p$-value by comparing the original combination statistic to combination statistics obtained by applying the combining function to $p$-values we would get if we treated each permuted test statistic as the original. For a more rigorous explanation see Pesarin and Salmaso *Permutation Tests for Complex Data* page 125.
+
+
+The specific outcomes we consider are differences between various soil properties measured in 2012 and in 1993. The soil properties are total Carbon in Mg ha$^{-1}$ (`totC_diff`), percent carbon (`percC_diff`), percent nitrogen (`percN_diff`), and percent clay (`clay_diff`). We use the $F$-statistic as our test statistic, looking for any difference between treatments. 
+
+```{r}
+B <- 10000
+
+#run tests for whole profile
+wp_change_data <- change_data %>% filter(depthcode == 6)
+
+#matrix of outcomes 
+Y <- wp_change_data %>%
+  dplyr::select(TotC_diff, percC_diff, percN_diff, clay_diff) %>%
+  as.matrix()
+x <- wp_change_data %>% pull(Treatment)
+#test statistic is equivalent to test statistic
+n <- table(x)
+
+#original test statistics
+observed_TotC <- sum(n * tapply(Y[,1], x, function(y){sum(y^2)}))
+observed_percC <- sum(n * tapply(Y[,2], x, function(y){sum(y^2)}))
+observed_percN <- sum(n * tapply(Y[,3], x, function(y){sum(y^2)}))
+observed_clay <- sum(n * tapply(Y[,4], x, function(y){sum(y^2)}))
+
+#permutation distributions
+permutations_TotC <- k_sample(x = Y[,1], group = as.numeric(as.factor(x)), reps = B, stat = "oneway_anova")
+permutations_percC <- k_sample(x = Y[,2], group = as.numeric(as.factor(x)), reps = B, stat = "oneway_anova")
+permutations_percN <- k_sample(x = Y[,3], group = as.numeric(as.factor(x)), reps = B, stat = "oneway_anova")
+permutations_clay <- k_sample(x = Y[,4], group = as.numeric(as.factor(x)), reps = B, stat = "oneway_anova")
+
+#compute separate p_values for each
+p_values <- c(t2p(observed_TotC, permutations_TotC, alternative = "two-sided"),
+              t2p(observed_percC, permutations_percC, alternative = "two-sided"),
+              t2p(observed_percN, permutations_percN, alternative = "two-sided"),
+              t2p(observed_clay, permutations_clay, alternative = "two-sided"))
+
+#combination p-value
+npc(p_values, distr = cbind(permutations_TotC, permutations_percC, permutations_percN, permutations_clay), combine = "fisher", alternatives = "two-sided")
+```
+
+
+NPC confirms that treatments make a difference to at least one of these outcomes. As a next step, we might look for which treatments cause differences or which treatment causes the most difference. 
+
+

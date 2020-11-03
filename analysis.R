@@ -115,6 +115,16 @@ B_grid <- expand.grid(B = 270:5000, cost_c = c(cost_c_low, cost_c_medium, cost_c
 #root-mean squared predictive error (basically the measurement variance) is ~0.68% for LOI (when predicting DC-EA)
 
 
+############ plot composite size versus std_error and cost #########
+composite_grid_dcea_top <- get_composite_error_grid(n = 100, sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = cost_c_low, cost_M = cost_M_dcea, cost_P = cost_P_dcea) %>%
+  pivot_longer(cols = c("std_error", "cost"), names_to = "quantity")
+
+composite_plot <- ggplot(data = composite_grid_dcea_top, aes(x = composite_size, y = value)) +
+  geom_line() +
+  geom_point() +
+  facet_grid(quantity ~ ., scales = "free")
+
+
 ############# optimal composite sizes (topsoil) ############
 optimal_composite_dcea_top <- get_optimal_composite_size(sigma_p = sigma_p_top, mu = mu_top, sigma_delta = sigma_delta_dcea, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_dcea, cost_M = cost_M_dcea)
 optimal_composite_loi_top <- get_optimal_composite_size(sigma_p = sigma_p_top, mu = mu_top, sigma_delta = sigma_delta_loi_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_loi, cost_M = cost_M_loi)
@@ -220,32 +230,52 @@ RE_table <- RE_matrix %>%
 
 
 ######## minimum cost for a given variance #######
-V_grid <- expand.grid(V = seq(.05, 2, by = .01)^2, cost_c = c(cost_c_low, cost_c_medium, cost_c_high))
+V_grid <- expand.grid(V = seq(.01, 2, by = .005)^2, cost_c = c(cost_c_low, cost_c_medium, cost_c_high))
 
+
+#topsoil costs
 optimal_costs_dcea_top <- get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_dcea, cost_M = cost_M_dcea, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
-  mutate(M = "DC-EA at 24.00 USD")
-
-
+  mutate(M = "DC-EA at 26.00 USD") %>%
+  mutate(depth = "Topsoil (0-10 cm)")
 optimal_costs_loi_top <- get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_loi_top, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_loi, cost_M = cost_M_loi, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
-  mutate(M = "LOI at 4.25 USD")
+  mutate(M = "LOI at 9.25 USD") %>%
+  mutate(depth = "Topsoil (0-10 cm)")
 optimal_costs_mirs_top <-  get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_mirs_top, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_mirs, cost_M = cost_M_mirs, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
-  mutate(M = "MIRS at 8.30 USD")
+  mutate(M = "MIRS at 10.30 USD") %>%
+  mutate(depth = "Topsoil (0-10 cm)")
+
+#deep soil costs
+optimal_costs_dcea_deep <- get_minimum_cost(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_dcea, mu = mu_deep, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_dcea, cost_M = cost_M_dcea, V = V_grid$V) %>%
+  bind_cols(V_grid) %>%
+  mutate(M = "DC-EA at 26.00 USD") %>%
+  mutate(depth = "Deep Soil (50-100 cm)")
+optimal_costs_loi_deep <- get_minimum_cost(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_loi_deep, mu = mu_deep, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_loi, cost_M = cost_M_loi, V = V_grid$V) %>%
+  bind_cols(V_grid) %>%
+  mutate(M = "LOI at 9.25 USD") %>%
+  mutate(depth = "Deep Soil (50-100 cm)")
+optimal_costs_mirs_deep <-  get_minimum_cost(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_mirs_deep, mu = mu_deep, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_mirs, cost_M = cost_M_mirs, V = V_grid$V) %>%
+  bind_cols(V_grid) %>%
+  mutate(M = "MIRS at 10.30 USD") %>%
+  mutate(depth = "Deep Soil (50-100 cm)")
 
 
-optimal_costs <- bind_rows(optimal_costs_dcea_top, optimal_costs_loi_top, optimal_costs_mirs_top) %>%
-  mutate(composite_size = n/k)
+optimal_costs <- bind_rows(optimal_costs_dcea_top, optimal_costs_loi_top, optimal_costs_mirs_top, optimal_costs_dcea_deep, optimal_costs_loi_deep, optimal_costs_mirs_deep) %>%
+  mutate(composite_size = n/k) %>%
+  mutate(cost_c = paste(cost_c, "USD per core")) %>%
+  mutate(cost_c = factor(cost_c, levels = paste(c(5,20,40), "USD per core"))) %>%
+  mutate(depth = factor(depth, levels = c("Topsoil (0-10 cm)", "Deep Soil (50-100 cm)"))) 
 
 optimal_cost_plot <- ggplot(optimal_costs, aes(x = sqrt(V), y = minimum_cost, color = as_factor(M))) +
-  facet_grid(~ cost_c) +
+  facet_grid(cost_c ~ depth) +
   geom_line(size = 1.5) +
-  coord_cartesian(xlim = c(.1,1.5), ylim = c(0,5000)) +
+  coord_cartesian(xlim = c(.1,1.5), ylim = c(0,1000)) +
   geom_hline(yintercept = 0) +
   geom_hline(yintercept = 200, linetype = "dashed") +
-  labs(x = "Standard Error", y = "Minimum Budget (USD)", color = "Sample Cost") +
-  scale_y_continuous(breaks = c(0,200,seq(500, 5000, by = 500))) +
+  labs(x = "Standard Error", y = "Minimum Budget (USD)", color = "Measurement") +
+  scale_y_continuous(breaks = c(0,200,seq(500, 1000, by = 500))) +
   scale_x_continuous(breaks = c(.1,seq(0.25, 2.0, by = 0.25))) +
   theme_bw() +
   theme(text = element_text(size = 16)) 
