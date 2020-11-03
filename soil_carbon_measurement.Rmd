@@ -1,0 +1,178 @@
+---
+title: "Measuring Soil Organic Carbon"
+author: "Jacob Spertus"
+date: "`r Sys.Date()`"
+output: html_document
+header-includes:
+  -\usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+
+```{r, message = FALSE}
+library(tidyverse)
+source("functions.R")
+set.seed(100)
+```
+
+# Introduction 
+
+Scientists interested in soil organic carbon (SOC) sequestration, need to be able to estimate the average concentration of SOC in a bounded plot. Average concentration expressed in percent SOC is interesting in its own right, and is also a key quantity in estimating the total amount of SOC in a plot, typically expressed in tons of SOC per hectare (Mg ha$^{-1}$). To estimate the average \% SOC, random samples are taken from a plot, possibly mixed together (composited), and then measured. The gold standard measurement method is dry combustion in an elemental analyzer (DC-EA). While precise compared to other measurement methods, DC-EA is still prone to error. In this notebook, we formalize measurement error in SOC assays, investigate some of its properties, and derive a way to estimate measurement error variance using replicated assays. 
+
+# Multiplicative Measurement Error Model
+
+We need a model for measurement error. Suppose a sample is selected at random from a plot and has true (fixed, unknown) SOC concentration $s$. An assay estimates $s$ with some error. Call $S_i$ a single measurement of $s$, and suppose we have $r$ replicates $\{S_1,...,S_r\}$. Let $\delta_i$ be a random variable, the measurement error, that perturbs $s$. An additive measurement error model is typical and assumes $S_i = s + \delta_i$. Additive measurement error does not really make sense for a \%SOC assay because \%SOC is bounded between 0\% and 100\% (negative \%SOC is impossible) and because the physics of measurement point to multiplicative measurement error. Specifically, in DC-EA a common source of error is poor weighing of the tiny aliquots to be combusted. Since the mass of the aliquot is in the denominator when converting from mass CO$_2$ released to \%SOC, the effect of these errors is likely multiplicative. Soil scientists generally expect errors in measurement to be larger when the $s$ is larger. 
+
+The multiplicative measurement error model asserts that $S_i = s \delta_i$. In order for $S_i$ to provide an unbiased estimate of $s$, we need to assume $\mathbb{E}(\delta_i) = 1$. In some $s$ itself is random (i.e. when we consider it a random sample from a plot), in this case we also need $s$ and $\delta_i$ to be independent. We also assume that $\delta_i$ has variance $\sigma_\delta^2$, which does not depend on $s$. The variance of $S_i$ is $\mathbb{V}(S_i) = s^2 \sigma_\delta^2$. Thus while the variance of the perturbations $\delta_i$ is constant, the variance of the measurements themselves depends on $s$. 
+
+
+# Estimating $s$ and $\sigma_\delta^2$ 
+
+The sample mean of replicates is
+$$\bar{S} \equiv \frac{1}{r} \sum_{i=1}^r S_i$$
+and yields an unbiased estimate of $s$ in the sense that $\mathbb{E}(\bar{S}) = s$. Furthermore, the variance of $\bar{S}$ is 
+$$\mathbb{V}(\bar{S}) = \frac{\mathbb{V}(S_i)}{r} = \frac{s^2 \sigma_\delta^2}{r}$$
+In typical fashion, the variance in estimating $s$ can be reduced either by employing a more precise measurement (lower $\sigma_\delta^2$) or by running more replicates (higher $r$). An unbiased estimator of $\mathbb{V}(S_i)$ is the sample variance over replicates:
+$$\widehat{\mathbb{V}}(S_i) = \frac{1}{r-1} \sum_{i=1}^r (S_i - \bar{S})^2$$
+Note that we can write $\sigma_\delta^2 = \mathbb{V}(S_i) / s^2$. $\bar{S}^2$ is not an unbiased estimator of $s^2$, but note we can use the computational form of the variance of $\bar{S}$ to write $s^2 = \mathbb{E}(\bar{S}^2) - \mathbb{V}(\bar{S})$. Thus an unbiased estimator of $s^2$ is:
+$$\widehat{s^2} = \bar{S}^2 - \widehat{\mathbb{V}}(S_i) / r$$
+Putting together the pieces, we can estimate $\sigma_\delta^2$ by:
+$$\hat{\sigma}_\delta^2 = \frac{\widehat{\mathbb{V}}(S_i)}{\widehat{s^2}}.$$
+
+Note that the square root of this quantity estimates the standard deviation of measurement error, and this is very similar to the "percent difference" between two assays defined as:
+
+$$\mbox{PD}(S_i, S_j) = \frac{|S_i - S_j|}{\frac{1}{2}(S_i + S_j)}$$
+
+To see the similarity with $\hat{\sigma}_\delta$, note that the numerator estimates the spread in the assays and the denominator estimates the true value $s$. The percent difference is sometimes employed by labs to check the measurement error of their assays. 
+
+
+# Sequential Measurement and Truncated Error
+
+The percent difference may be employed in a sequential manner to gather assays until they are deemed precise enough. Specifically, an investigator might take measurements of samples sequentially until two samples are within say 10\% of each other, as measured by percent difference. This process can introduce bias into measurement unless we are willing to make further assumptions. Specifically, sequentially running assays in this way will lead to unbiased measurement _if_ the measurement error distribution is symmetric. Otherwise, there could be bias. We now demonstrate measurement error through simulation. 
+
+
+We first define the function `add_symmetric_measurement_error()` which simulates measurement errors from a specific distribution (a shifted and scaled beta distribution).
+
+```{r}
+add_symmetric_measurement_error <- function(true_sample, error_bounds, error_sd, replicates = 1){
+  #corrupts samples with independent, symmetric, beta distributed measurement error 
+  #inputs:
+  #true_sample: a length 1 vector of samples
+  #error_bounds: a length-2 vector specifying the lower and upper bounds of the error, the mean of these (halfway between the left and right bound) is the expected value of the measurement error
+  #replicates: the number of times to measure each sample (duplicate, triplicate, etc)
+  #output: 
+  #the measured samples a vector of length replicates
+  if(error_sd^2 > (1/4)*(error_bounds[2] - error_bounds[1])^2){
+    stop("error variance is too big given the error bounds!")
+  }
+  alpha <- (error_bounds[1] - error_bounds[2])^2 / (8 * error_sd^2) - 1/2
+  delta_star <- rbeta(length(true_sample)*replicates, shape1 = alpha, shape2 = alpha)
+  delta <- (delta_star - 1/2) * abs(error_bounds[1] - error_bounds[2]) + mean(error_bounds)
+  samples_frame <- expand.grid("sample" = rep(1:length(true_sample)), "measurement_replicate" = rep(1:replicates))
+  
+  measured_samples <- rep(true_sample, replicates) * delta
+  measured_samples
+}
+```
+
+
+This is what the distribution looks like for a bound of [.5,1.5] and $\sigma_\delta = .1$
+
+```{r}
+hist(add_symmetric_measurement_error(true_sample = 1, error_bounds = c(.5,1.5), error_sd = 0.1, replicates = 5000), breaks = 30, main = "Symmetric measurement error", xlab = "Error")
+```
+
+Now we demonstrate that the measurements are unbiased under symmetric, mean 1 measurement error, even when assays are selected using a sequential rule.
+
+```{r}
+#a grid of true concentrations from .1 to 5 percent SOC
+samples <- seq(.1, 20, length.out = 50)
+
+#simulate a bunch of measurements
+measured_samples <- sapply(samples, add_symmetric_measurement_error, error_bounds = c(.5,1.5), error_sd = .1, replicates = 500)
+
+#measurement is unbiased for any s if we don't do any thresholding
+plot(x = samples, y = colMeans(measured_samples), pch = 20, cex = 1.5, xlab = "True value of s", ylab = "Expected Value of Measurements")
+abline(0,1)
+
+#sequential thresholding function
+get_sequential_duplicates <- function(measured_samples, threshold = .1){
+  sequential_differences <- apply(measured_samples, 2, diff)
+  sequential_averages <- apply(measured_samples, 2, zoo::rollmean, k = 2)
+  sequential_pct_differences <- abs(sequential_differences) / sequential_averages
+  sequential_duplicates <- apply(sequential_pct_differences, 2, function(x){min(which(x < threshold))})
+  duplicate_estimate <- sequential_averages[cbind(sequential_duplicates,1:ncol(sequential_averages))]
+  duplicate_estimate
+}
+
+#simulate the measurement process a bunch of times
+run_simulation <- function(true_samples, error_bounds, error_sd, threshold){
+  measured_samples <- sapply(true_samples, add_symmetric_measurement_error, error_bounds = error_bounds, error_sd = error_sd, replicates = 50)
+  get_sequential_duplicates(measured_samples, threshold = threshold)
+}
+
+
+#now run simulations
+simulation_results <- replicate(n = 200, run_simulation(true_samples = samples, error_bounds = c(.5,1.5), error_sd = .15, threshold = .1))
+#there is still no bias
+plot(y = rowMeans(simulation_results), x = samples, pch = 20, cex = 1.5, xlab = "True value of s", ylab = "Expected value of sequentially thresholded duplicates")
+abline(0,1)
+```
+
+On the other hand, if the distribution is not symmetric, we may see bias. The function `add_skewed_measurement_error()` adds measurement errors that are skewed so that the mode falls on one side of 1.  
+
+```{r}
+add_skewed_measurement_error <- function(true_sample, alpha = 20, beta = 5, replicates = 1){
+  #corrupts samples with independent, symmetric, beta distributed measurement error 
+  #inputs:
+  #alpha: the parameter alpha in the beta distribution
+  #beta: the parameter beta in the beta distribution
+  #true_sample: a length 1 vector of samples
+  #replicates: the number of times to measure each sample (duplicate, triplicate, etc)
+  #output: 
+  #the measured samples a vector of length replicates
+
+  delta_star <- rbeta(length(true_sample)*replicates, shape1 = alpha, shape2 = beta)
+  delta <- (delta_star - alpha/(alpha+beta)) + 1
+  samples_frame <- expand.grid("sample" = rep(1:length(true_sample)), "measurement_replicate" = rep(1:replicates))
+  
+  measured_samples <- rep(true_sample, replicates) * delta
+  measured_samples
+}
+```
+
+
+These measurement errors can be quite skewed but still have mean 1:
+
+```{r}
+skewed_errors <- add_skewed_measurement_error(true_sample = 1, alpha = 10, beta = 1, replicates = 5000)
+hist(skewed_errors, breaks = 30, main = "Skewed Measurement Error", xlab = "Error")
+mean(skewed_errors)
+```
+
+Now we examine the properties of skewed measurement errors:
+
+```{r}
+#simulate a bunch of measurements
+measured_samples <- sapply(samples, add_skewed_measurement_error, alpha = 10, beta = 1, replicates = 500)
+
+#measurement is still unbiased for any s if we don't do any thresholding
+plot(x = samples, y = colMeans(measured_samples), pch = 20, cex = 1.5, xlab = "True value of s", ylab = "Expected Value of Measurements")
+abline(0,1)
+
+#simulate the measurement process a bunch of times
+run_simulation_skewed <- function(true_samples, alpha, beta, threshold){
+  measured_samples <- sapply(true_samples, add_skewed_measurement_error, alpha = alpha, beta = beta, replicates = 50)
+  get_sequential_duplicates(measured_samples, threshold = threshold)
+}
+
+
+#now run simulations
+simulation_results_skewed <- replicate(n = 200, run_simulation_skewed(true_samples = samples, alpha = 10, beta = 1, threshold = .1))
+#there is some bias (esp in higher s samples) if the measurement error distribution is skewed
+plot(y = rowMeans(simulation_results_skewed), x = samples, pch = 20, cex = 1.5, xlab = "True value of s", ylab = "Expected value of sequentially thresholded duplicates", main = "Skewed Measurement Error")
+abline(0,1)
+```
