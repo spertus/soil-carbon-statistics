@@ -105,7 +105,7 @@ carbon_plot <- ggplot(change_data, aes(x = percC_1993, y = percC_2012)) +
   facet_grid(depthcode ~ .)
 
 
-#paired t tests for change within treatments, depths
+############# paired t tests for change within treatments, depths ##########
 #I suspect they used a paired t.test (see esp results for OMT aka ORG and LMT aka CONV+WCC)
 #I can't get the exact right p-value for OMT, depthcode = 2 (15-30cm), which should be .006
 paired_t_test_concentration_results <- change_data %>%
@@ -113,7 +113,7 @@ paired_t_test_concentration_results <- change_data %>%
   summarize(point_estimate = mean(percC_2012 - percC_1993), test_stat = sqrt(n()) * mean(percC_2012 - percC_1993) / sd(percC_2012 - percC_1993), size = n()) %>%
   mutate(parametric_p_value = 2*(1 - pt(abs(test_stat), df = size - 1)))
 
-#Another inconsitency: 2.59 mg C / ha reported for 15-30cm ORG at top of page 7 is a typo, I estimate 2.42 Mg C / ha, p-value of .04 (not .01)
+# 2.59 mg C / ha reported for 15-30cm ORG at top of page 7 is a typo? I estimate 2.42 Mg C / ha, p-value of .04 (not .01)
 paired_t_test_stock_results <- change_data %>%
   group_by(depthcode, Treatment) %>%
   summarize(point_estimate = mean(TotC_2012 - TotC_1993), test_stat = sqrt(n()) * mean(TotC_2012 - TotC_1993) / sd(TotC_2012 - TotC_1993), size = n()) %>%
@@ -188,7 +188,7 @@ FDR_plot <- ggplot(pt_concentration_change, aes(y = perm_p_value, x = p_value_or
   geom_line(aes(x = p_value_order, y = bh_threshold), linetype = "dashed", color = "forestgreen")
 
 
-#NPC for testing intersection null (some treatment has an effect on SOC)
+#NPC for testing intersection null (treatment has an effect on some outcome)
 
 
 
