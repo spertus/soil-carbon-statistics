@@ -70,13 +70,13 @@ LBL_fitted <- fitted(LOI_DC_model)[LBL_index]
 hist(LBL_residuals, breaks = 30)
 RMSE_loi <- sd(LBL_residuals) #.31
 
-sigma_delta_loi <- RMSE_loi * sigma_delta_dcea / marin_summary$median_mu + sigma_delta_dcea + RMSE_loi / marin_summary$median_mu
+sigma_delta_loi <- sigma_delta_dcea + RMSE_loi / marin_summary$median_mu
 
 ################## estimating MIRS error #################
 
 #from England and Viscarra-Rossel 2018
 RMSE_mirs <- 0.11
-sigma_delta_mirs <- RMSE_mirs * sigma_delta_dcea / marin_summary$median_mu + sigma_delta_dcea + RMSE_mirs / marin_summary$median_mu
+sigma_delta_mirs <- sigma_delta_dcea + RMSE_mirs / marin_summary$median_mu
 
 
 
@@ -117,12 +117,15 @@ B_grid <- expand.grid(B = 270:5000, cost_c = c(cost_c_low, cost_c_medium, cost_c
 
 ############ plot composite size versus std_error and cost #########
 composite_grid_dcea_top <- get_composite_error_grid(n = 100, sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = cost_c_low, cost_M = cost_M_dcea, cost_P = cost_P_dcea) %>%
-  pivot_longer(cols = c("std_error", "cost"), names_to = "quantity")
+  pivot_longer(cols = c("std_error", "cost"), names_to = "quantity") %>%
+  mutate(quantity = recode(quantity, std_error = "Standard Error", cost = "Cost (USD)"))
 
 composite_plot <- ggplot(data = composite_grid_dcea_top, aes(x = composite_size, y = value)) +
   geom_line() +
   geom_point() +
-  facet_grid(quantity ~ ., scales = "free")
+  facet_grid(quantity ~ ., scales = "free") +
+  xlab("Composite Size") +
+  ylab("")
 
 
 ############# optimal composite sizes (topsoil) ############
@@ -194,6 +197,7 @@ optima_variance <- bind_rows(optima_variance_top, optima_variance_deep) %>%
 optima_std_error_plot <- ggplot(data = optima_variance, mapping = aes(x = B, y = sqrt(optimum_variance), color = as_factor(M))) +
   geom_line(size = 1.5) +
   labs(x = "Budget (USD)", y = "Standard Error", color = "Measurement") +
+  scale_color_manual(values = c("steelblue", "darkorange3", "forestgreen", "firebrick")) +
   scale_x_continuous(breaks = seq(500,5000,by=500)) +
   coord_cartesian(xlim = c(400,3000), ylim = c(0,.5)) +
   theme_bw() +
@@ -203,6 +207,7 @@ optima_std_error_plot <- ggplot(data = optima_variance, mapping = aes(x = B, y =
 optima_cv_plot <- ggplot(data = optima_variance, mapping = aes(x = B, y = cv, color = as_factor(M))) +
   geom_line(size = 1.5) +
   labs(x = "Budget (USD)", y = "Coefficient of Variation", color = "Measurement") +
+  scale_color_manual(values = c("steelblue", "darkorange3", "forestgreen", "firebrick")) +
   scale_x_continuous(breaks = seq(500,5000,by=500)) +
   coord_cartesian(xlim = c(400,3000), ylim = c(0,.4)) +
   theme_bw() +
