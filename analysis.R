@@ -102,9 +102,9 @@ cost_c_high <- 40.00
 cost_P_loi <- 8.00
 cost_P_dcea <- 11.00
 cost_P_mirs <- 9.00
-cost_M_dcea <- 15.00
-cost_M_loi <- 1.25
-cost_M_mirs <- 1.30
+cost_A_dcea <- 15.00
+cost_A_loi <- 1.25
+cost_A_mirs <- 1.30
 
 
 B_grid <- expand.grid(B = 270:5000, cost_c = c(cost_c_low, cost_c_medium, cost_c_high))
@@ -116,48 +116,52 @@ B_grid <- expand.grid(B = 270:5000, cost_c = c(cost_c_low, cost_c_medium, cost_c
 
 
 ############ plot composite size versus std_error and cost #########
-composite_grid_dcea_top <- get_composite_error_grid(n = 100, sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = cost_c_low, cost_M = cost_M_dcea, cost_P = cost_P_dcea) %>%
+composite_grid_dcea_top <- get_composite_error_grid(n = 100, sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = cost_c_low, cost_A = cost_A_dcea, cost_P = cost_P_dcea) %>%
   pivot_longer(cols = c("std_error", "cost"), names_to = "quantity") %>%
-  mutate(quantity = recode(quantity, std_error = "Standard Error", cost = "Cost (USD)"))
+  mutate(quantity = recode(quantity, std_error = "Standard Error (% SOC)", cost = "Cost (USD)"))
 
-composite_plot <- ggplot(data = composite_grid_dcea_top, aes(x = composite_size, y = value)) +
+composite_plot <- ggplot(data = composite_grid_dcea_top, aes(x = 100/composite_size, y = value)) +
   geom_line() +
-  geom_point() +
+  geom_point(size = 3) +
   facet_grid(quantity ~ ., scales = "free") +
-  xlab("Composite Size") +
-  ylab("")
+  scale_x_continuous(breaks = c(1,25,50,100)) +
+  xlab("Number of Assays") +
+  ylab("") +
+  theme_bw() +
+  theme(text = element_text(size = 16)) 
+
 
 
 ############# optimal composite sizes (topsoil) ############
-optimal_composite_dcea_top <- get_optimal_composite_size(sigma_p = sigma_p_top, mu = mu_top, sigma_delta = sigma_delta_dcea, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_dcea, cost_M = cost_M_dcea)
-optimal_composite_loi_top <- get_optimal_composite_size(sigma_p = sigma_p_top, mu = mu_top, sigma_delta = sigma_delta_loi_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_loi, cost_M = cost_M_loi)
-optimal_composite_mirs_top <- get_optimal_composite_size(sigma_p = sigma_p_top, mu = mu_top, sigma_delta = sigma_delta_mirs_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_mirs, cost_M = cost_M_mirs)
+optimal_composite_dcea_top <- get_optimal_composite_size(sigma_p = sigma_p_top, mu = mu_top, sigma_delta = sigma_delta_dcea, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_dcea, cost_A = cost_A_dcea)
+optimal_composite_loi_top <- get_optimal_composite_size(sigma_p = sigma_p_top, mu = mu_top, sigma_delta = sigma_delta_loi_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_loi, cost_A = cost_A_loi)
+optimal_composite_mirs_top <- get_optimal_composite_size(sigma_p = sigma_p_top, mu = mu_top, sigma_delta = sigma_delta_mirs_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_mirs, cost_A = cost_A_mirs)
 
-optimal_composite_dcea_deep <- get_optimal_composite_size(sigma_p = sigma_p_deep, mu = mu_deep, sigma_delta = sigma_delta_dcea, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_dcea, cost_M = cost_M_dcea)
-optimal_composite_loi_deep <- get_optimal_composite_size(sigma_p = sigma_p_deep, mu = mu_deep, sigma_delta = sigma_delta_loi_deep, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_loi, cost_M = cost_M_loi)
-optimal_composite_mirs_deep <- get_optimal_composite_size(sigma_p = sigma_p_deep, mu = mu_deep, sigma_delta = sigma_delta_mirs_deep, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_mirs, cost_M = cost_M_mirs)
+optimal_composite_dcea_deep <- get_optimal_composite_size(sigma_p = sigma_p_deep, mu = mu_deep, sigma_delta = sigma_delta_dcea, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_dcea, cost_A = cost_A_dcea)
+optimal_composite_loi_deep <- get_optimal_composite_size(sigma_p = sigma_p_deep, mu = mu_deep, sigma_delta = sigma_delta_loi_deep, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_loi, cost_A = cost_A_loi)
+optimal_composite_mirs_deep <- get_optimal_composite_size(sigma_p = sigma_p_deep, mu = mu_deep, sigma_delta = sigma_delta_mirs_deep, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), cost_P = cost_P_mirs, cost_A = cost_A_mirs)
 
 
 
 ################# optimal variance under range of budgets (topsoil) ##########
-optima_variance_dcea_top <- get_minimum_error(sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_dcea, cost_M = cost_M_dcea, B = B_grid$B) %>%
+optima_variance_dcea_top <- get_minimum_error(sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_dcea, cost_A = cost_A_dcea, B = B_grid$B) %>%
   bind_cols(B_grid) %>%
   mutate(M = "DC-EA at 26.00 USD") %>%
   mutate(depth = "Topsoil (0-10 cm)")
 
-optima_variance_loi_top <- get_minimum_error(sigma_p = sigma_p_top, sigma_delta = sigma_delta_loi_top, mu = mu_top, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_loi, cost_M = cost_M_loi, B = B_grid$B) %>%
+optima_variance_loi_top <- get_minimum_error(sigma_p = sigma_p_top, sigma_delta = sigma_delta_loi_top, mu = mu_top, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_loi, cost_A = cost_A_loi, B = B_grid$B) %>%
   bind_cols(B_grid) %>%
   mutate(M = "LOI at 9.25 USD") %>%
   mutate(depth = "Topsoil (0-10 cm)")
 
-optima_variance_mirs_top <- get_minimum_error(sigma_p = sigma_p_top, sigma_delta = sigma_delta_mirs_top, mu = mu_top,C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_mirs, cost_M = cost_M_mirs, B = B_grid$B) %>%
+optima_variance_mirs_top <- get_minimum_error(sigma_p = sigma_p_top, sigma_delta = sigma_delta_mirs_top, mu = mu_top,C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_mirs, cost_A = cost_A_mirs, B = B_grid$B) %>%
   bind_cols(B_grid) %>%
   mutate(M = "MIRS at 10.30 USD") %>%
   mutate(depth = "Topsoil (0-10 cm)")
 
-optima_variance_no_error_top <- get_minimum_error(sigma_p = sigma_p_top, sigma_delta = 0, mu = mu_top, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = 0, cost_M = 0, B = B_grid$B, measurement_error = FALSE) %>%
+optima_variance_no_error_top <- get_minimum_error(sigma_p = sigma_p_top, sigma_delta = 0, mu = mu_top, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = 0, cost_A = 0, B = B_grid$B, measurement_error = FALSE) %>%
   bind_cols(B_grid) %>%
-  mutate(M = "No Measurement Error") %>%
+  mutate(M = "No Assay Error or Cost") %>%
   mutate(depth = "Topsoil (0-10 cm)")
 
 optima_variance_top <- bind_rows(optima_variance_dcea_top, optima_variance_loi_top, optima_variance_mirs_top, optima_variance_no_error_top ) %>%
@@ -165,24 +169,24 @@ optima_variance_top <- bind_rows(optima_variance_dcea_top, optima_variance_loi_t
 
 
 ############ optimal variance under range of budgets (deep soi) ##########
-optima_variance_dcea_deep <- get_minimum_error(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_dcea, mu = mu_deep, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_dcea, cost_M = cost_M_dcea, B = B_grid$B) %>%
+optima_variance_dcea_deep <- get_minimum_error(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_dcea, mu = mu_deep, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_dcea, cost_A = cost_A_dcea, B = B_grid$B) %>%
   bind_cols(B_grid) %>%
   mutate(M = "DC-EA at 26.00 USD") %>%
   mutate(depth = "Deep Soil (50-100 cm)")
 
-optima_variance_loi_deep <- get_minimum_error(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_loi_deep, mu = mu_deep, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_loi, cost_M = cost_M_loi, B = B_grid$B) %>%
+optima_variance_loi_deep <- get_minimum_error(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_loi_deep, mu = mu_deep, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_loi, cost_A = cost_A_loi, B = B_grid$B) %>%
   bind_cols(B_grid) %>%
   mutate(M = "LOI at 9.25 USD") %>%
   mutate(depth = "Deep Soil (50-100 cm)")
 
-optima_variance_mirs_deep <- get_minimum_error(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_mirs_deep, mu = mu_deep, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_mirs, cost_M = cost_M_mirs, B = B_grid$B) %>%
+optima_variance_mirs_deep <- get_minimum_error(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_mirs_deep, mu = mu_deep, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = cost_P_mirs, cost_A = cost_A_mirs, B = B_grid$B) %>%
   bind_cols(B_grid) %>%
   mutate(M = "MIRS at 10.30 USD") %>%
   mutate(depth = "Deep Soil (50-100 cm)")
 
-optima_variance_no_error_deep <- get_minimum_error(sigma_p = sigma_p_deep, sigma_delta = 0, mu = mu_deep, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = 0, cost_M = 0, B = B_grid$B, measurement_error = FALSE) %>%
+optima_variance_no_error_deep <- get_minimum_error(sigma_p = sigma_p_deep, sigma_delta = 0, mu = mu_deep, C_0 = C_0, cost_c = B_grid$cost_c, cost_P = 0, cost_A = 0, B = B_grid$B, measurement_error = FALSE) %>%
   bind_cols(B_grid) %>%
-  mutate(M = "No Measurement Error") %>%
+  mutate(M = "No Assay Error or Cost") %>%
   mutate(depth = "Deep Soil (50-100 cm)")
 
 optima_variance_deep <- bind_rows(optima_variance_dcea_deep, optima_variance_loi_deep, optima_variance_mirs_deep, optima_variance_no_error_deep) %>%
@@ -196,7 +200,7 @@ optima_variance <- bind_rows(optima_variance_top, optima_variance_deep) %>%
 
 optima_std_error_plot <- ggplot(data = optima_variance, mapping = aes(x = B, y = sqrt(optimum_variance), color = as_factor(M))) +
   geom_line(size = 1.5) +
-  labs(x = "Budget (USD)", y = "Standard Error", color = "Measurement") +
+  labs(x = "Budget (USD)", y = "Standard Error", color = "Assay") +
   scale_color_manual(values = c("steelblue", "darkorange3", "forestgreen", "firebrick")) +
   scale_x_continuous(breaks = seq(500,5000,by=500)) +
   coord_cartesian(xlim = c(400,3000), ylim = c(0,.5)) +
@@ -206,7 +210,7 @@ optima_std_error_plot <- ggplot(data = optima_variance, mapping = aes(x = B, y =
 
 optima_cv_plot <- ggplot(data = optima_variance, mapping = aes(x = B, y = cv, color = as_factor(M))) +
   geom_line(size = 1.5) +
-  labs(x = "Budget (USD)", y = "Coefficient of Variation", color = "Measurement") +
+  labs(x = "Budget (USD)", y = "Coefficient of Variation", color = "Assay") +
   scale_color_manual(values = c("steelblue", "darkorange3", "forestgreen", "firebrick")) +
   scale_x_continuous(breaks = seq(500,5000,by=500)) +
   coord_cartesian(xlim = c(400,3000), ylim = c(0,.4)) +
@@ -216,14 +220,14 @@ optima_cv_plot <- ggplot(data = optima_variance, mapping = aes(x = B, y = cv, co
 
 ################ relative efficiencies ################ 
 #relative efficiencies in the top soil
-RE_dcea_loi_top <- get_relative_efficiency(sigma_p = sigma_p_top, mu = mu_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_dcea, cost_P_1 = cost_P_dcea, cost_M_1 = cost_M_dcea, sigma_delta_2 = sigma_delta_loi_top, cost_P_2 = cost_P_loi, cost_M_2 = cost_M_loi)
-RE_dcea_mirs_top <- get_relative_efficiency(sigma_p = sigma_p_top, mu = mu_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_dcea, cost_P_1 = cost_P_dcea, cost_M_1 = cost_M_dcea, sigma_delta_2 = sigma_delta_mirs_top, cost_P_2 = cost_P_mirs, cost_M_2 = cost_M_mirs)
-RE_mirs_loi_top <- get_relative_efficiency(sigma_p = sigma_p_top, mu = mu_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_mirs_top, cost_P_1 = cost_P_mirs, cost_M_1 = cost_M_mirs, sigma_delta_2 = sigma_delta_loi_top, cost_P_2 = cost_P_loi, cost_M_2 = cost_M_loi)
+RE_dcea_loi_top <- get_relative_efficiency(sigma_p = sigma_p_top, mu = mu_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_dcea, cost_P_1 = cost_P_dcea, cost_A_1 = cost_A_dcea, sigma_delta_2 = sigma_delta_loi_top, cost_P_2 = cost_P_loi, cost_A_2 = cost_A_loi)
+RE_dcea_mirs_top <- get_relative_efficiency(sigma_p = sigma_p_top, mu = mu_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_dcea, cost_P_1 = cost_P_dcea, cost_A_1 = cost_A_dcea, sigma_delta_2 = sigma_delta_mirs_top, cost_P_2 = cost_P_mirs, cost_A_2 = cost_A_mirs)
+RE_mirs_loi_top <- get_relative_efficiency(sigma_p = sigma_p_top, mu = mu_top, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_mirs_top, cost_P_1 = cost_P_mirs, cost_A_1 = cost_A_mirs, sigma_delta_2 = sigma_delta_loi_top, cost_P_2 = cost_P_loi, cost_A_2 = cost_A_loi)
 
 #relative efficiencies in deep soil
-RE_dcea_loi_deep <- get_relative_efficiency(sigma_p = sigma_p_deep, mu = mu_deep, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_dcea, cost_P_1 = cost_P_dcea, cost_M_1 = cost_M_dcea, sigma_delta_2 = sigma_delta_loi_deep, cost_P_2 = cost_P_loi, cost_M_2 = cost_M_loi)
-RE_dcea_mirs_deep <- get_relative_efficiency(sigma_p = sigma_p_deep, mu = mu_deep, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_dcea, cost_P_1 = cost_P_dcea, cost_M_1 = cost_M_dcea, sigma_delta_2 = sigma_delta_mirs_deep, cost_P_2 = cost_P_mirs, cost_M_2 = cost_M_mirs)
-RE_mirs_loi_deep <- get_relative_efficiency(sigma_p = sigma_p_deep, mu = mu_deep, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_mirs_deep, cost_P_1 = cost_P_mirs, cost_M_1 = cost_M_mirs, sigma_delta_2 = sigma_delta_loi_deep, cost_P_2 = cost_P_loi, cost_M_2 = cost_M_loi)
+RE_dcea_loi_deep <- get_relative_efficiency(sigma_p = sigma_p_deep, mu = mu_deep, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_dcea, cost_P_1 = cost_P_dcea, cost_A_1 = cost_A_dcea, sigma_delta_2 = sigma_delta_loi_deep, cost_P_2 = cost_P_loi, cost_A_2 = cost_A_loi)
+RE_dcea_mirs_deep <- get_relative_efficiency(sigma_p = sigma_p_deep, mu = mu_deep, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_dcea, cost_P_1 = cost_P_dcea, cost_A_1 = cost_A_dcea, sigma_delta_2 = sigma_delta_mirs_deep, cost_P_2 = cost_P_mirs, cost_A_2 = cost_A_mirs)
+RE_mirs_loi_deep <- get_relative_efficiency(sigma_p = sigma_p_deep, mu = mu_deep, cost_c = c(cost_c_low, cost_c_medium, cost_c_high), sigma_delta_1 = sigma_delta_mirs_deep, cost_P_1 = cost_P_mirs, cost_A_1 = cost_A_mirs, sigma_delta_2 = sigma_delta_loi_deep, cost_P_2 = cost_P_loi, cost_A_2 = cost_A_loi)
 
 RE_matrix <- cbind(rbind(RE_dcea_loi_top, RE_dcea_mirs_top), rbind(RE_dcea_loi_deep, RE_dcea_mirs_deep))
 colnames(RE_matrix) <- c("Topsoil, 5 USD", "Topsoil, 20 USD", "Topsoil, 40 USD", "Deep Soil, 5 USD", "Deep Soil, 20 USD", "Deep Soil, 40 USD")
@@ -239,29 +243,29 @@ V_grid <- expand.grid(V = seq(.01, 2, by = .005)^2, cost_c = c(cost_c_low, cost_
 
 
 #topsoil costs
-optimal_costs_dcea_top <- get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_dcea, cost_M = cost_M_dcea, V = V_grid$V) %>%
+optimal_costs_dcea_top <- get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_dcea, cost_A = cost_A_dcea, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
   mutate(M = "DC-EA at 26.00 USD") %>%
   mutate(depth = "Topsoil (0-10 cm)")
-optimal_costs_loi_top <- get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_loi_top, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_loi, cost_M = cost_M_loi, V = V_grid$V) %>%
+optimal_costs_loi_top <- get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_loi_top, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_loi, cost_A = cost_A_loi, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
   mutate(M = "LOI at 9.25 USD") %>%
   mutate(depth = "Topsoil (0-10 cm)")
-optimal_costs_mirs_top <-  get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_mirs_top, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_mirs, cost_M = cost_M_mirs, V = V_grid$V) %>%
+optimal_costs_mirs_top <-  get_minimum_cost(sigma_p = sigma_p_top, sigma_delta = sigma_delta_mirs_top, mu = mu_top, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_mirs, cost_A = cost_A_mirs, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
   mutate(M = "MIRS at 10.30 USD") %>%
   mutate(depth = "Topsoil (0-10 cm)")
 
 #deep soil costs
-optimal_costs_dcea_deep <- get_minimum_cost(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_dcea, mu = mu_deep, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_dcea, cost_M = cost_M_dcea, V = V_grid$V) %>%
+optimal_costs_dcea_deep <- get_minimum_cost(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_dcea, mu = mu_deep, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_dcea, cost_A = cost_A_dcea, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
   mutate(M = "DC-EA at 26.00 USD") %>%
   mutate(depth = "Deep Soil (50-100 cm)")
-optimal_costs_loi_deep <- get_minimum_cost(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_loi_deep, mu = mu_deep, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_loi, cost_M = cost_M_loi, V = V_grid$V) %>%
+optimal_costs_loi_deep <- get_minimum_cost(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_loi_deep, mu = mu_deep, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_loi, cost_A = cost_A_loi, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
   mutate(M = "LOI at 9.25 USD") %>%
   mutate(depth = "Deep Soil (50-100 cm)")
-optimal_costs_mirs_deep <-  get_minimum_cost(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_mirs_deep, mu = mu_deep, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_mirs, cost_M = cost_M_mirs, V = V_grid$V) %>%
+optimal_costs_mirs_deep <-  get_minimum_cost(sigma_p = sigma_p_deep, sigma_delta = sigma_delta_mirs_deep, mu = mu_deep, C_0 = C_0, cost_c = V_grid$cost_c, cost_P = cost_P_mirs, cost_A = cost_A_mirs, V = V_grid$V) %>%
   bind_cols(V_grid) %>%
   mutate(M = "MIRS at 10.30 USD") %>%
   mutate(depth = "Deep Soil (50-100 cm)")
@@ -279,7 +283,7 @@ optimal_cost_plot <- ggplot(optimal_costs, aes(x = sqrt(V), y = minimum_cost, co
   coord_cartesian(xlim = c(.1,1.5), ylim = c(0,1000)) +
   geom_hline(yintercept = 0) +
   geom_hline(yintercept = 200, linetype = "dashed") +
-  labs(x = "Standard Error", y = "Minimum Budget (USD)", color = "Measurement") +
+  labs(x = "Standard Error", y = "Minimum Budget (USD)", color = "Assay") +
   scale_y_continuous(breaks = c(0,200,seq(500, 1000, by = 500))) +
   scale_x_continuous(breaks = c(.1,seq(0.25, 2.0, by = 0.25))) +
   theme_bw() +
