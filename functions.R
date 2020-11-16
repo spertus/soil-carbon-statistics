@@ -416,7 +416,7 @@ get_variance <- function(n, k, sigma_p, mu, sigma_delta){
 
 
 
-get_minimum_error <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_M, B, measurement_error = TRUE){
+get_minimum_error <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_A, B, measurement_error = TRUE){
   #solve optimization problem (in closed form, by lagrange multiplier) for simple random sampling and a fixed measurement method that determines sigma_delta
   #input: 
     #sigma_p: the plot variance
@@ -425,7 +425,7 @@ get_minimum_error <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cos
     #C_0: the fixed cost(s) of the survey
     #cost_c: the cost of collecting a single core (sample) from the plot
     #cost_P: the cost of prepping a single (composited) sample
-    #cost_M: the cost of measuring a single (composited) sample from the plot
+    #cost_A: the cost of measuring a single (composited) sample from the plot
     #B: the total budget for sampling and measurement
     #measurement_error: option to compute n without measurement error or cost (e.g. to lower bound error as sampling error)
   #output:
@@ -438,7 +438,7 @@ get_minimum_error <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cos
   #if there is no measurement error and cost of measurement, the solution is very simple
   if(!measurement_error){
     cost_P <- 0
-    cost_M <- 0
+    cost_A <- 0
     sigma_delta <- 0
     n_star <- (B - C_0) / cost_c
     k_star <- n_star #this doesnt actually matter if there is no measurement error or cost of measurement
@@ -446,33 +446,33 @@ get_minimum_error <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cos
     
   } else {
     #proceed to compute optimization solution
-    n_star <- (B - C_0) * sigma_p * sqrt(1 + sigma_delta^2) / (sigma_p * sqrt((1 + sigma_delta^2)) * cost_c + mu * sigma_delta * sqrt((cost_P + cost_M) * cost_c))
-    k_star <- (B - C_0) * mu * sigma_delta / ((sigma_p * sqrt((1 + sigma_delta^2) * cost_c * (cost_P + cost_M))  + mu * sigma_delta * (cost_P + cost_M)))
+    n_star <- (B - C_0) * sigma_p * sqrt(1 + sigma_delta^2) / (sigma_p * sqrt((1 + sigma_delta^2)) * cost_c + mu * sigma_delta * sqrt((cost_P + cost_A) * cost_c))
+    k_star <- (B - C_0) * mu * sigma_delta / ((sigma_p * sqrt((1 + sigma_delta^2) * cost_c * (cost_P + cost_A))  + mu * sigma_delta * (cost_P + cost_A)))
     
     #check boundary conditions and correct if violated
-    n_star[which(k_star < 1)] <- ((B - C_0 - cost_P - cost_M) / cost_c)[which(k_star < 1)]
+    n_star[which(k_star < 1)] <- ((B - C_0 - cost_P - cost_A) / cost_c)[which(k_star < 1)]
     k_star[which(k_star < 1)] <- 1
     k_star_greater_nstar <- which(k_star > n_star)
-    n_star[k_star_greater_nstar] <- ((B - C_0) / (cost_c + cost_P + cost_M))[k_star_greater_nstar]
-    k_star[k_star_greater_nstar] <- ((B - C_0) / (cost_c + cost_P + cost_M))[k_star_greater_nstar]
+    n_star[k_star_greater_nstar] <- ((B - C_0) / (cost_c + cost_P + cost_A))[k_star_greater_nstar]
+    k_star[k_star_greater_nstar] <- ((B - C_0) / (cost_c + cost_P + cost_A))[k_star_greater_nstar]
     
     #stop if there's not enough money to do at least one sample and measurement
     max_cost_P <- max(cost_P)
-    max_cost_M <- max(cost_M)
+    max_cost_A <- max(cost_A)
     max_cost_c <- max(cost_c)
     if(any(n_star < 1 | k_star < 1)){
-      stop(paste("Not enough budget to do at least one sample and measurement! Increase minimum budget to at least", C_0 + max_cost_c + max_cost_M + max_cost_P))
+      stop(paste("Not enough budget to do at least one sample and measurement! Increase minimum budget to at least", C_0 + max_cost_c + max_cost_A + max_cost_P))
     }
   }
   
   optimum_variance <- get_variance(n = n_star, k = k_star, sigma_p = sigma_p, sigma_delta = sigma_delta, mu = mu)
   
-  total_cost <- C_0 + n_star * cost_c + k_star * (cost_P + cost_M)
+  total_cost <- C_0 + n_star * cost_c + k_star * (cost_P + cost_A)
   
   data.frame(n = n_star, k = k_star, total_cost = total_cost, optimum_variance = optimum_variance)
 }
 
-get_composite_error_grid <- function(n, sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_M){
+get_composite_error_grid <- function(n, sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_A){
   #for a range of composite sizes 1 to n, return the achieved standard error
   #input: 
     #n: the number of samples
@@ -481,18 +481,18 @@ get_composite_error_grid <- function(n, sigma_p, sigma_delta, mu, C_0, cost_c, c
     #sigma_delta: the variance of the (multiplicative) measurement error
     #cost_c: the cost of collecting a single core (sample) from the plot
     #cost_P: the cost of prepping a single (composited) sample
-    #cost_M: the cost of measuring a single (composited) sample from the plot
+    #cost_A: the cost of measuring a single (composited) sample from the plot
   #output:
     #a 2 column dataframe with all tenable composite sizes and achieved standard errors
   possible_k <- 1:n
   k <- possible_k[(n %% possible_k) == 0]
   composite_sizes <- n / k
   variances <- get_variance(n = n, k = k, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta)
-  costs <- C_0 + n * cost_c + k * (cost_P + cost_M)
+  costs <- C_0 + n * cost_c + k * (cost_P + cost_A)
   data.frame(composite_size = composite_sizes, std_error = sqrt(variances), cost = costs)
 }
 
-get_optimal_composite_size <- function(sigma_p, sigma_delta, mu, cost_c, cost_P, cost_M){
+get_optimal_composite_size <- function(sigma_p, sigma_delta, mu, cost_c, cost_P, cost_A){
   #get the optimal size of composites, which doesn't depend on the budget or fixed costs
   #input: 
     #sigma_p: the plot variance
@@ -500,34 +500,34 @@ get_optimal_composite_size <- function(sigma_p, sigma_delta, mu, cost_c, cost_P,
     #sigma_delta: the variance of the (multiplicative) measurement error
     #cost_c: the cost of collecting a single core (sample) from the plot
     #cost_P: the cost of prepping a single (composited) sample
-    #cost_M: the cost of measuring a single (composited) sample from the plot
+    #cost_A: the cost of measuring a single (composited) sample from the plot
   #output:
     #a scalar, the optimal composite size
-  optimal_composite_size <- sigma_p * sqrt(1 + sigma_delta^2) * sqrt(cost_P + cost_M) / (mu * sigma_delta * sqrt(cost_c))
+  optimal_composite_size <- sigma_p * sqrt(1 + sigma_delta^2) * sqrt(cost_P + cost_A) / (mu * sigma_delta * sqrt(cost_c))
   optimal_composite_size
 }
 
-get_relative_efficiency <- function(sigma_p, mu, cost_c, sigma_delta_1, cost_P_1, cost_M_1, sigma_delta_2, cost_P_2, cost_M_2){
+get_relative_efficiency <- function(sigma_p, mu, cost_c, sigma_delta_1, cost_P_1, cost_A_1, sigma_delta_2, cost_P_2, cost_A_2){
   #input: 
     #sigma_p: the plot variance
     #mu: the average carbon concentration in the plot
     #cost_c: the cost of collecting a single core (sample) from the plot
     #sigma_delta_1: the measurement error variance of method 1
     #cost_P_1: the sample prep cost of method 1
-    #cost_M_1: the measurement cost of method 1
+    #cost_A_1: the measurement cost of method 1
     #sigma_delta_2: the measurement error variance of method 2
     #cost_P_2: the sample prep cost of method 2
-    #cost_M_2: the measurement cost of method 2
+    #cost_A_2: the measurement cost of method 2
   #output:
     #a scalar, the relative efficiency of measurement 1 over measurement 2
-  numerator <- sigma_p * sqrt((1 + sigma_delta_1) * cost_c) + mu * sigma_delta_1 * sqrt(cost_P_1 + cost_M_1)
-  denominator <- sigma_p * sqrt((1 + sigma_delta_2) * cost_c) + mu * sigma_delta_2 * sqrt(cost_P_2 + cost_M_2)
+  numerator <- sigma_p * sqrt((1 + sigma_delta_1) * cost_c) + mu * sigma_delta_1 * sqrt(cost_P_1 + cost_A_1)
+  denominator <- sigma_p * sqrt((1 + sigma_delta_2) * cost_c) + mu * sigma_delta_2 * sqrt(cost_P_2 + cost_A_2)
   numerator / denominator
 }
 
 
 
-get_minimum_cost <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_M, V, integer_outputs = TRUE){
+get_minimum_cost <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_A, V, integer_outputs = TRUE){
   #given a fixed precision (variance) that we would like to achieve, what is the minimum total cost of the design input. 
   #input: 
   #sigma_p: the plot variance
@@ -536,13 +536,13 @@ get_minimum_cost <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost
   #C_0: fixed cost of the survey 
   #cost_c: the cost of collecting a single core (sample) from the plot
   #cost_P: the cost of prepping a single (composited) sample
-  #cost_M: the cost of measuring a single (composited) sample from the plot after prep
+  #cost_A: the cost of measuring a single (composited) sample from the plot after prep
   #V: the maximum tolerable variance
   #integer_outputs: should outputs be appropriately bounded and rounded to produce integer solutions? If FALSE, outputs are not rounded and bounds (k < n, n,k > 1) are not respected.
   #output:
   #a dataframe with columns for the optimal n and k, the variance attained (which is currently subject to minor floating point errors and so not exactly equal to V), and the minimum cost to attain that variance
-  n_star <- (sigma_p^2 * (1+sigma_delta^2)) / (V * (1 - 1/(sqrt(cost_c * sigma_p^2 * (1 + sigma_delta^2) / (cost_P + cost_M)) + 1)))
-  k_star <- (sqrt(cost_c * sigma_p^2 * (1 + sigma_delta^2) / (cost_P + cost_M)) + 1) * (mu^2 * sigma_delta^2 / V)
+  n_star <- (sigma_p^2 * (1+sigma_delta^2)) / (V * (1 - 1/(sqrt(cost_c * sigma_p^2 * (1 + sigma_delta^2) / (cost_P + cost_A)) + 1)))
+  k_star <- (sqrt(cost_c * sigma_p^2 * (1 + sigma_delta^2) / (cost_P + cost_A)) + 1) * (mu^2 * sigma_delta^2 / V)
   
   if(integer_outputs){
     #boundary conditions
@@ -563,7 +563,7 @@ get_minimum_cost <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost
   
   
   variance <- sigma_p^2 * (1+sigma_delta^2) / n_star + mu^2 * sigma_delta^2 / k_star
-  minimum_cost <- C_0 + n_star * cost_c + k_star * (cost_P + cost_M)
+  minimum_cost <- C_0 + n_star * cost_c + k_star * (cost_P + cost_A)
   
   
   data.frame(n = n_star, k = k_star, variance = variance, minimum_cost = minimum_cost)
