@@ -570,7 +570,7 @@ get_minimum_cost <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost
 }
 
 
-get_power_two_sample <- function(n_1, k_1 = NULL, n_2, k_2 = NULL, mu_1, mu_2, sigma_p_1, sigma_p_2, sigma_delta, alpha = .05){
+get_power_two_sample <- function(n_1 = NULL, k_1 = NULL, n_2 = NULL, k_2 = NULL, mu_1, mu_2, sigma_p_1, sigma_p_2, sigma_delta, alpha = .05, beta = NULL){
   #return the power of a two sample test given sample sizes and plot parameters (no cost model). The null hypothesis is no difference.
   #inputs:
     #n_1: sample size for plot 1
@@ -583,14 +583,27 @@ get_power_two_sample <- function(n_1, k_1 = NULL, n_2, k_2 = NULL, mu_1, mu_2, s
     #sigma_p_2: the population heterogeneity (sd) of plot 2
   #output:
     #the standard deviation of the difference-in-means estimator and the power 
-  if(is.null(k_1)){k_1 <- n_1}
-  if(is.null(k_2)){k_2 <- n_2}
-  var_1 <- get_variance(n = n_1, k = k_1, sigma_p = sigma_p_1, mu = mu_1, sigma_delta = sigma_delta)
-  var_2 <- get_variance(n = n_2, k = k_2, sigma_p = sigma_p_2, mu = mu_2, sigma_delta = sigma_delta)
-  delta <- mu_1 - mu_2
-  std_error_diff <- sqrt(var_1 + var_2)
-  dof <- (var_1 + var_2)^2 / (var_1^2 / (n_1 - 1) + var_2^2 / (n_2 - 1))
-  critical_value <- qt(p = alpha/2, df = dof, lower.tail = FALSE)
-  power <- pt(critical_value, df = dof, ncp = delta/std_error_diff, lower.tail = FALSE) + pt(-critical_value, df = dof, ncp = delta/std_error_diff)
-  power
+  if(!is.null(n_1) & !is.null(n_2)){
+    if(is.null(k_1)){k_1 <- n_1}
+    if(is.null(k_2)){k_2 <- n_2}
+    var_1 <- get_variance(n = n_1, k = k_1, sigma_p = sigma_p_1, mu = mu_1, sigma_delta = sigma_delta)
+    var_2 <- get_variance(n = n_2, k = k_2, sigma_p = sigma_p_2, mu = mu_2, sigma_delta = sigma_delta)
+    delta <- mu_1 - mu_2
+    std_error_diff <- sqrt(var_1 + var_2)
+    dof <- (var_1 + var_2)^2 / (var_1^2 / (n_1 - 1) + var_2^2 / (n_2 - 1))
+    critical_value <- qt(p = alpha/2, df = dof, lower.tail = FALSE)
+    power <- pt(critical_value, df = dof, ncp = delta/std_error_diff, lower.tail = FALSE) + pt(-critical_value, df = dof, ncp = delta/std_error_diff)
+    power
+  } else if(!is.null(beta)){
+    var_1 <- sigma_p_1^2 * (1 + sigma_delta^2) + mu_1^2 * sigma_delta^2
+    var_2 <- sigma_p_2^2 * (1 + sigma_delta^2) + mu_2^2 * sigma_delta^2
+    pooled_sd <- sqrt(var_1 + var_2)
+    delta <- abs(mu_1 - mu_2)
+    z_alpha <- qnorm(1-alpha/2)
+    z_beta <- qnorm(1-beta)
+    sample_size <- 2 * ((z_alpha + z_beta) / (delta/pooled_sd))^2
+    sample_size
+  } else {
+    stop("Supply either sample sizes (n_1 and n_2) or a targeted type 2 error rate (beta)!")
+  }
 }
