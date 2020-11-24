@@ -590,7 +590,7 @@ get_power_two_sample <- function(n_1, k_1 = NULL, n_2, k_2 = NULL, mu_1, mu_2, s
   delta <- mu_1 - mu_2
   std_error_diff <- sqrt(var_1 + var_2)
   dof <- (var_1 + var_2)^2 / (var_1^2 / (n_1 - 1) + var_2^2 / (n_2 - 1))
-  critical_value <- qt(p = alpha/2, df = dof)
-  power <- 1 - (pt(delta/std_error_diff + critical_value, df = dof) + pt(delta/std_error_diff - critical_value, df = dof))
+  critical_value <- qt(p = alpha/2, df = dof, lower.tail = FALSE)
+  power <- pt(critical_value, df = dof, ncp = delta/std_error_diff, lower.tail = FALSE) + pt(-critical_value, df = dof, ncp = delta/std_error_diff)
   power
 }
