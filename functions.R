@@ -1,6 +1,7 @@
 library(tidyverse)
 library(data.table)
 library(gstat)
+library(BalancedSampling)
 
 ################## function to simulate a % SOC surface #################
 simulate_truth <- function(size = c(250,600), nugget = .01, sill = .05, range = 20, intercept = .01, y_trend = TRUE, max_mean = .2){
@@ -94,7 +95,7 @@ get_stratified_sample <- function(population_vector, within_strata_sample_size, 
   if(length(unique(table(strata))) != 1){
     warning(paste("Not all strata are the same size. Sizes are:", paste(table(strata), collapse = " ")))
   }
-  samples <- tapply(X = population_vector, INDEX = strata, FUN = sample, size = within_strata_sample_size, replace = TRUE)
+  samples <- tapply(X = population_vector, INDEX = strata, FUN = sample, size = within_strata_sample_size, replace = FALSE)
   samples_vec <- unlist(samples)
   names(samples_vec) <- str_sub(names(samples_vec), end = -2)
   samples_vec
@@ -109,6 +110,7 @@ collect_sample <- function(surface, design = "transect", n_samp = 9, n_strata = 
     #design: the sampling design, currently:
       #"transect" to sample along a transect starting randomly in either the lower left or right corner
       #"simple random sample" for a simple random sample from the entire surface
+      #"well-spread" for a spatially balanced sample as per Grafström, A. Lisic, J (2018). BalancedSampling: Balanced and Spatially Balanced Sampling
       #"stratified random sample" for a stratified random sample. As of now, the strata are defined only in the y direction and are of equal size max(surface$y) / n_strata
     #n_samp: the number of samples to draw
   #outputs: samples collected along random transects, these are the true values (i.e. with no measurement error)  
@@ -126,22 +128,27 @@ collect_sample <- function(surface, design = "transect", n_samp = 9, n_strata = 
     }
     grid <- data.frame("x" = x_grid, "y" = y_grid, "strata" = paste("(", min(surface$y), ",", max(surface$y), "]", sep = ""))
   } else if(design == "simple random sample"){
-    y_samples <- sample(1:max(surface$y), size = n_samp, replace = TRUE)
-    x_samples <- sample(1:max(surface$x), size = n_samp, replace = TRUE)
+    y_samples <- sample(1:max(surface$y), size = n_samp, replace = FALSE)
+    x_samples <- sample(1:max(surface$x), size = n_samp, replace = FALSE)
     grid <- data.frame("x" = x_samples, "y" = y_samples, "strata" = paste("(", min(surface$y), ",", max(surface$y), "]", sep = ""))
   } else if(design == "stratified random sample"){
-    x_samples <- sample(1:max(surface$x), size = n_samp, replace = TRUE)
+    x_samples <- sample(1:max(surface$x), size = n_samp, replace = FALSE)
     if((n_samp %% n_strata) != 0){stop("sample size is not a multiple of the number of strata -> unequal sampling across strata (not currently supported)")}
     strata_endpoints <- round(seq(0, max(surface$y), length.out = n_strata + 1))
     y_samples <- get_stratified_sample(1:max(surface$y), within_strata_sample_size = n_samp / n_strata, strata_endpoints = strata_endpoints)
     
     grid <- data.frame("x" = x_samples, "y" = y_samples, "strata" = names(y_samples))
+  } else if(design == "well-spread"){
+    inclusion_probs <- rep(n_samp / nrow(surface), nrow(surface))
+    sample_rows <- lpm1(prob = inclusion_probs, x = cbind(surface$x, surface$y))
+    grid <- data.frame("x" = surface$x[sample_rows], "y" = surface$y[sample_rows], "strata" = paste("(", min(surface$y), ",", max(surface$y), "]", sep = ""))
   } else{
     stop("need to specify a valid sampling design")
   }
   
   true_samples <- surface %>% 
     inner_join(grid, by = c("x","y")) 
+  true_samples
 }
 
 
@@ -569,9 +576,9 @@ get_minimum_cost <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost
   data.frame(n = n_star, k = k_star, variance = variance, minimum_cost = minimum_cost)
 }
 
-
+############### power analysis #######################
 get_power_two_sample <- function(n_1 = NULL, k_1 = NULL, n_2 = NULL, k_2 = NULL, mu_1, mu_2, sigma_p_1, sigma_p_2, sigma_delta, alpha = .05, beta = NULL){
-  #return the power of a two sample test given sample sizes and plot parameters (no cost model). The null hypothesis is no difference.
+  #return the (asymptotic) power of a two sample t test given sample sizes and plot parameters (no cost model). The null hypothesis is no difference.
   #inputs:
     #n_1: sample size for plot 1
     #k_1: number of assays of samples from plot 1
