@@ -1,0 +1,10 @@
+name: shiny
+title:
+username:
+account: jakespertus
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3393370
+bundleId: 3980317
+url: https://jakespertus.shinyapps.io/shiny/
+when: 1607805652.21012
