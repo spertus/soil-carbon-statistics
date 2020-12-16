@@ -115,11 +115,13 @@ collect_sample <- function(surface, design = "transect", n_samp = 9, n_strata = 
     #n_samp: the number of samples to draw
   #outputs: samples collected along random transects, these are the true values (i.e. with no measurement error)  
   if(design == "transect"){
+    transect_x_span <- round(.8 * max(surface$x))
+    transect_y_span <- round(.8 * max(surface$y))
     #start randomly in lower left corner
-    start_x <- sample(1:floor(max(surface$x)/n_samp), size = 1)
-    start_y <- sample(1:floor(max(surface$y)/n_samp), size = 1)
-    x_increment <- floor(max(surface$x) / n_samp)
-    y_increment <- floor(max(surface$y) / n_samp)
+    start_x <- sample(1:(max(surface$x) - transect_x_span), size = 1)
+    start_y <- sample(1:(max(surface$y) - transect_y_span), size = 1)
+    x_increment <- round(transect_x_span / n_samp)
+    y_increment <- round(transect_x_span / n_samp)
     x_grid <- start_x + (0:(n_samp-1)) * x_increment
     y_grid <- start_y + (0:(n_samp-1)) * y_increment
     #also randomly start from lower left or right corner
@@ -130,17 +132,15 @@ collect_sample <- function(surface, design = "transect", n_samp = 9, n_strata = 
   } else if(design == "simple random sample"){
     y_samples <- sample(1:max(surface$y), size = n_samp, replace = FALSE)
     x_samples <- sample(1:max(surface$x), size = n_samp, replace = FALSE)
-    grid <- data.frame("x" = x_samples, "y" = y_samples, "strata" = paste("(", min(surface$y), ",", max(surface$y), "]", sep = ""))
+    grid <- surface %>% 
+      sample_n(n_samp, replace = FALSE) %>%
+      select(x, y) %>%
+      mutate(strata = paste("(", min(surface$y), ",", max(surface$y), "]", sep = ""))
   } else if(design == "stratified random sample"){
-    x_samples <- sample(1:max(surface$x), size = n_samp, replace = FALSE)
-    if((n_samp %% n_strata) != 0){stop("sample size is not a multiple of the number of strata -> unequal sampling across strata (not currently supported)")}
-    strata_endpoints <- round(seq(0, max(surface$y), length.out = n_strata + 1))
-    y_samples <- get_stratified_sample(1:max(surface$y), within_strata_sample_size = n_samp / n_strata, strata_endpoints = strata_endpoints)
-    
-    grid <- data.frame("x" = x_samples, "y" = y_samples, "strata" = names(y_samples))
+    stop("Stratified random sampling not currently supported.")
   } else if(design == "well-spread"){
     inclusion_probs <- rep(n_samp / nrow(surface), nrow(surface))
-    sample_rows <- lpm1(prob = inclusion_probs, x = cbind(surface$x, surface$y))
+    sample_rows <- SamplingBigData::lpm2_kdtree(prob = inclusion_probs, x = cbind(surface$x, surface$y))
     grid <- data.frame("x" = surface$x[sample_rows], "y" = surface$y[sample_rows], "strata" = paste("(", min(surface$y), ",", max(surface$y), "]", sep = ""))
   } else{
     stop("need to specify a valid sampling design")
