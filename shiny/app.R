@@ -1,5 +1,5 @@
 library(shiny)
-source("functions.R")
+source("../functions.R")
 
 ####user interface####
 ui <- fluidPage(
@@ -132,18 +132,30 @@ server <- function(input,output){
   })
   
   # plot a simulated plot and sampled points
-  surface <- reactive({
-    simulate_truth(size = c(50,50), nugget = 0, sill = (input$sigma_p_sample/100)^2, range = input$range_sample, intercept = input$mu_sample/100, y_trend = FALSE) %>%
+  surface <- eventReactive(input$refresh_plot_sample, {
+    simulate_truth(size = c(50,50), nugget = 0, sill = (input$sigma_p_sample/100), range = input$range_sample, intercept = input$mu_sample/100, y_trend = FALSE) %>%
       mutate(z = 100*z)
   })
+
   
-  samples <- reactive({
+  samples <- eventReactive(input$refresh_samples_sample, {
     collect_sample(surface = surface(), design = input$type_sample, n_samp = input$n_sample)
   })
-  
+ 
   output$plot_samples <- renderPlot({
-    
     plot_surface_samples(surface = surface(), samples = samples())
+  })
+  output$population_mean <- renderText({
+    paste("True (population) mean: ", round(mean(surface()$z), digits = 2), sep = "")
+  })
+  output$population_sd <- renderText({
+    paste("True heterogeneity: ", round(sd(surface()$z), digits = 2), sep = "")
+  })
+  output$sample_mean <- renderText({
+    paste("Sample mean: ", round(mean(samples()$z), digits = 2), sep = "")
+  })
+  output$sample_sd <- renderText({
+    paste("Sample standard deviation: ", round(sd(samples()$z), digits = 2), sep = "")
   })
   
   ## End ##
