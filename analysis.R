@@ -35,9 +35,11 @@ marin_DCEA_error <- marin_data %>%
   filter(n() > 1) %>% #drop unduplicated samples
   summarize(variance = var(carbon), mean = mean(carbon), R_i = n()) %>%
   mutate(measurement_variance_estimate = variance / (mean^2 - variance / R_i)) %>%
-  summarize(avg_measurement_variance = mean(measurement_variance_estimate, na.rm = T), median_measurement_variance = median(measurement_variance_estimate, na.rm = T))
+  summarize(
+    avg_measurement_variance = mean(measurement_variance_estimate, na.rm = T), 
+    median_measurement_variance = median(measurement_variance_estimate, na.rm = T))
 #average sigma_delta_DCEA estimate is 0.144, median is .022
-sigma_delta_dcea <- sqrt(marin_DCEA_error$avg_measurement_variance)
+sigma_delta_dcea <- sqrt(marin_DCEA_error$median_measurement_variance)
 
 
 ####################### estimating LOI error #######################
@@ -88,7 +90,6 @@ sigma_p_top <- marin_summary$median_sigma_p[1]
 mu_deep <- marin_summary$median_mu[4]
 sigma_p_deep <- marin_summary$median_sigma_p[4]
 #measurement errors
-sigma_delta_dcea <- 0.14
 #constant additive error leads to better multiplicative error in topsoil then deep soil because low avg measurements are pertrubed more on a multiplicative scale 
 sigma_delta_loi_top <- sigma_delta_loi[1]
 sigma_delta_mirs_top <- sigma_delta_mirs[1]
@@ -116,11 +117,11 @@ B_grid <- expand.grid(B = 270:5000, cost_c = c(cost_c_low, cost_c_medium, cost_c
 
 
 ############ plot composite size versus std_error and cost #########
-composite_grid_dcea_top <- get_composite_error_grid(n = 100, sigma_p = sigma_p_top, sigma_delta = sigma_delta_dcea, mu = mu_top, C_0 = C_0, cost_c = cost_c_low, cost_A = cost_A_dcea, cost_P = cost_P_dcea) %>%
+composite_grid_loi_top <- get_composite_error_grid(n = 100, sigma_p = sigma_p_top, sigma_delta = sigma_delta_loi_top, mu = mu_top, C_0 = C_0, cost_c = cost_c_low, cost_A = cost_A_dcea, cost_P = cost_P_dcea) %>%
   pivot_longer(cols = c("std_error", "cost"), names_to = "quantity") %>%
   mutate(quantity = recode(quantity, std_error = "Standard Error (% SOC)", cost = "Cost (USD)"))
 
-composite_plot <- ggplot(data = composite_grid_dcea_top, aes(x = 100/composite_size, y = value)) +
+composite_plot <- ggplot(data = composite_grid_loi_top, aes(x = composite_size, y = value)) +
   geom_line() +
   geom_point(size = 3) +
   facet_grid(quantity ~ ., scales = "free") +
@@ -203,7 +204,7 @@ optima_std_error_plot <- ggplot(data = optima_variance, mapping = aes(x = B, y =
   labs(x = "Budget (USD)", y = "Standard Error", color = "Assay") +
   scale_color_manual(values = c("steelblue", "darkorange3", "forestgreen", "firebrick")) +
   scale_x_continuous(breaks = seq(500,5000,by=500)) +
-  coord_cartesian(xlim = c(400,3000), ylim = c(0,.5)) +
+  coord_cartesian(xlim = c(400,2000), ylim = c(0,.4)) +
   theme_bw() +
   theme(text = element_text(size = 16)) + 
   facet_grid(cost_c ~ depth)
@@ -213,7 +214,7 @@ optima_cv_plot <- ggplot(data = optima_variance, mapping = aes(x = B, y = cv, co
   labs(x = "Budget (USD)", y = "Coefficient of Variation", color = "Assay") +
   scale_color_manual(values = c("steelblue", "darkorange3", "forestgreen", "firebrick")) +
   scale_x_continuous(breaks = seq(500,5000,by=500)) +
-  coord_cartesian(xlim = c(400,3000), ylim = c(0,.4)) +
+  coord_cartesian(xlim = c(400,2000), ylim = c(0,.2)) +
   theme_bw() +
   theme(text = element_text(size = 16)) + 
   facet_grid(cost_c ~ depth)

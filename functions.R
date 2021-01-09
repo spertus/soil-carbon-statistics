@@ -130,8 +130,6 @@ collect_sample <- function(surface, design = "transect", n_samp = 9, n_strata = 
     }
     grid <- data.frame("x" = x_grid, "y" = y_grid, "strata" = paste("(", min(surface$y), ",", max(surface$y), "]", sep = ""))
   } else if(design == "simple random sample"){
-    y_samples <- sample(1:max(surface$y), size = n_samp, replace = FALSE)
-    x_samples <- sample(1:max(surface$x), size = n_samp, replace = FALSE)
     grid <- surface %>% 
       sample_n(n_samp, replace = FALSE) %>%
       select(x, y) %>%
