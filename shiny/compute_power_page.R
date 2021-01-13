@@ -14,7 +14,8 @@ basicPage(
              numericInput("sigma_delta_power", "Input assay uncertainty (\\(\\sigma_\\delta\\))", value = 0)
   ),
   mainPanel(
-    textOutput("power")
+    h3("Results"),
+    span(textOutput("power"), style="color:blue; font-size:20px")
   )
 )
 

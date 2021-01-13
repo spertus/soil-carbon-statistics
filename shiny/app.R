@@ -1,5 +1,5 @@
 library(shiny)
-source("../functions.R")
+source("shiny_functions.R")
 
 ####user interface####
 ui <- fluidPage(
@@ -32,11 +32,11 @@ server <- function(input,output){
   })
   
   output$n_error <- renderText({
-    paste("Sample size (number of cores):", round(get_minimum_error(B = input$B, C_0 = input$C_0, cost_c = input$cost_c, cost_P = input$cost_P, cost_A = input$cost_A, sigma_p = input$sigma_p, mu = input$mu, sigma_delta = input$sigma_delta)$n))
+    paste("Sample size (n):", round(get_minimum_error(B = input$B, C_0 = input$C_0, cost_c = input$cost_c, cost_P = input$cost_P, cost_A = input$cost_A, sigma_p = input$sigma_p, mu = input$mu, sigma_delta = input$sigma_delta)$n))
   })
   
   output$k_error <- renderText({
-    paste("Number of assays:", round(get_minimum_error(B = input$B, C_0 = input$C_0, cost_c = input$cost_c, cost_P = input$cost_P, cost_A = input$cost_A, sigma_p = input$sigma_p, mu = input$mu, sigma_delta = input$sigma_delta)$k))
+    paste("Number of assays (k):", round(get_minimum_error(B = input$B, C_0 = input$C_0, cost_c = input$cost_c, cost_P = input$cost_P, cost_A = input$cost_A, sigma_p = input$sigma_p, mu = input$mu, sigma_delta = input$sigma_delta)$k))
   })
   
   # Minimum Budget #

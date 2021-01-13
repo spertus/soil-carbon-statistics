@@ -5,7 +5,7 @@ basicPage(
   h5("Graph costs and standard errors in %SOC (on the y-axes) against size of composites (on the x-axis). Compositing allows investigators to conduct fewer assays of a given number of samples (\\(n\\)). Compositing thus lowers costs but raises error when there is assay error. These plots allow us to explore the tradeoff."),
   sidebarPanel(
              numericInput("n_composites", "Input the number of cores (\\(n\\))", value = 100),
-             numericInput("C_0_composites", "Input total fixed costs (\\(C_0\\))", value = 0),
+             numericInput("C_0_composites", "Input total fixed costs (\\(\\mbox{cost}_0\\))", value = 0),
              numericInput("cost_c_composites", "Input the cost of taking a single core (\\(\\mbox{cost}_c\\))", value = 20),
              numericInput("cost_P_composites", "Input the cost of preparing a single composite sample (\\(\\mbox{cost}_P\\))", value = 5),
              numericInput("cost_A_composites", "Input the cost of assaying a single composite sample (\\(\\mbox{cost}_A\\))", value = 5),
