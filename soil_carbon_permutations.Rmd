@@ -257,6 +257,7 @@ observed_TotC <- sum(n * tapply(Y[,1], x, function(y){sum(y^2)}))
 observed_percC <- sum(n * tapply(Y[,2], x, function(y){sum(y^2)}))
 observed_percN <- sum(n * tapply(Y[,3], x, function(y){sum(y^2)}))
 observed_clay <- sum(n * tapply(Y[,4], x, function(y){sum(y^2)}))
+observed_statistics <- c(observed_TotC, observed_percC, observed_percN, observed_clay)
 
 #permutation distributions
 permutations_TotC <- k_sample(x = Y[,1], group = as.numeric(as.factor(x)), reps = B, stat = "oneway_anova")
@@ -264,14 +265,8 @@ permutations_percC <- k_sample(x = Y[,2], group = as.numeric(as.factor(x)), reps
 permutations_percN <- k_sample(x = Y[,3], group = as.numeric(as.factor(x)), reps = B, stat = "oneway_anova")
 permutations_clay <- k_sample(x = Y[,4], group = as.numeric(as.factor(x)), reps = B, stat = "oneway_anova")
 
-#compute separate p_values for each
-p_values <- c(t2p(observed_TotC, permutations_TotC, alternative = "two-sided"),
-              t2p(observed_percC, permutations_percC, alternative = "two-sided"),
-              t2p(observed_percN, permutations_percN, alternative = "two-sided"),
-              t2p(observed_clay, permutations_clay, alternative = "two-sided"))
-
 #combination p-value
-npc(p_values, distr = cbind(permutations_TotC, permutations_percC, permutations_percN, permutations_clay), combine = "fisher", alternatives = "two-sided")
+npc(statistics = observed_statistics, distr = cbind(permutations_TotC, permutations_percC, permutations_percN, permutations_clay), combine = "fisher", alternatives = "two-sided")
 ```
 
 
