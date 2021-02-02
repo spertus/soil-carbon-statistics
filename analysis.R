@@ -119,17 +119,25 @@ B_grid <- expand.grid(B = 270:5000, cost_c = c(cost_c_low, cost_c_medium, cost_c
 ############ plot composite size versus std_error and cost #########
 composite_grid_loi_top <- get_composite_error_grid(n = 100, sigma_p = sigma_p_top, sigma_delta = sigma_delta_loi_top, mu = mu_top, C_0 = C_0, cost_c = cost_c_low, cost_A = cost_A_dcea, cost_P = cost_P_dcea) %>%
   pivot_longer(cols = c("std_error", "cost"), names_to = "quantity") %>%
-  mutate(quantity = recode(quantity, std_error = "Standard Error (% SOC)", cost = "Cost (USD)"))
+  mutate(quantity = dplyr::recode(quantity, std_error = "Standard Error (% SOC)", cost = "Cost (USD)"))
 
-composite_plot <- ggplot(data = composite_grid_loi_top, aes(x = composite_size, y = value)) +
+composite_cost_plot <- ggplot(data = composite_grid_loi_top %>% filter(quantity == "Cost (USD)"), aes(x = composite_size, y = value)) +
   geom_line() +
-  geom_point(size = 3) +
-  facet_grid(quantity ~ ., scales = "free") +
+  geom_point(size = 5) +
   scale_x_continuous(breaks = c(1,25,50,100)) +
-  xlab("Number of Assays") +
-  ylab("") +
+  xlab("Composite Size") +
+  ylab("Cost (USD)") +
   theme_bw() +
-  theme(text = element_text(size = 16)) 
+  theme(text = element_text(size = 24)) 
+
+composite_error_plot <- ggplot(data = composite_grid_loi_top %>% filter(quantity == "Standard Error (% SOC)"), aes(x = composite_size, y = value)) +
+  geom_line() +
+  geom_point(size = 5) +
+  scale_x_continuous(breaks = c(1,25,50,100)) +
+  xlab("Composite Size") +
+  ylab("Standard Error (% SOC)") +
+  theme_bw() +
+  theme(text = element_text(size = 24)) 
 
 
 
