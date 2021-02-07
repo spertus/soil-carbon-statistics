@@ -210,12 +210,25 @@ ggplot(p_value_frame, aes(x = log10(avg_TIC), y = diff_mean, shape = p_value < .
   geom_point()
 
 ############### costs and optimal compositing #############
+#Costs based on 'Cost of Carbon Analysis.xlsx' assembled by Jessica Chiartas
+#in sampling, about 20-24 samples (4 transects * 5-6 composites) costs 400$ at 25$/hr and 16hrs, so we'll take 20 USD per sample.
+#the commercial labs had costs of 19.5, 7.75, 22, 10, and 8.75 USD per sample to assess SOC. So we'll take the cost of measurement with dry combustion as 13.60, including sample prep.
+#the in-house cost of measurement was 2.78
+
+
+#sample size
+sample_size <- 60
+#max budget, i.e. the budget to sample and measure sample_size samples, with no compositing
+max_budget <- 20 * sample_size + 13.6 * sample_size 
 #precision of the sample mean 
 precision_paicines <- paicines_master %>%
   group_by(depth) %>%
   summarize(mu = mean(TC, na.rm = T), sigma_p = sd(TC, na.rm = T)) %>%
-  mutate(se_no_compositing = sqrt(get_variance(n = 60, k = 60, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech))) %>%
-  mutate(se_full_compositing = sqrt(get_variance(n = 60, k = 1, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech)))
+  mutate(se_no_compositing = sqrt(get_variance(n = sample_size, k = sample_size, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech))) %>%
+  mutate(se_full_compositing = sqrt(get_variance(n = sample_size, k = 1, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech))) %>%
+  mutate(se_optimal_compositing = sqrt(get_minimum_error(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = max_budget)$optimum_variance)) %>%
+  mutate(optimal_composite_size_commercial = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 13.60)) %>%
+  mutate(optimal_composite_size_inhouse = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 2.78))
 
 #power to detect a half-percentage point change in SOC
 power_change_paicines <- paicines_master %>%
@@ -224,4 +237,5 @@ power_change_paicines <- paicines_master %>%
   mutate(power_no_compositing = get_power_two_sample(n_1 = 60, k_1 = 60, n_2 = 60, k_2 = 60, mu_1 = mu, sigma_p_1 = sigma_p, mu_2 = mu + .5, sigma_p_2 = sigma_p, sigma_delta = sigma_delta_costech)) %>%
   mutate(power_full_compositing = get_power_two_sample(n_1 = 30, k_1 = 1, n_2 = 30, k_2 = 1, mu_1 = mu, sigma_p_1 = sigma_p, mu_2 = mu + .5, sigma_p_2 = sigma_p, sigma_delta = sigma_delta_costech))
   
+
 
