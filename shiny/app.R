@@ -13,6 +13,8 @@ ui <- fluidPage(
                                  source("minimum_budget_page.R")$value),
                         tabPanel("Compute power for fixed sample sizes",
                                  source("compute_power_page.R")$value),
+                        tabPanel("Compute sample size to achieve a given power",
+                                 source("samplesize_effectsize_page.R")$value),
                         tabPanel("Graph costs and standard errors across a range of composite sizes",
                                  source("plot_composites_page.R")$value),
                         tabPanel("Graph sample size needed to achieve a given power",
@@ -58,7 +60,7 @@ server <- function(input,output){
     paste("Number of assays:", solution$k)
   })
   
-  # Compute power 
+  # Compute power for a given sample size
   output$power <- renderText({
     
     solution <- round(get_power_two_sample(n_1 = input$n_1_power, k_1 = input$k_1_power, n_2 = input$n_2_power, input$k_2_power, sigma_p_1 = input$sigma_p_1_power, mu_1 = input$mu_1_power, sigma_p_2 = input$sigma_p_2_power, mu_2 = input$mu_2_power, sigma_delta = input$sigma_delta_power), 2)
@@ -66,6 +68,18 @@ server <- function(input,output){
     paste("Power:", solution)
   })
   
+  
+  
+  # Compute sample size needed to achieve a given power
+  output$n_effectsize <- renderText({
+    solution <- abs(input$mu_1_samplesize_power - input$mu_2_samplesize_power)
+    paste("Effect size:", solution)
+  })
+  
+  output$n_samplesize <- renderText({
+    solution <- ceiling(get_power_two_sample(sigma_p_1 = input$sigma_p_1_samplesize_power, mu_1 = input$mu_1_samplesize_power, sigma_p_2 = input$sigma_p_2_samplesize_power, mu_2 = input$mu_2_samplesize_power, sigma_delta = input$sigma_delta_samplesize_power, beta = 1 - input$power_samplesize_power))
+    paste("Sample size:", solution)
+  })
   
   # Minimum budget plot 
   output$plot_budget <- renderPlot({
