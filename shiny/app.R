@@ -78,7 +78,7 @@ server <- function(input,output){
   
   output$n_samplesize <- renderText({
     solution <- ceiling(get_power_two_sample(sigma_p_1 = input$sigma_p_1_samplesize_power, mu_1 = input$mu_1_samplesize_power, sigma_p_2 = input$sigma_p_2_samplesize_power, mu_2 = input$mu_2_samplesize_power, sigma_delta = input$sigma_delta_samplesize_power, beta = 1 - input$power_samplesize_power))
-    paste("Sample size:", solution)
+    paste("Total sample size:", solution)
   })
   
   # Minimum budget plot 
