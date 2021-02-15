@@ -2,7 +2,7 @@
 
 basicPage(
   titlePanel("Return sample size needed to achieve a given power"),
-  h5("Return the number of samples necessary to detect a difference between two plots at a particular power. Assumes a two-sided, two-sample, unpaired t-test, with uniform independent random sampling, no compositing of cores, and a significance level of \\(\\alpha = .05\\). Also assumes that %SOC is normally distributed or else that sample sizes are fairly large in order for the t-test to be approximately valid."),
+  h5("Return the total number of samples necessary to detect a difference between two plots at a particular power. Assumes a two-sided, two-sample, unpaired t-test, with uniform independent random sampling, no compositing of cores, and a significance level of \\(\\alpha = .05\\). Also assumes that %SOC is normally distributed or else that sample sizes are fairly large in order for the t-test to be approximately valid. A simplifying assumption is that the returned sample size is approximately evenly distributed between the two plots. In practice the sampling effort should concentrate on the plot with more heterogeneity for an efficient design. "),
   sidebarPanel(
              numericInput("mu_1_samplesize_power", "Input average %SOC in plot 1 (\\(\\mu_1\\))", value = 1),
              numericInput("mu_2_samplesize_power", "Input average %SOC in plot 2 (\\(\\mu_1\\))", value = 1.5),
