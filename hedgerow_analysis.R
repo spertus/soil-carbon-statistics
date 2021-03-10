@@ -12,7 +12,7 @@ set.seed(1337)
 #this has only topsoil data, but includes physical indicators of soil health
 #Site FBF is missing all biological data, we drop it.
 hr_data <- read_csv("../Data/HR_Soil_Health_Updated.csv") %>%
-  rename(site_name = `Site Name`, site = Site, hr_age = HR_age, compost = Compost, crops = Crops, cover_crop = Cover_Crop, fallow = Fallow, soil_type = Soil_Type, treatment = Treatment,  location = Location, upper_depth = Upper_Depth, profile_carbon = profileC, macroagg = Macroagg, microagg = Microagg, total_agg = Total_Agg, infiltration_dry = Infiltration_Dry, infiltration_wet = Infiltration_Wet, surface_hardness = SH_15) %>% 
+  rename(site_name = `Site Name`, site = Site, hr_age = HR_age, compost = Compost, crops = Crops, cover_crop = Cover_Crop, fallow = Fallow, soil_type = Soil_Type, treatment = Treatment,  location = Location, upper_depth = Upper_Depth, profile_carbon = profileC, macroagg = Macroagg, microagg = Microagg, total_agg = Total_Agg, infiltration_dry = Infiltration_Dry, infiltration_wet = Infiltration_Wet, surface_hardness = SH_15, subsurface_hardness = SSH_30) %>% 
   filter(site_name != "FBF") %>%
   filter(!is.na(site_name)) #there's a tail of all NA values, which I'm deleting
 
@@ -36,7 +36,7 @@ mean_impute <- function(column){
 #texture and pH should not differ between treatments but should differ between soil types
 #GWC should not predict changes in soil health, microbial biomass should be controlled for GWC. Note that we do not see a significant difference in GWC between H and R
 #these are names of the variables that are soil health indicators:
-soil_health_vars <- c("per_C", "per_N", "profile_carbon", "POXc", "EOC", "MBC", "MBN", "glucam", "glucos", "cell", "BD", "macroagg", "microagg", "infiltration_dry", "infiltration_wet", "surface_hardness")
+soil_health_vars <- c("per_C", "per_N", "profile_carbon", "POXc", "EOC", "MBC", "MBN", "glucam", "glucos", "cell", "BD")
 
 
 #the site FBF is missing all biological information, so delete it for now.
@@ -72,15 +72,24 @@ soil_means <- hr_data %>%
     totalagg = mean(total_agg),
     infiltration_dry = mean(infiltration_dry, na.rm = T), #infiltration and surface hardness are missing for a few sampling locations
     infiltration_wet = mean(infiltration_wet, na.rm = T),
-    surface_hardness = mean(surface_hardness, na.rm = T)
+    surface_hardness = mean(surface_hardness, na.rm = T),
+    subsurface_hardness = mean(subsurface_hardness, na.rm = T)
   ) %>%
   ungroup() %>%
   group_by(upper_depth) %>%
   mutate(infiltration_dry = mean_impute(infiltration_dry)) %>%
   mutate(infiltration_wet = mean_impute(infiltration_wet)) %>%
   mutate(surface_hardness = mean_impute(surface_hardness)) %>%
+  mutate(subsurface_hardness = mean_impute(subsurface_hardness)) %>%
   ungroup() %>%
   mutate(soil_type = as_factor(soil_type)) 
+carbon_means <- carbon_data %>% 
+  group_by(site_name, treatment, upper_depth) %>%
+  summarize(C_stock = mean(C_Mg_ha, na.rm = TRUE)) %>% 
+  pivot_wider(names_from = upper_depth, values_from = C_stock, names_prefix = "stock_") %>%
+  ungroup() %>%
+  mutate(stock_75 = mean_impute(stock_75))
+
 
 topsoil_means <- soil_means %>% filter(upper_depth == 0)
 subsoil_means <- soil_means %>% filter(upper_depth == 10)
@@ -94,12 +103,11 @@ plot_profile_carbon_change <- ggplot(topsoil_means, aes(x = profile_carbon, y = 
 
 #PCAs of topsoil and subsoil data
 topsoil_matrix <- topsoil_data %>%
-  select(all_of(soil_health_vars), GWC, pH, sand, clay) %>%
+  select(all_of(soil_health_vars), macroagg, microagg, infiltration_dry, infiltration_wet, surface_hardness, GWC, pH, sand, clay) %>%
   mutate_all(mean_impute) %>%
   as.matrix() 
 subsoil_matrix <- subsoil_data %>%
-  select(all_of(soil_health_vars), GWC, pH, sand, clay) %>%
-  select(-macroagg, -microagg) %>%
+  select(all_of(soil_health_vars), subsurface_hardness, GWC, pH, sand, clay) %>%
   mutate_all(mean_impute) %>%
   as.matrix() 
 
@@ -126,22 +134,28 @@ text(x = sub_pca$rotation[,1]*12, y = sub_pca$rotation[,2]*11, labels = pca_labe
 #parametric manovas based on Gaussian assumptions
 #create matrix of soil health variables from means within plots
 topmeans_matrix <- topsoil_means %>%
-  select(all_of(c(soil_health_vars))) %>%
+  select(all_of(c(soil_health_vars)), macroagg, microagg, infiltration_dry, infiltration_wet, surface_hardness) %>%
   as.matrix()
 submeans_matrix <- subsoil_means %>%
-  select(all_of(soil_health_vars)) %>%
-  select(-microagg, -macroagg) %>%
+  select(all_of(soil_health_vars), subsurface_hardness) %>%
+  as.matrix()
+carbon_matrix <- carbon_means %>%
+  select(stock_0, stock_10, stock_20, stock_50, stock_75) %>%
   as.matrix()
 
 top_corr_matrix <- cor(topmeans_matrix, use = "complete.obs", method = 'spearman')
 sub_corr_matrix <- cor(submeans_matrix, use = "complete.obs", method = 'spearman')
+total_corr_matrix <- cor(cbind(topmeans_matrix, submeans_matrix, carbon_matrix), use = "complete.obs", method = "spearman")
 varnames_top <- c("Percent C", "Percent N", "Whole Profile SOC", "POXc", "EOC", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", "Macroaggregates", "Microaggregates", "Dry Infiltration", "Wet Infiltration", "Surface Hardness")
-varnames_sub <- c("Percent C", "Percent N", "Whole Profile SOC", "POXc", "EOC", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", "Dry Infiltration", "Wet Infiltration", "Surface Hardness")
+varnames_sub <- c("Percent C", "Percent N", "Whole Profile SOC", "POXc", "EOC", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", " Surface Hardness")
+varnames_carbon <- c("C Stock 0-10", "C Stock 10-20", "C Stock 20-50", "C Stock 50-75", "C Stock 75-100")
 colnames(top_corr_matrix) <- rownames(top_corr_matrix) <- varnames_top
 colnames(sub_corr_matrix) <- rownames(sub_corr_matrix) <- varnames_sub
+colnames(total_corr_matrix) <- rownames(total_corr_matrix) <- c(paste("Top", varnames_top), paste("Sub",varnames_sub), varnames_carbon)
 
 corrplot(top_corr_matrix, method = "square")
 corrplot(sub_corr_matrix, method = "square")
+corrplot(total_corr_matrix, method = "square")
 
 #whole profile carbon model
 carbon_model <- lm(formula(paste("profile_carbon ~ ", paste(soil_health_vars[-c(3)], collapse = "+"))), data = topsoil_means)
@@ -154,6 +168,7 @@ summary(manova(twoway_manova_model))
 
 
 #non-parametric paired one-way manova
+#topsoil differences
 topsoil_means_differences <- topsoil_means %>%
   select(site_name, soil_type, treatment, all_of(soil_health_vars)) %>%
   pivot_wider(names_from = treatment, values_from = all_of(soil_health_vars)) %>%
@@ -171,15 +186,50 @@ topsoil_means_differences <- topsoil_means %>%
     diff_macroagg = macroagg_H - macroagg_R,
     diff_microagg = microagg_H - microagg_R,
     diff_infiltration_dry = infiltration_dry_H - infiltration_dry_R,
-    diff_infiltration_wet = infiltration_wet_H - infiltration_wet_R,
-    diff_surface_hardness = surface_hardness_H - surface_hardness_R) %>%
+    diff_infiltration_wet = infiltration_wet_H - infiltration_wet_R) %>%
   select(-starts_with(soil_health_vars))
+#subsoil differences
+subsoil_means_differences <- subsoil_means %>%
+  select(site_name, soil_type, treatment, all_of(soil_health_vars)) %>%
+  pivot_wider(names_from = treatment, values_from = all_of(soil_health_vars)) %>%
+  mutate(
+    diff_per_N = per_N_H - per_N_R,
+    diff_per_C = per_C_H - per_C_R,
+    diff_BD = BD_H - BD_R,
+    diff_POXc = POXc_H - POXc_R,
+    diff_EOC = EOC_H - EOC_R,
+    diff_MBC = MBC_H - MBC_R,
+    diff_MBN = MBN_H - MBN_R,
+    diff_glucam = glucam_H - glucam_R,
+    diff_glucos = glucos_H - glucos_R,
+    diff_cell = cell_H - cell_R) %>%
+  select(starts_with("diff_"))
+#carbon differences
+carbon_means_differences <- carbon_means %>%
+  pivot_wider(names_from = treatment, values_from = starts_with("stock_")) %>%
+  mutate(diff_stock_0 = stock_0_H - stock_0_R) %>%
+  mutate(diff_stock_10 = stock_10_H - stock_10_R) %>%
+  mutate(diff_stock_20 = stock_20_H - stock_20_R) %>%
+  mutate(diff_stock_50 = stock_50_H - stock_50_R) %>%
+  mutate(diff_stock_75 = stock_75_H - stock_75_R) %>%
+  select(starts_with("diff_"))
+
 soil_type <- as.numeric(topsoil_means_differences$soil_type)
 
-diff_matrix <- topsoil_means_differences %>%
+diff_matrix_top <- topsoil_means_differences %>%
   select(-site_name, -soil_type) %>%
   as.matrix()
+colnames(diff_matrix_top) <- paste("top_", gsub("diff_", "", colnames(diff_matrix_top)), sep = "")
+diff_matrix_sub <- subsoil_means_differences %>%
+  as.matrix()
+colnames(diff_matrix_sub) <- paste("sub_", gsub("diff_", "", colnames(diff_matrix_sub)), sep = "")
+diff_matrix_carbon <- carbon_means_differences %>%
+  as.matrix()
+
+diff_matrix <- cbind(diff_matrix_top, diff_matrix_sub, diff_matrix_carbon)
+
 diff_means <- apply(diff_matrix, 2, mean)
+
 #ANOVA test statistic 
 #for an example of this see the permuter github page https://github.com/statlab/permuter/blob/master/vignettes/examples_chapters1_4.Rmd
 get_ANOVA_soiltype <- function(dependent_variable){
@@ -203,31 +253,13 @@ for(i in 1:length(paired_p_values)){
 #nonparametric one-way MANOVA
 combined_paired_p_value <- npc(diff_means, distr = paired_perm_dist, combine = "fisher", alternatives = "two-sided")
 combined_interaction_p_value <- npc(original_ANOVAs, distr = interaction_perm_dist, combine = "fisher", alternatives = "two-sided")
+
 #p-values for partial tests, adjusted for multiplicity by closed testing.
 closed_paired_p_values <- fwe_minp(paired_p_values, paired_perm_dist)
 
 
 p_value_frame <- data.frame("variable" = colnames(diff_matrix), "difference_in_means" = diff_means, "p_value" = paired_p_values, "adjusted_p_value" = closed_paired_p_values)
 rownames(p_value_frame) <- NULL
-
-
-#TODO: nonparametric two-way MANOVA with soil type
-#THIS NEEDS WORK!
-shuffle <- function(x){sample(x, size = length(x), replace = TRUE)}
-permutation_twoway_ANOVA <- function(y, treatment, block, B = 1000){
-  n_treatment <- as.numeric(table(treatment))
-  n_block <- as.numeric(table(block))
-  grand_mean <- mean(y)
-  original_treatment_means <- tapply(y, treatment, mean)
-  original_block_means <- tapply(y, block, mean)
-  original_test_stat <- sum(n_treatment * (original_treatment_means - grand_mean)^2) / sum(y - original_treatment_means - original_block_means + grand_mean)
-  perm_dist <- rep(NA, B)
-  for(i in 1:B){
-    block_shuffled_y <- tapply(y, block, shuffle) %>% reduce(c)
-    shuffled_treatment_mean <- tapply(block_shuffled_y, treatment, mean)
-    perm_dist[i] <- sum(n_treatment * (shuffled_treatment_mean - grand_mean)^2)
-  }
-}
 
 
 #Negative controls
