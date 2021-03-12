@@ -9,69 +9,72 @@ source("functions.R")
 ########### read in data from excel spreadsheet(s) ##############
 #data from Paicines Ranch
 #from the original data sent to me by Paige Stanley, I deleted a few free-floating cells on the Rangeland_BD sheet. I also changed 'dulk_density_g/cm3' to 'bulk_density_g/cm3' on Rangeland_BD and Cropland_BD.
-paicines_master <- read_excel("../Data/Heterogeneity_Master_PS_02032021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
-  rename(SOC = TOC) %>%
-  mutate(SOC = ifelse(SOC == "NA", NA, SOC)) %>%
+
+paicines_master <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
+  rename(TOC = TOC) %>%
+  mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TIC = ifelse(TIC == "NA", NA, TIC)) %>%
   mutate(TC = ifelse(TC == "NA", NA, TC)) %>%
-  mutate(SOC = as.numeric(SOC), TIC = as.numeric(TIC), TC = as.numeric(TC), sample_number = as.numeric(sample_number))
+  mutate(TOC = as.numeric(TOC), TIC = as.numeric(TIC), TC = as.numeric(TC), sample_number = as.numeric(sample_number)) %>%
+  mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
-paicines_solitoc_reps <- read_excel("../Data/Heterogeneity_Master_PS_02032021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
-  rename(SOC = TOC) %>%
-  mutate(SOC = ifelse(SOC == "NA", NA, SOC)) %>%
-  mutate(SOC = as.numeric(SOC), sample_number = as.numeric(sample_number)) %>%
-  select(-TOC_replicate_avg, -TOC_replicate_stdev) %>%
+paicines_solitoc_reps <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
+  mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
+  mutate(TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "solitoc")
 
-paicines_costech_reps <- read_excel("../Data/Heterogeneity_Master_PS_02032021.xlsx", sheet = "Rangeland_Reps_Costech") %>%
-  rename(TC = TOC) %>%
-  mutate(TC = ifelse(TC == "NA", NA, TC)) %>%
-  mutate(TC = as.numeric(TC), sample_number = as.numeric(sample_number)) %>%
-  select(-replicate_avg, -replicate_stdev) %>%
+paicines_costech_reps <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_Costech") %>%
+  mutate(TC = ifelse(TC == "NA", NA, TC), TOC = ifelse(TOC == "NA", NA, TOC)) %>%
+  mutate(TC = as.numeric(TC), TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "costech")
 
-paicines_BD <- read_excel("../Data/Heterogeneity_Master_PS_02032021.xlsx", sheet = "Rangeland_BD") %>%
+paicines_BD <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_BD") %>%
   rename('bd' = 'bulk_density_g/cm3') %>%
-  mutate(bd = as.numeric(bd))
+  mutate(bd = as.numeric(bd)) %>%
+  mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
 #data from various croplands around California
-cropland_master <- read_excel("../Data/Heterogeneity_Master_PS_02032021.xlsx", sheet = "Cropland_All_Costech") %>%
-  rename(TC = TOC) %>%
-  mutate(TC = ifelse(TC == "NA", NA, TC)) %>%
-  mutate(TC = as.numeric(TC), sample_number = as.numeric(sample_number))
+cropland_master <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_All_Costech") 
 
-cropland_solitoc_reps <- read_excel("../Data/Heterogeneity_Master_PS_02032021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
-  rename(SOC = TOC) %>%
-  mutate(SOC = ifelse(SOC == "NA", NA, SOC)) %>%
-  mutate(SOC = as.numeric(SOC), sample_number = as.numeric(sample_number)) %>%
-  select(-TOC_replicate_avg, -TOC_replicate_stdev) %>% 
+cropland_solitoc_reps <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
+  mutate(sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "solitoc")
 
-cropland_costech_reps <- read_excel("../Data/Heterogeneity_Master_PS_02032021.xlsx", sheet = "Cropland_Reps_Costech") %>%
-  rename(TC = TOC) %>%
-  mutate(TC = ifelse(TC == "NA", NA, TC)) %>%
-  mutate(TC = as.numeric(TC), sample_number = as.numeric(sample_number)) %>%
-  select(-replicate_avg, -replicate_stdev) %>% 
+cropland_costech_reps <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_Reps_Costech") %>%
+  mutate(TC = ifelse(TC == "NA", NA, TC), TOC = ifelse(TOC == "NA", NA, TOC)) %>%
+  mutate(TC = as.numeric(TC), TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "costech")
 
-cropland_BD <- read_excel("../Data/Heterogeneity_Master_PS_02032021.xlsx", sheet = "Cropland_BD")  %>%
+
+cropland_BD <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_BD")  %>%
   rename('bd' = 'bulk_density_g/cm3') %>%
   mutate(bd = as.numeric(bd))
 
+replicates_comparison <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Replicate_Comparison") %>% 
+  rename(TC_solitoc = TC_soliTOC, TOC_solitoc = TOC_soliTOC) %>%
+  mutate_at(vars(starts_with(c("TC_", "TOC_"))), as.numeric)
 
 
-###################### SOC concentration and BD in space ######################
+###################### TOC concentration and BD in space ######################
 
 #stacked histograms for Paicines data
 ggplot(paicines_master, aes(TC)) +
   geom_histogram() +
-  facet_grid(depth ~ transect)
+  facet_grid(depth_long ~ transect) +
+  xlab("% Carbon") +
+  ylab("Number of Samples") +
+  theme_bw() +
+  theme(text = element_text(size = 16))
 
 
 #stacked histograms for cropland data
 ggplot(cropland_master, aes(TC)) +
   geom_histogram() +
-  facet_grid(depth ~ site)
+  facet_grid(depth ~ site) +
+  xlab("% Carbon") +
+  ylab("Number of Samples") +
+  theme_bw() +
+  theme(text = element_text(size = 16))
 
 
 #summary tables
@@ -96,11 +99,22 @@ anova(cropland_model)
 #NOTE: histograms are not disaggregated by location, which drives variation
 ggplot(paicines_BD, aes(bd)) +
   geom_histogram() +
-  facet_grid(depth ~ .)
+  facet_grid(depth_long ~ .) +
+  xlab("Bulk Density") +
+  ylab("Number of samples") +
+  xlim(.8, 2.5) +
+  theme_bw() +
+  theme(text = element_text(size = 16))
+
 
 ggplot(cropland_BD, aes(bd)) +
   geom_histogram() +
-  facet_grid(depth ~ .)
+  facet_grid(depth ~ .) +
+  xlab("Bulk Density") +
+  ylab("Number of Samples") +
+  xlim(.8, 2.5) +
+  theme_bw() +
+  theme(text = element_text(size = 16))
 
 paicines_summary_bd <- paicines_BD %>%
   group_by(depth, transect) %>%
@@ -110,77 +124,61 @@ cropland_summary_bd <- cropland_BD %>%
   group_by(depth, site) %>%
   summarize(mean_bd = mean(bd, na.rm = TRUE), sd_bd = sd(bd, na.rm = TRUE))
 
+
+
 ############## replicates and assay error ##############
-assay_error_solitoc <- paicines_solitoc_reps %>% 
-  bind_rows(cropland_solitoc_reps) %>%
+assay_error <- replicates_comparison %>%
   group_by(site, sample_number) %>%
   summarize(
-    machine = first(machine),
-    depth = first(depth), 
-    sigma_delta = sqrt(var(TC) / (mean(TC)^2 - var(TC)/n())),
-    TC = mean(TC)
+    sigma_delta_TC_solitoc = sqrt(var(TC_solitoc, na.rm = T) / (mean(TC_solitoc,  na.rm = T)^2 - var(TC_solitoc, na.rm = T)/n())),
+    TC_solitoc = mean(TC_solitoc, na.rm = T),
+    sigma_delta_TOC_solitoc = sqrt(var(TOC_solitoc, na.rm = T) / (mean(TOC_solitoc,  na.rm = T)^2 - var(TOC_solitoc, na.rm = T)/n())),
+    TOC_solitoc = mean(TOC_solitoc, na.rm = T),
+    sigma_delta_TC_costech = sqrt(var(TC_costech, na.rm = T) / (mean(TC_costech,  na.rm = T)^2 - var(TC_costech, na.rm = T)/n())),
+    TC_costech = mean(TC_costech, na.rm = T),
+    sigma_delta_TOC_costech = sqrt(var(TOC_costech, na.rm = T) / (mean(TOC_costech,  na.rm = T)^2 - var(TOC_costech, na.rm = T)/n())),
+    TOC_costech = mean(TOC_costech, na.rm = T),
   ) %>%
-  ungroup() %>%
-  na.omit()
+  ungroup() 
 
-assay_error_costech <- paicines_costech_reps %>% 
-  bind_rows(cropland_costech_reps) %>%
-  group_by(site, sample_number) %>%
-  summarize(
-    machine = first(machine),
-    depth = first(depth), 
-    sigma_delta = sqrt(var(TC) / (mean(TC)^2 - var(TC)/n())),
-    TC = mean(TC)
-  ) %>%
-  na.omit()
 
-assay_error_long <- bind_rows(assay_error_solitoc, assay_error_costech)
+assay_error_long <- assay_error %>%
+  select(site, sample_number, sigma_delta_TC_solitoc, sigma_delta_TC_costech) %>%
+  pivot_longer(cols = c("sigma_delta_TC_solitoc", "sigma_delta_TC_costech"), names_to = "machine", names_prefix = "sigma_delta_TC_", values_to = "sigma_delta_TC")
+  
 
 #compare average errors on paicines samples
-ggplot(assay_error_long, aes(sigma_delta*100, fill = machine)) +
+ggplot(assay_error_long, aes(sigma_delta_TC*100, fill = machine)) +
   geom_density(alpha = .5) +
   xlim(0,10) +
   xlab("Percent Error")
 
-sigma_delta_solitoc <- median(assay_error_solitoc$sigma_delta)
-sigma_delta_costech <- median(assay_error_costech$sigma_delta)
+median_sigma_delta <- assay_error_long %>%
+  group_by(machine) %>%
+  summarize(sigma_delta = median(sigma_delta_TC))
 
-#compare measurements
-assay_error_wide <- assay_error_long %>%
-  pivot_wider(names_from = "machine", values_from = c("sigma_delta", "TC"))
-
-ggplot(assay_error_wide, aes(x = TC_solitoc, y = TC_costech, color = site)) +
-  geom_point() +
-  geom_abline(slope = 1, intercept = 0) +
-  xlab("%TC SoliTOC") +
-  ylab("%TC Costech")
-cor(assay_error_wide$TC_solitoc, assay_error_wide$TC_costech, method = "spearman")
-
-
-ggplot(assay_error_wide, aes(x = sigma_delta_solitoc, y = sigma_delta_costech, color = site)) +
-  geom_point() +
-  geom_abline(slope = 1, intercept = 0) +
-  xlab("% Error SoliTOC") +
-  ylab("% Error Costech") +
-  ylim(0,.25) +
-  xlim(0,.25)
-
-median(assay_error_solitoc$TC)
-median(assay_error_costech$TC)
 
 
 #non-parametric permutation test for differences in measurement
-B <- 10000
 
 #nonparametric analysis of no difference in labs/machines:
-reps_long <- bind_rows(paicines_solitoc_reps, cropland_solitoc_reps) %>%
-  select(-SOC, -TIC) %>%
-  bind_rows(paicines_costech_reps %>% rename(TC = TC), cropland_costech_reps %>% rename(TC = TC)) %>%
-  na.omit() %>%
-  mutate(sample_ID = paste(site, sample_number, sep = "_"))
+reps_long_TC <- replicates_comparison %>% 
+  select(site, sample_number, TC_solitoc, TC_costech) %>%
+  pivot_longer(cols = c("TC_solitoc", "TC_costech"), names_prefix = "TC_", names_to = "machine", values_to = "TC") %>%
+  na.omit()
+
+#there are only a few measurements for TOC on the costech
+reps_long_TOC <- replicates_comparison %>% 
+  select(site, sample_number, TOC_solitoc, TOC_costech) %>%
+  group_by(sample_number) %>%
+  filter(sum(!is.na(TOC_costech)) >= 2) %>%
+  ungroup() %>%
+  pivot_longer(cols = c("TOC_solitoc", "TOC_costech"), names_prefix = "TOC_", names_to = "machine", values_to = "TOC") %>%
+  na.omit()
 
 
-strata <- as_factor(reps_long$sample_ID)
+B <- 10000
+strata <- as_factor(reps_long_TOC$sample_number)
 num_strata <- length(unique(strata))
 #test statistic is difference in means between labs
 diff_means <- rep(0, num_strata)
@@ -189,44 +187,27 @@ null_distributions <- matrix(0, ncol = num_strata, nrow = B)
 p_values <- rep(0, num_strata)
 #iterate across strata (samples)
 for(k in 1:num_strata){
-  solitoc_TC <- reps_long$TC[reps_long$machine == "solitoc" & strata == levels(strata)[k]]
-  costech_TC <- reps_long$TC[reps_long$machine == "costech" & strata == levels(strata)[k]]
-  diff_means[k] <- mean(solitoc_TC) - mean(costech_TC)
-  pooled_ses[k] <- sqrt(var(solitoc_TC) / length(solitoc_TC) + var(costech_TC) / length(solitoc_TC))
-  null_distributions[,k] <- two_sample(x = solitoc_TC, y = costech_TC, reps = B)
+  solitoc_TOC <- reps_long_TOC$TOC[reps_long_TOC$machine == "solitoc" & strata == levels(strata)[k]]
+  costech_TOC <- reps_long_TOC$TOC[reps_long_TOC$machine == "costech" & strata == levels(strata)[k]]
+  diff_means[k] <- mean(solitoc_TOC) - mean(costech_TOC)
+  pooled_ses[k] <- sqrt(var(solitoc_TOC) / length(solitoc_TOC) + var(costech_TOC) / length(solitoc_TOC))
+  null_distributions[,k] <- two_sample(x = solitoc_TOC, y = costech_TOC, reps = B)
   p_values[k] <- mean(abs(diff_means[k]) <= abs(null_distributions[,k])) 
 }
-fisher_p_value <- pchisq(-2 * sum(log(p_values)), df = 2 * num_strata, lower.tail = F)
+
 npc_p_value <- npc(diff_means, distr = null_distributions, combine=  "fisher", alternatives = "two-sided")
 
 
-#average inorganic carbon is interesting as a predictor of difference between costech and solitoc
-avg_TIC <- bind_rows(paicines_solitoc_reps, cropland_solitoc_reps) %>%
-  mutate(sample_ID = paste(site, sample_number, sep = "_")) %>%
-  group_by(sample_ID) %>%
-  summarize(avg_TIC = mean(TIC), avg_TC = mean(TC), site = first(site))
 
-p_value_frame <- data.frame(sample_ID = levels(strata), diff_mean = diff_means, t_stat = diff_means/pooled_ses, permutation_p_value = p_values) %>%
-  left_join(avg_TIC, by = "sample_ID") %>%
-  as_tibble()
-
-ggplot(p_value_frame, aes(x = log10(avg_TC), y = t_stat, label = sample_ID, shape = permutation_p_value < .05, color = site)) +
-  geom_hline(yintercept = 0) +
-  geom_hline(yintercept = qt(p = 1 - .025/nrow(p_value_frame), df = nrow(p_value_frame)), linetype = 'dashed') + 
-  geom_hline(yintercept = qt(p =.025/nrow(p_value_frame), df = nrow(p_value_frame)), linetype = 'dashed') +
-  geom_point()
-
-
-
-############# spatial correlation of SOC concentrations at Paicines ##########
+############# spatial correlation of TOC concentrations at Paicines ##########
 #first just do for a single transect
-T_topsoil_soc <- paicines_master %>% 
+T_topsoil_TOC <- paicines_master %>% 
   filter(transect == "T", depth == "a") %>%
   arrange(sample_number) %>%
-  pull(SOC)
+  pull(TOC)
 
 #dataframe for use with geodata
-T_topsoil_geodata <- as.geodata(data.frame(x = 1:length(T_topsoil_soc), y = 1, soc = T_topsoil_soc), coords.col = 1:2, data.col = 3)
+T_topsoil_geodata <- as.geodata(data.frame(x = 1:length(T_topsoil_TOC), y = 1, TOC = T_topsoil_TOC), coords.col = 1:2, data.col = 3)
 T_topsoil_variogram <- variog(T_topsoil_geodata, option = "bin")
 plot(T_topsoil_variogram)
 
@@ -240,13 +221,13 @@ plot_variogram <- function(paicines_depth = "a", paicines_transect = "T"){
   if(!(paicines_depth %in% c("a","b","c","d","e")) | !(paicines_transect %in% c("T","Mx","My","Bx","By"))){
     stop("Depth or transect is invalid! See comments.")
   }
-  soc <- paicines_master %>% 
+  TOC <- paicines_master %>% 
     filter(transect == paicines_transect, depth == paicines_depth) %>%
     arrange(sample_number) %>%
-    pull(SOC)
+    pull(TOC)
   
   #dataframe for use with geodata
-  geodataframe <- as.geodata(data.frame(x = 3 * 1:length(soc), y = 1, soc = soc), coords.col = 1:2, data.col = 3)
+  geodataframe <- as.geodata(data.frame(x = 3 * 1:length(TOC), y = 1, TOC = TOC), coords.col = 1:2, data.col = 3)
   variogram <- variog(geodataframe, option = "bin")
   plot(variogram, xlab = "Distance (m)", ylab = "Semivariance", main = paste("Variogram for transect", paicines_transect, "and depth", paicines_depth))
 }
@@ -266,7 +247,7 @@ par(mfrow = c(1,1))
 ############### costs and optimal compositing #############
 #Costs based on 'Cost of Carbon Analysis.xlsx' assembled by Jessica Chiartas
 #in sampling, about 20-24 samples (4 transects * 5-6 composites) costs 400$ at 25$/hr and 16hrs, so we'll take 20 USD per sample.
-#the commercial labs had costs of 19.5, 7.75, 22, 10, and 8.75 USD per sample to assess SOC. So we'll take the cost of measurement with dry combustion as 13.60, including sample prep.
+#the commercial labs had costs of 19.5, 7.75, 22, 10, and 8.75 USD per sample to assess TOC. So we'll take the cost of measurement with dry combustion as 13.60, including sample prep.
 #the in-house cost of measurement was 2.78
 
 
@@ -276,6 +257,10 @@ sample_size <- 60
 max_budget <- 20 * sample_size + 13.6 * sample_size
 #sample size if we measure once and devote the rest of the budget to sampling
 max_sample_size <- floor((max_budget - 13.6) / 20)
+#measurement error of a costech
+sigma_delta_costech <- median_sigma_delta %>% 
+  filter(machine == "costech") %>%
+  pull(sigma_delta)
 
 #precision of the sample mean 
 precision_paicines <- paicines_master %>%
@@ -288,13 +273,44 @@ precision_paicines <- paicines_master %>%
   mutate(optimal_composite_size_commercial = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 13.60)) %>%
   mutate(optimal_composite_size_inhouse = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 2.78))
 
-#power to detect a half-percentage point change in SOC
+#power of two-sample t-test to detect a half-percentage point change in TOC 
 power_change_paicines <- paicines_master %>%
   group_by(depth) %>%
   summarize(mu = mean(TC, na.rm = T), sigma_p = sd(TC, na.rm = T)) %>%
   mutate(power_no_compositing = get_power_two_sample(n_1 = sample_size, k_1 = sample_size, n_2 = sample_size, k_2 = sample_size, mu_1 = mu, sigma_p_1 = sigma_p, mu_2 = mu + 0.5, sigma_p_2 = sigma_p, sigma_delta = sigma_delta_costech)) %>%
   mutate(power_full_compositing = get_power_two_sample(n_1 = max_sample_size, k_1 = 1, n_2 = max_sample_size, k_2 = 1, mu_1 = mu, sigma_p_1 = sigma_p, mu_2 = mu + 0.5, sigma_p_2 = sigma_p, sigma_delta = sigma_delta_costech))
   
+
+#power of a permutation test to detect topsoil change
+topsoil_TOC_paicines <- paicines_master %>% 
+  filter(depth == "a" & !is.na(TOC)) %>%
+  pull(TOC) 
+  
+#number of simulations to run
+n_sims <- 200
+#number of samples to take from each plot
+sample_size <- 60
+#fixed effect
+shift <- seq(0, 2, by=.1)
+#container for p values
+perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+for(i in 1:n_sims){
+  for(j in 1:length(shift)){
+    sample_1 <- sample(topsoil_TOC_paicines, size = sample_size, replace = TRUE)
+    sample_2 <- sample(topsoil_TOC_paicines + shift[j], size = sample_size, replace = TRUE)
+    diff_mean <- mean(sample_1) - mean(sample_2)
+    normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
+    perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 200), alternative = "two-sided")
+  }
+}
+
+normal_power_shift <- colMeans(normal_p_values < .05)
+perm_power_shift <- colMeans(perm_p_values < .05)
+
+#the normal theory and permutation power functions are almost identical
+plot(x = shift, y = perm_power_shift, type = 'l', col = 'blue', lwd = 3, ylim = c(0,1))
+points(x = shift, y = normal_power_shift, type = 'l', col = 'red', lwd = 3)
 
 
 ############## analyze advantages of stratified versus uniform random sampling ###########
@@ -306,10 +322,10 @@ power_change_paicines <- paicines_master %>%
 #the strata are defined by transects, which roughly correspond to different locations on the ranch
 paicines_data_topsoil <- paicines_master %>% 
   filter(depth == "a") %>%
-  filter(!is.na(SOC))
+  filter(!is.na(TOC))
 
 #the sample size for simulations
-n <- 30
+n <- 100
 #function to return the estimated mean and standard error given a population and sample index
 get_mean_se <- function(population, sample_index){
   c(mean(population[sample_index]), sd(population[sample_index])/sqrt(length(sample_index)))
@@ -326,21 +342,27 @@ get_mean_se_stratified <- function(population, strata_sizes, sample_index, strat
 #function to run a single simulation on the Paicines data
 run_paicines_sim <- function(data_frame){
   N_strata <- as.numeric(table(data_frame$transect))
-  #technically there are slightly fewer samples in transect Bx
-  n_strata <- c(6, 6, 6, 6, 6)
+  #proportional allocation to strata
+  n_strata <- round(n * N_strata / sum(N_strata))
+  if(sum(n_strata) < n){
+    n_strata[length(n_strata)] <- n_strata[length(n_strata)] + 1
+  } 
+  if(sum(n_strata) > n){
+    n_strata[length(n_strata)] <- n_strata[length(n_strata)] - 1
+  }
   proportional_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata, method = "srswr")
   
   random_sample <- sample(1:nrow(data_frame), size = n, replace = TRUE)
   
   
-  stratified_estimates <- get_mean_se_stratified(data_frame$SOC, N_strata, proportional_stratified_sample$ID_unit, proportional_stratified_sample$Stratum)
-  random_estimates <- get_mean_se(data_frame$SOC, random_sample)
+  stratified_estimates <- get_mean_se_stratified(data_frame$TOC, N_strata, proportional_stratified_sample$ID_unit, proportional_stratified_sample$Stratum)
+  random_estimates <- get_mean_se(data_frame$TOC, random_sample)
   #local_pivotal_estimates <- get_mean_se(population, local_pivotal_sample)
   
   cbind(stratified_estimates, random_estimates)
 }
 #compute the estimand, i.e. the true mean in the Paicines topsoil data
-true_paicines_mean <- mean(paicines_data_topsoil$SOC)
+true_paicines_mean <- mean(paicines_data_topsoil$TOC)
 
 #run simulations, replicated 1000 times
 paicines_sims <- replicate(n = 1000, run_paicines_sim(data_frame = paicines_data_topsoil))
@@ -355,12 +377,14 @@ se_paicines <- apply(paicines_sims, c(1,2), sd)[1,]
 #the average estimated standard error
 se_hat_paicines <- apply(paicines_sims, c(1,2), mean)[2,]
 #the mean squared error
-mse_paicines <- apply((paicines_sims - true_paicines_mean)^2, c(1,2), mean)[1,]
+rmse_paicines <- sqrt(apply((paicines_sims - true_paicines_mean)^2, c(1,2), mean)[1,])
+mad_paicines <- apply(abs(paicines_sims - true_paicines_mean), c(1,2), median)[1,]
 #ratio of mse compared to uniform independent random sampling
-mse_paicines <- mse_paicines / mse_paicines[2]
-paicines_results_frame <- rbind(coverage_paicines, ci_width_paicines, mse_paicines) %>%
+#rmse_paicines <- rmse_paicines / rmse_paicines[2]
+#compile results
+paicines_results_frame <- rbind(coverage_paicines, ci_width_paicines, rmse_paicines, mad_paicines) %>%
   as_tibble() %>%
-  mutate(property = c("coverage", "ci width", "relative MSE")) %>%
+  mutate(property = c("coverage", "ci width", "RMSE", "MAD")) %>%
   select(property, random_estimates, stratified_estimates)
 
 
