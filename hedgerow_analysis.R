@@ -85,21 +85,32 @@ soil_means <- hr_data %>%
   mutate(soil_type = as_factor(soil_type)) 
 carbon_means <- carbon_data %>% 
   group_by(site_name, treatment, upper_depth) %>%
-  summarize(C_stock = mean(C_Mg_ha, na.rm = TRUE)) %>% 
-  pivot_wider(names_from = upper_depth, values_from = C_stock, names_prefix = "stock_") %>%
+  summarize(C_stock = mean(C_Mg_ha, na.rm = TRUE), per_C = mean(per_C, na.rm = TRUE)) %>% 
+  pivot_wider(names_from = upper_depth, values_from = c(C_stock, per_C)) %>%
   ungroup() %>%
-  mutate(stock_75 = mean_impute(stock_75))
+  mutate(C_stock_75 = mean_impute(C_stock_75), per_C_75 = mean_impute(per_C_75))
 
 
 topsoil_means <- soil_means %>% filter(upper_depth == 0)
 subsoil_means <- soil_means %>% filter(upper_depth == 10)
 
 
-#plot profile carbon
-plot_profile_carbon_change <- ggplot(topsoil_means, aes(x = profile_carbon, y = site_name, color = treatment)) +
+#summarize profile carbon
+carbon_means_long <- carbon_data %>%
+  group_by(site_name, soil, treatment, upper_depth) %>%
+  summarize(C_stock = mean(C_Mg_ha, na.rm = TRUE), per_C = mean(per_C, na.rm = TRUE)) %>%
+  ungroup()
+plot_profile_carbon_change <- ggplot(carbon_means_long, aes(x = C_stock, y = site_name, color = treatment)) +
   geom_line(aes(group = site_name), color = "black") +
   geom_point(size = 3) +
-  facet_grid(soil_type ~ ., scales = "free_y")
+  facet_grid(upper_depth ~ . , scales = "free")
+
+#estimate soil carbon change
+carbon_table <- carbon_means_long %>%
+  pivot_wider(names_from = treatment, values_from = c("C_stock", "per_C")) %>%
+  group_by(upper_depth) %>%
+  summarize(mean_diff_stock = mean(C_stock_H - C_stock_R, na.rm = T), mean_diff_per_C = mean(per_C_H - per_C_R, na.rm = T))
+
 
 #PCAs of topsoil and subsoil data
 topsoil_matrix <- topsoil_data %>%
@@ -124,6 +135,8 @@ plot(prop_explained, type = 'b')
 plot(top_pca$x, xlim = c(-6,6),ylim=c(-6,6), col = brewer.pal(4, 'Dark2')[topsoil_data$soil_type], pch = ifelse(topsoil_data$treatment == "H", 19, 17), lwd = 1.5, cex = 1.5)
 arrows(x0 = 0, y0 = 0, x1 = top_pca$rotation[,1]*10, y1 = top_pca$rotation[,2]*10, lwd = 1.5, length = .1)
 text(x = top_pca$rotation[,1]*12, y = top_pca$rotation[,2]*11, labels = pca_labels, lwd = 1.5)
+legend(x = 3, y = 6, col = brewer.pal(4, 'Dark2'), pch = 19, legend = c("Yolo", "Brentwood", "Capay", "Corning"))
+legend(x = -6, y = 6, pch = c(19, 17), legend = c("Hedgerow","Crop"))
 
 #subsoil PCA plot
 plot(sub_pca$x, xlim = c(-6,6),ylim=c(-6,6), col = brewer.pal(4, 'Dark2')[subsoil_data$soil_type], pch = ifelse(subsoil_data$treatment == "H", 19, 17), lwd = 1.5, cex = 1.5)
@@ -140,7 +153,7 @@ submeans_matrix <- subsoil_means %>%
   select(all_of(soil_health_vars), subsurface_hardness) %>%
   as.matrix()
 carbon_matrix <- carbon_means %>%
-  select(stock_0, stock_10, stock_20, stock_50, stock_75) %>%
+  select(C_stock_0, C_stock_10, C_stock_20, C_stock_50, C_stock_75) %>%
   as.matrix()
 
 top_corr_matrix <- cor(topmeans_matrix, use = "complete.obs", method = 'spearman')
@@ -170,8 +183,8 @@ summary(manova(twoway_manova_model))
 #non-parametric paired one-way manova
 #topsoil differences
 topsoil_means_differences <- topsoil_means %>%
-  select(site_name, soil_type, treatment, all_of(soil_health_vars)) %>%
-  pivot_wider(names_from = treatment, values_from = all_of(soil_health_vars)) %>%
+  select(site_name, soil_type, treatment, all_of(soil_health_vars), macroagg, microagg, infiltration_dry, infiltration_wet, surface_hardness) %>%
+  pivot_wider(names_from = treatment, values_from = all_of(c(soil_health_vars, "macroagg", "microagg", "infiltration_dry", "infiltration_wet", "surface_hardness"))) %>%
   mutate(
     diff_per_N = per_N_H - per_N_R,
     diff_per_C = per_C_H - per_C_R,
@@ -186,8 +199,10 @@ topsoil_means_differences <- topsoil_means %>%
     diff_macroagg = macroagg_H - macroagg_R,
     diff_microagg = microagg_H - microagg_R,
     diff_infiltration_dry = infiltration_dry_H - infiltration_dry_R,
-    diff_infiltration_wet = infiltration_wet_H - infiltration_wet_R) %>%
-  select(-starts_with(soil_health_vars))
+    diff_infiltration_wet = infiltration_wet_H - infiltration_wet_R,
+    diff_surface_hardness = surface_hardness_H - surface_hardness_R) %>%
+  arrange(site_name) %>%
+  select(site_name, soil_type, starts_with("diff_"))
 #subsoil differences
 subsoil_means_differences <- subsoil_means %>%
   select(site_name, soil_type, treatment, all_of(soil_health_vars)) %>%
@@ -203,15 +218,18 @@ subsoil_means_differences <- subsoil_means %>%
     diff_glucam = glucam_H - glucam_R,
     diff_glucos = glucos_H - glucos_R,
     diff_cell = cell_H - cell_R) %>%
+  arrange(site_name) %>%
   select(starts_with("diff_"))
 #carbon differences
 carbon_means_differences <- carbon_means %>%
-  pivot_wider(names_from = treatment, values_from = starts_with("stock_")) %>%
-  mutate(diff_stock_0 = stock_0_H - stock_0_R) %>%
-  mutate(diff_stock_10 = stock_10_H - stock_10_R) %>%
-  mutate(diff_stock_20 = stock_20_H - stock_20_R) %>%
-  mutate(diff_stock_50 = stock_50_H - stock_50_R) %>%
-  mutate(diff_stock_75 = stock_75_H - stock_75_R) %>%
+  select(-starts_with("per_C_")) %>%
+  pivot_wider(names_from = treatment, values_from = starts_with("C_stock_")) %>%
+  mutate(diff_stock_0 = C_stock_0_H - C_stock_0_R) %>%
+  mutate(diff_stock_10 = C_stock_10_H - C_stock_10_R) %>%
+  mutate(diff_stock_20 = C_stock_20_H - C_stock_20_R) %>%
+  mutate(diff_stock_50 = C_stock_50_H - C_stock_50_R) %>%
+  mutate(diff_stock_75 = C_stock_75_H - C_stock_75_R) %>%
+  arrange(site_name) %>%
   select(starts_with("diff_"))
 
 soil_type <- as.numeric(topsoil_means_differences$soil_type)
