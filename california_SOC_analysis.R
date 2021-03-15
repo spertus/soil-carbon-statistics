@@ -10,45 +10,45 @@ source("functions.R")
 #data from Paicines Ranch
 #from the original data sent to me by Paige Stanley, I deleted a few free-floating cells on the Rangeland_BD sheet. I also changed 'dulk_density_g/cm3' to 'bulk_density_g/cm3' on Rangeland_BD and Cropland_BD.
 
-paicines_master <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
+paicines_master <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TIC = ifelse(TIC == "NA", NA, TIC)) %>%
   mutate(TC = ifelse(TC == "NA", NA, TC)) %>%
   mutate(TOC = as.numeric(TOC), TIC = as.numeric(TIC), TC = as.numeric(TC), sample_number = as.numeric(sample_number)) %>%
   mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
-paicines_solitoc_reps <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
+paicines_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "solitoc")
 
-paicines_costech_reps <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_Costech") %>%
+paicines_costech_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_Costech") %>%
   mutate(TC = ifelse(TC == "NA", NA, TC), TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TC = as.numeric(TC), TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "costech")
 
-paicines_BD <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_BD") %>%
+paicines_BD <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_BD") %>%
   rename('bd' = 'bulk_density_g/cm3') %>%
   mutate(bd = as.numeric(bd)) %>%
   mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
 #data from various croplands around California
-cropland_master <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_All_Costech") 
+cropland_master <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_All_Costech") 
 
-cropland_solitoc_reps <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
+cropland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
   mutate(sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "solitoc")
 
-cropland_costech_reps <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_Reps_Costech") %>%
+cropland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_Reps_Costech") %>%
   mutate(TC = ifelse(TC == "NA", NA, TC), TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TC = as.numeric(TC), TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "costech")
 
-cropland_BD <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_BD")  %>%
+cropland_BD <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_BD")  %>%
   rename('bd' = 'bulk_density_g/cm3') %>%
   mutate(bd = as.numeric(bd))
 
-replicates_comparison <- read_excel("../Data/R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Replicate_Comparison") %>% 
+replicates_comparison <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Replicate_Comparison") %>% 
   rename(TC_solitoc = TC_soliTOC, TOC_solitoc = TOC_soliTOC) %>%
   mutate_at(vars(starts_with(c("TC_", "TOC_"))), as.numeric)
 
@@ -287,9 +287,9 @@ topsoil_TOC_paicines <- paicines_master %>%
   pull(TOC) 
   
 #number of simulations to run
-n_sims <- 200
+n_sims <- 400
 #number of samples to take from each plot
-sample_size <- 90
+sample_size <- 30
 #fixed effect
 shift <- seq(0, 2, by=.1)
 #container for p values
@@ -309,9 +309,9 @@ normal_power_shift <- colMeans(normal_p_values < .05)
 perm_power_shift <- colMeans(perm_p_values < .05)
 
 #the normal theory and permutation power functions are almost identical
-plot(x = shift, y = perm_power_shift, type = 'l', col = 'blue', lwd = 3, ylim = c(0,1))
+plot(x = shift, y = perm_power_shift, type = 'l', col = 'blue', lwd = 3, ylim = c(0,1), bty = "n", xlab = "Change in %SOC", ylab = "Power", main = "Power for n = 30")
 points(x = shift, y = normal_power_shift, type = 'l', col = 'red', lwd = 3)
-
+legend(x = 1, y = .8, lwd = 3, legend = c("t-test", "Permutation test"), col = c("red", "blue"))
 
 ############## analyze advantages of stratified versus uniform random sampling ###########
 #we will empirically investigate the advantages of stratified sampling in these settings
@@ -325,7 +325,7 @@ paicines_data_topsoil <- paicines_master %>%
   filter(!is.na(TOC))
 
 #the sample size for simulations
-n <- 100
+n <- 90
 #function to return the estimated mean and standard error given a population and sample index
 get_mean_se <- function(population, sample_index){
   c(mean(population[sample_index]), sd(population[sample_index])/sqrt(length(sample_index)))
@@ -365,7 +365,7 @@ run_paicines_sim <- function(data_frame){
 true_paicines_mean <- mean(paicines_data_topsoil$TOC)
 
 #run simulations, replicated 1000 times
-paicines_sims <- replicate(n = 1000, run_paicines_sim(data_frame = paicines_data_topsoil))
+paicines_sims <- replicate(n = 2000, run_paicines_sim(data_frame = paicines_data_topsoil))
 
 #compute properties of the samples
 #the empirical coverage of 95% normal theory confidence intervals (should be 95%)
@@ -396,7 +396,13 @@ crop_data_topsoil <- cropland_master %>%
 run_cropland_sim <- function(data_frame){
   N_strata <- as.numeric(table(data_frame$site))
   #sample size in each strata should be about proportional to the size of each strata
-  n_strata <- c(5, 5, 9, 4, 4, 3)
+  n_strata <- round(n * N_strata / sum(N_strata))
+  if(sum(n_strata) < n){
+    n_strata[length(n_strata)] <- n_strata[length(n_strata)] + 1
+  } 
+  if(sum(n_strata) > n){
+    n_strata[length(n_strata)] <- n_strata[length(n_strata)] - 1
+  }
   proportional_stratified_sample <- strata(data = data_frame, stratanames = "site", size = n_strata, method = "srswr")
   
   random_sample <- sample(1:nrow(data_frame), size = n, replace = FALSE)
