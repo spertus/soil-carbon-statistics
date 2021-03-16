@@ -7,27 +7,24 @@ library(geoR)
 source("functions.R")
 
 ########### read in data from excel spreadsheet(s) ##############
-#data from Paicines Ranch
-#from the original data sent to me by Paige Stanley, I deleted a few free-floating cells on the Rangeland_BD sheet. I also changed 'dulk_density_g/cm3' to 'bulk_density_g/cm3' on Rangeland_BD and Cropland_BD.
-
-paicines_master <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
+rangeland_master <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TIC = ifelse(TIC == "NA", NA, TIC)) %>%
   mutate(TC = ifelse(TC == "NA", NA, TC)) %>%
   mutate(TOC = as.numeric(TOC), TIC = as.numeric(TIC), TC = as.numeric(TC), sample_number = as.numeric(sample_number)) %>%
   mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
-paicines_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
+rangeland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "solitoc")
 
-paicines_costech_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_Costech") %>%
+rangeland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_Costech") %>%
   mutate(TC = ifelse(TC == "NA", NA, TC), TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TC = as.numeric(TC), TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "costech")
 
-paicines_BD <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_BD") %>%
+rangeland_BD <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_BD") %>%
   rename('bd' = 'bulk_density_g/cm3') %>%
   mutate(bd = as.numeric(bd)) %>%
   mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
@@ -55,11 +52,11 @@ replicates_comparison <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", s
 
 ###################### TOC concentration and BD in space ######################
 
-#stacked histograms for Paicines data
-ggplot(paicines_master, aes(TC)) +
+#stacked histograms for rangeland data
+ggplot(rangeland_master, aes(TC)) +
   geom_histogram() +
   facet_grid(depth_long ~ transect) +
-  xlab("% Carbon") +
+  xlab("Percent Total Carbon") +
   ylab("Number of Samples") +
   theme_bw() +
   theme(text = element_text(size = 16))
@@ -69,14 +66,14 @@ ggplot(paicines_master, aes(TC)) +
 ggplot(cropland_master, aes(TC)) +
   geom_histogram() +
   facet_grid(depth ~ site) +
-  xlab("% Carbon") +
+  xlab("Percent Total Carbon") +
   ylab("Number of Samples") +
   theme_bw() +
   theme(text = element_text(size = 16))
 
 
 #summary tables
-paicines_summary <- paicines_master %>% 
+rangeland_summary <- rangeland_master %>% 
   group_by(depth, transect) %>%
   summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T))
 
@@ -86,16 +83,16 @@ cropland_summary <- cropland_master %>%
 
 
 #linear models
-paicines_model <- lm(TC ~ transect*depth, data = paicines_master)
+rangeland_model <- lm(TC ~ transect*depth, data = rangeland_master)
 cropland_model <- lm(TC ~ site*depth, data = cropland_master)
 
-anova(paicines_model)
+anova(rangeland_model)
 anova(cropland_model)
 
 
 #bulk densities
 #NOTE: histograms are not disaggregated by location, which drives variation
-ggplot(paicines_BD, aes(bd)) +
+ggplot(rangeland_BD, aes(bd)) +
   geom_histogram() +
   facet_grid(depth_long ~ .) +
   xlab("Bulk Density") +
@@ -114,7 +111,7 @@ ggplot(cropland_BD, aes(bd)) +
   theme_bw() +
   theme(text = element_text(size = 16))
 
-paicines_summary_bd <- paicines_BD %>%
+rangeland_summary_bd <- rangeland_BD %>%
   group_by(depth, transect) %>%
   summarize(mean_bd = mean(bd, na.rm = TRUE), sd_bd = sd(bd, na.rm = TRUE))
 
@@ -145,7 +142,7 @@ assay_error_long <- assay_error %>%
   pivot_longer(cols = c("sigma_delta_TC_solitoc", "sigma_delta_TC_costech"), names_to = "machine", names_prefix = "sigma_delta_TC_", values_to = "sigma_delta_TC")
   
 
-#compare average errors on paicines samples
+#compare average errors on rangeland samples
 ggplot(assay_error_long, aes(sigma_delta_TC*100, fill = machine)) +
   geom_density(alpha = .5) +
   xlim(0,10) +
@@ -196,9 +193,9 @@ npc_p_value <- npc(diff_means, distr = null_distributions, combine=  "fisher", a
 
 
 
-############# spatial correlation of TOC concentrations at Paicines ##########
+############# spatial correlation of TOC concentrations at rangeland ##########
 #first just do for a single transect
-T_topsoil_TOC <- paicines_master %>% 
+T_topsoil_TOC <- rangeland_master %>% 
   filter(transect == "T", depth == "a") %>%
   arrange(sample_number) %>%
   pull(TOC)
@@ -210,16 +207,16 @@ plot(T_topsoil_variogram)
 
 #function to plot a variogram for any depth and transect
 #inputs:
-  #paicines_depth: a string denoting the depth, either "a", "b", "c", "d", or "e"
-  #paicines_transect: a string denoting the transect, eitehr "T", "Mx", "My", "Bx", or "By"
+  #rangeland_depth: a string denoting the depth, either "a", "b", "c", "d", or "e"
+  #rangeland_transect: a string denoting the transect, eitehr "T", "Mx", "My", "Bx", or "By"
 #output:
   #a plot of the empirical variogram generated by binning variances between points at a range of distances
-plot_variogram <- function(paicines_depth = "a", paicines_transect = "T", plot = TRUE){
-  if(!(paicines_depth %in% c("a","b","c","d","e")) | !all(paicines_transect %in% c("T","Mx","My","Bx","By"))){
+plot_variogram <- function(rangeland_depth = "a", rangeland_transect = "T", plot = TRUE){
+  if(!(rangeland_depth %in% c("a","b","c","d","e")) | !all(rangeland_transect %in% c("T","Mx","My","Bx","By"))){
     stop("Depth or transect is invalid! See comments.")
   }
-  TOC <- paicines_master %>% 
-    filter(transect == paicines_transect, depth == paicines_depth) %>%
+  TOC <- rangeland_master %>% 
+    filter(transect == rangeland_transect, depth == rangeland_depth) %>%
     arrange(sample_number) %>%
     pull(TOC)
   
@@ -227,18 +224,18 @@ plot_variogram <- function(paicines_depth = "a", paicines_transect = "T", plot =
   geodataframe <- as.geodata(data.frame(x = 3 * 1:length(TOC), y = 1, TOC = TOC), coords.col = 1:2, data.col = 3)
   variogram <- variog(geodataframe, option = "bin")
   if(plot){
-    plot(variogram, xlab = "Distance (meters)", ylab = "Semivariance", main = paste("Variogram for transect", paicines_transect, "and depth", paicines_depth))
+    plot(variogram, xlab = "Distance (meters)", ylab = "Semivariance", main = paste("Variogram for transect", rangeland_transect, "and depth", rangeland_depth))
   } else{
     variogram
   }
 }
 
 
-variog_T <- plot_variogram(paicines_depth = "a", paicines_transect = "T", plot = FALSE)
-variog_Mx <- plot_variogram(paicines_depth = "a", paicines_transect = "Mx", plot = FALSE)
-variog_My <- plot_variogram(paicines_depth = "a", paicines_transect = "My", plot = FALSE)
-variog_Bx <- plot_variogram(paicines_depth = "a", paicines_transect = "Bx", plot = FALSE)
-variog_By <- plot_variogram(paicines_depth = "a", paicines_transect = "By", plot = FALSE)
+variog_T <- plot_variogram(rangeland_depth = "a", rangeland_transect = "T", plot = FALSE)
+variog_Mx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Mx", plot = FALSE)
+variog_My <- plot_variogram(rangeland_depth = "a", rangeland_transect = "My", plot = FALSE)
+variog_Bx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Bx", plot = FALSE)
+variog_By <- plot_variogram(rangeland_depth = "a", rangeland_transect = "By", plot = FALSE)
 
 distance <- variog_T$u
 avg_variogram <- colMeans(rbind(variog_T$v, variog_Mx$v, variog_My$v, variog_Bx$v, variog_By$v))
@@ -263,7 +260,7 @@ sigma_delta_costech <- median_sigma_delta %>%
   pull(sigma_delta)
 
 #precision of the sample mean 
-precision_paicines <- paicines_master %>%
+precision_rangeland <- rangeland_master %>%
   group_by(depth) %>%
   summarize(mu = mean(TC, na.rm = T), sigma_p = sd(TC, na.rm = T)) %>%
   mutate(se_no_compositing = sqrt(get_variance(n = sample_size, k = sample_size, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech))) %>%
@@ -274,7 +271,7 @@ precision_paicines <- paicines_master %>%
   mutate(optimal_composite_size_inhouse = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 2.78))
 
 #power of two-sample t-test to detect a half-percentage point change in TOC 
-power_change_paicines <- paicines_master %>%
+power_change_rangeland <- rangeland_master %>%
   group_by(depth) %>%
   summarize(mu = mean(TC, na.rm = T), sigma_p = sd(TC, na.rm = T)) %>%
   mutate(power_no_compositing = get_power_two_sample(n_1 = sample_size, k_1 = sample_size, n_2 = sample_size, k_2 = sample_size, mu_1 = mu, sigma_p_1 = sigma_p, mu_2 = mu + 0.5, sigma_p_2 = sigma_p, sigma_delta = sigma_delta_costech)) %>%
@@ -282,7 +279,7 @@ power_change_paicines <- paicines_master %>%
   
 
 #power of a permutation test to detect topsoil change
-topsoil_TOC_paicines <- paicines_master %>% 
+topsoil_TOC_rangeland <- rangeland_master %>% 
   filter(depth == "a" & !is.na(TOC)) %>%
   pull(TOC) 
   
@@ -297,8 +294,8 @@ perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
 normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
 for(i in 1:n_sims){
   for(j in 1:length(shift)){
-    sample_1 <- sample(topsoil_TOC_paicines, size = sample_size, replace = TRUE)
-    sample_2 <- sample(topsoil_TOC_paicines + shift[j], size = sample_size, replace = TRUE)
+    sample_1 <- sample(topsoil_TOC_rangeland, size = sample_size, replace = TRUE)
+    sample_2 <- sample(topsoil_TOC_rangeland + shift[j], size = sample_size, replace = TRUE)
     diff_mean <- mean(sample_1) - mean(sample_2)
     normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
     perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 200), alternative = "two-sided")
@@ -318,9 +315,9 @@ legend(x = 1, y = .8, lwd = 3, legend = c("t-test", "Permutation test"), col = c
 #the idea is similar to a bootstrap. 
 #take the samples as a population and then simulate taking subsamples
 
-#first we analyze stratified sampling at a small scale by using the Paicines samples
+#first we analyze stratified sampling at a small scale by using the rangeland samples
 #the strata are defined by transects, which roughly correspond to different locations on the ranch
-paicines_data_topsoil <- paicines_master %>% 
+rangeland_data_topsoil <- rangeland_master %>% 
   filter(depth == "a") %>%
   filter(!is.na(TOC))
 
@@ -339,8 +336,8 @@ get_mean_se_stratified <- function(population, strata_sizes, sample_index, strat
   c(mean(strata_means), sqrt(var_estimate))
 }
 
-#function to run a single simulation on the Paicines data
-run_paicines_sim <- function(data_frame){
+#function to run a single simulation on the rangeland data
+run_rangeland_sim <- function(data_frame){
   N_strata <- as.numeric(table(data_frame$transect))
   #proportional allocation to strata
   n_strata <- round(n * N_strata / sum(N_strata))
@@ -361,28 +358,28 @@ run_paicines_sim <- function(data_frame){
   
   cbind(stratified_estimates, random_estimates)
 }
-#compute the estimand, i.e. the true mean in the Paicines topsoil data
-true_paicines_mean <- mean(paicines_data_topsoil$TOC)
+#compute the estimand, i.e. the true mean in the rangeland topsoil data
+true_rangeland_mean <- mean(rangeland_data_topsoil$TOC)
 
 #run simulations, replicated 1000 times
-paicines_sims <- replicate(n = 2000, run_paicines_sim(data_frame = paicines_data_topsoil))
+rangeland_sims <- replicate(n = 2000, run_rangeland_sim(data_frame = rangeland_data_topsoil))
 
 #compute properties of the samples
 #the empirical coverage of 95% normal theory confidence intervals (should be 95%)
-coverage_paicines <- apply(paicines_sims[1,,] - qnorm(p = .975) * paicines_sims[2,,] <= true_paicines_mean & true_paicines_mean <= paicines_sims[1,,] + qnorm(p = .975) * paicines_sims[2,,], 1, mean)
+coverage_rangeland <- apply(rangeland_sims[1,,] - qnorm(p = .975) * rangeland_sims[2,,] <= true_rangeland_mean & true_rangeland_mean <= rangeland_sims[1,,] + qnorm(p = .975) * rangeland_sims[2,,], 1, mean)
 #the width of a confidence interval, basically 4 times the SE
-ci_width_paicines <- apply(2 * qnorm(p = .975) * paicines_sims[2,,], 1, mean)
+ci_width_rangeland <- apply(2 * qnorm(p = .975) * rangeland_sims[2,,], 1, mean)
 #the actual standard error over simulations
-se_paicines <- apply(paicines_sims, c(1,2), sd)[1,]
+se_rangeland <- apply(rangeland_sims, c(1,2), sd)[1,]
 #the average estimated standard error
-se_hat_paicines <- apply(paicines_sims, c(1,2), mean)[2,]
+se_hat_rangeland <- apply(rangeland_sims, c(1,2), mean)[2,]
 #the mean squared error
-rmse_paicines <- sqrt(apply((paicines_sims - true_paicines_mean)^2, c(1,2), mean)[1,])
-mad_paicines <- apply(abs(paicines_sims - true_paicines_mean), c(1,2), median)[1,]
+rmse_rangeland <- sqrt(apply((rangeland_sims - true_rangeland_mean)^2, c(1,2), mean)[1,])
+mad_rangeland <- apply(abs(rangeland_sims - true_rangeland_mean), c(1,2), median)[1,]
 #ratio of mse compared to uniform independent random sampling
-#rmse_paicines <- rmse_paicines / rmse_paicines[2]
+#rmse_rangeland <- rmse_rangeland / rmse_rangeland[2]
 #compile results
-paicines_results_frame <- rbind(coverage_paicines, ci_width_paicines, rmse_paicines, mad_paicines) %>%
+rangeland_results_frame <- rbind(coverage_rangeland, ci_width_rangeland, rmse_rangeland, mad_rangeland) %>%
   as_tibble() %>%
   mutate(property = c("coverage", "ci width", "RMSE", "MAD")) %>%
   select(property, random_estimates, stratified_estimates)
