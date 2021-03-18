@@ -169,6 +169,11 @@ reps_long_TOC <- replicates_comparison %>%
   ungroup() %>%
   pivot_longer(cols = c("TOC_solitoc", "TOC_costech"), names_prefix = "TOC_", names_to = "machine", values_to = "TOC") %>%
   na.omit()
+#plot assay densities stratified by sample number
+assay_density_plot <- ggplot(reps_long_TOC, aes(log10(TOC), fill = machine)) +
+  geom_density(alpha = .5) +
+  facet_grid(sample_number ~ .)
+
 
 
 B <- 10000
@@ -321,8 +326,10 @@ rangeland_data_topsoil <- rangeland_master %>%
   filter(depth == "a") %>%
   filter(!is.na(TOC))
 
+
+
 #the sample size for simulations
-n <- 90
+n <- 30
 #function to return the estimated mean and standard error given a population and sample index
 get_mean_se <- function(population, sample_index){
   c(mean(population[sample_index]), sd(population[sample_index])/sqrt(length(sample_index)))
