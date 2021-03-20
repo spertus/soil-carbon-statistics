@@ -169,10 +169,7 @@ reps_long_TOC <- replicates_comparison %>%
   ungroup() %>%
   pivot_longer(cols = c("TOC_solitoc", "TOC_costech"), names_prefix = "TOC_", names_to = "machine", values_to = "TOC") %>%
   na.omit()
-#plot assay densities stratified by sample number
-assay_density_plot <- ggplot(reps_long_TOC, aes(log10(TOC), fill = machine)) +
-  geom_density(alpha = .5) +
-  facet_grid(sample_number ~ .)
+
 
 
 
@@ -196,7 +193,26 @@ for(k in 1:num_strata){
 
 npc_p_value <- npc(diff_means, distr = null_distributions, combine=  "fisher", alternatives = "two-sided")
 
+reps_long_TOC <- reps_long_TOC %>%
+  mutate(rejected = ifelse(sample_number %in% levels(strata)[p_values < .05], 1, 0))
 
+#plot assay densities stratified by sample number
+assay_density_plot_accepted <- ggplot(reps_long_TOC %>% filter(rejected == 0), aes(TOC, fill = machine)) +
+  geom_density(alpha = .5) +
+  facet_grid(sample_number ~ ., scales = "free") +
+  xlab("Percent Organic Carbon") +
+  ggtitle("Similar Assays") +
+  theme_bw() +
+  scale_fill_discrete(name = "Machine") +
+  theme(text = element_text(size = 16), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.title.y = element_blank())
+assay_density_plot_rejected <- ggplot(reps_long_TOC %>% filter(rejected == 1), aes(TOC, fill = machine)) +
+  geom_density(alpha = .5) +
+  facet_grid(sample_number ~ ., scales = "free") +
+  xlab("Percent Organic Carbon") +
+  ggtitle("Significantly Different Assays") +
+  theme_bw() +
+  scale_fill_discrete(name = "Machine") +
+  theme(text = element_text(size = 16), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.title.y = element_blank())
 
 ############# spatial correlation of TOC concentrations at rangeland ##########
 #first just do for a single transect
@@ -324,42 +340,48 @@ legend(x = 1, y = .8, lwd = 3, legend = c("t-test", "Permutation test"), col = c
 #the strata are defined by transects, which roughly correspond to different locations on the ranch
 rangeland_data_topsoil <- rangeland_master %>% 
   filter(depth == "a") %>%
+  select(transect, sample_number, TOC) %>%
   filter(!is.na(TOC))
 
 
 
 #the sample size for simulations
-n <- 30
+n <- 90
 #function to return the estimated mean and standard error given a population and sample index
 get_mean_se <- function(population, sample_index){
   c(mean(population[sample_index]), sd(population[sample_index])/sqrt(length(sample_index)))
 }
 #function to return estimated mean and standard error given a population, sampling index, and stratification information
-get_mean_se_stratified <- function(population, strata_sizes, sample_index, strata){
-  strata_sample_sizes <- as.numeric(table(strata))
-  strata_means <- tapply(population[sample_index], strata, mean)
-  strata_vars <- tapply(population[sample_index], strata, var)
-  var_estimate <- sum((strata_sizes / length(population))^2 * strata_vars / strata_sample_sizes)
-  c(mean(strata_means), sqrt(var_estimate))
+get_mean_se_stratified <- function(sample, N, N_strata){
+  
+  strata_weights <- N_strata / N
+  n_strata <- as.numeric(table(sample$transect))
+  strata_means <- tapply(sample$TOC, sample$transect, mean)
+  strata_vars <- tapply(sample$TOC, sample$transect, var)
+  var_estimate <- N^(-2) * sum(N_strata^2 * strata_vars / n_strata)
+  c(sum(strata_weights * strata_means), sqrt(var_estimate))
 }
 
+N_strata <- as.numeric(table(rangeland_data_topsoil$transect))
+#proportional allocation to strata
+n_strata_prop <- round(n * N_strata / sum(N_strata))
+
+if(sum(n_strata) < n){
+  n_strata[length(n_strata)] <- n_strata[length(n_strata)] + 1
+} 
+if(sum(n_strata) > n){
+  n_strata[length(n_strata)] <- n_strata[length(n_strata)] - 1
+}
+df_SRS <- n - 1
+
+  
 #function to run a single simulation on the rangeland data
 run_rangeland_sim <- function(data_frame){
-  N_strata <- as.numeric(table(data_frame$transect))
-  #proportional allocation to strata
-  n_strata <- round(n * N_strata / sum(N_strata))
-  if(sum(n_strata) < n){
-    n_strata[length(n_strata)] <- n_strata[length(n_strata)] + 1
-  } 
-  if(sum(n_strata) > n){
-    n_strata[length(n_strata)] <- n_strata[length(n_strata)] - 1
-  }
-  proportional_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata, method = "srswr")
+  proportional_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata_prop, method = "srswr")
   
   random_sample <- sample(1:nrow(data_frame), size = n, replace = TRUE)
   
-  
-  stratified_estimates <- get_mean_se_stratified(data_frame$TOC, N_strata, proportional_stratified_sample$ID_unit, proportional_stratified_sample$Stratum)
+  stratified_estimates <- get_mean_se_stratified(sample = getdata(data_frame, proportional_stratified_sample), N = nrow(data_frame), N_strata = table(data_frame$transect))
   random_estimates <- get_mean_se(data_frame$TOC, random_sample)
   #local_pivotal_estimates <- get_mean_se(population, local_pivotal_sample)
   
