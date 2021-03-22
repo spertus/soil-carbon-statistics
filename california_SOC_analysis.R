@@ -146,7 +146,11 @@ assay_error_long <- assay_error %>%
 ggplot(assay_error_long, aes(sigma_delta_TC*100, fill = machine)) +
   geom_density(alpha = .5) +
   xlim(0,10) +
-  xlab("Percent Error")
+  xlab("Percent Error") +
+  ylab("Density") +
+  theme_bw() +
+  scale_fill_discrete(name = "Machine") +
+  theme(text = element_text(size = 16))
 
 median_sigma_delta <- assay_error_long %>%
   group_by(machine) %>%
@@ -307,7 +311,7 @@ topsoil_TOC_rangeland <- rangeland_master %>%
 #number of simulations to run
 n_sims <- 400
 #number of samples to take from each plot
-sample_size <- 30
+sample_size <- 90
 #fixed effect
 shift <- seq(0, 2, by=.1)
 #container for p values
@@ -327,9 +331,9 @@ normal_power_shift <- colMeans(normal_p_values < .05)
 perm_power_shift <- colMeans(perm_p_values < .05)
 
 #the normal theory and permutation power functions are almost identical
-plot(x = shift, y = perm_power_shift, type = 'l', col = 'blue', lwd = 3, ylim = c(0,1), bty = "n", xlab = "Change in %SOC", ylab = "Power", main = "Power for n = 30")
+plot(x = shift, y = perm_power_shift, type = 'l', col = 'blue', lwd = 3, ylim = c(0,1), bty = "n", xlab = "Change in %SOC", ylab = "Power", main = "Power for n = 90", cex.lab = 1.5, cex.main = 1.5, cex.axis = 1.5)
 points(x = shift, y = normal_power_shift, type = 'l', col = 'red', lwd = 3)
-legend(x = 1, y = .8, lwd = 3, legend = c("t-test", "Permutation test"), col = c("red", "blue"))
+legend(x = .8, y = .4, lwd = 3, legend = c("t-test", "Permutation test"), col = c("red", "blue"), cex = 1.5)
 
 ############## analyze advantages of stratified versus uniform random sampling ###########
 #we will empirically investigate the advantages of stratified sampling in these settings
@@ -341,7 +345,8 @@ legend(x = 1, y = .8, lwd = 3, legend = c("t-test", "Permutation test"), col = c
 rangeland_data_topsoil <- rangeland_master %>% 
   filter(depth == "a") %>%
   select(transect, sample_number, TOC) %>%
-  filter(!is.na(TOC))
+  filter(!is.na(TOC)) %>%
+  arrange(transect)
 
 
 
@@ -352,8 +357,8 @@ get_mean_se <- function(population, sample_index){
   c(mean(population[sample_index]), sd(population[sample_index])/sqrt(length(sample_index)))
 }
 #function to return estimated mean and standard error given a population, sampling index, and stratification information
-get_mean_se_stratified <- function(sample, N, N_strata){
-  
+get_mean_se_stratified <- function(sample, N_strata){
+  N <- sum(N_strata)
   strata_weights <- N_strata / N
   n_strata <- as.numeric(table(sample$transect))
   strata_means <- tapply(sample$TOC, sample$transect, mean)
@@ -363,29 +368,39 @@ get_mean_se_stratified <- function(sample, N, N_strata){
 }
 
 N_strata <- as.numeric(table(rangeland_data_topsoil$transect))
-#proportional allocation to strata
-n_strata_prop <- round(n * N_strata / sum(N_strata))
-
-if(sum(n_strata) < n){
-  n_strata[length(n_strata)] <- n_strata[length(n_strata)] + 1
-} 
-if(sum(n_strata) > n){
-  n_strata[length(n_strata)] <- n_strata[length(n_strata)] - 1
+#helper function to make integer sample sizes with the sum preserved
+round_strata_sizes <- function(n_strata){
+  rounded_n_strata <- floor(n_strata)
+  indices <- tail(order(n_strata-rounded_n_strata), round(sum(n_strata)) - sum(rounded_n_strata))
+  rounded_n_strata[indices] <- rounded_n_strata[indices] + 1
+  rounded_n_strata
 }
-df_SRS <- n - 1
+
+#proportional allocation to strata
+strata_weights_prop <- N_strata / length(rangeland_data_topsoil$transect)
+n_strata_prop <- round_strata_sizes(n * strata_weights_prop)
+sigma_strata <- tapply(rangeland_data_topsoil$TOC, rangeland_data_topsoil$transect, sd)
+strata_weights_opt <- N_strata * sigma_strata / sum(N_strata * sigma_strata) 
+n_strata_opt <- round_strata_sizes(n * strata_weights_opt)
+
+
+
 
   
 #function to run a single simulation on the rangeland data
 run_rangeland_sim <- function(data_frame){
   proportional_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata_prop, method = "srswr")
+  optimal_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata_opt, method = "srswr")
   
   random_sample <- sample(1:nrow(data_frame), size = n, replace = TRUE)
   
-  stratified_estimates <- get_mean_se_stratified(sample = getdata(data_frame, proportional_stratified_sample), N = nrow(data_frame), N_strata = table(data_frame$transect))
+  prop_stratified_estimates <- get_mean_se_stratified(sample = getdata(data_frame, proportional_stratified_sample), N_strata = table(data_frame$transect))
+  opt_stratified_estimates <- get_mean_se_stratified(sample = getdata(data_frame, optimal_stratified_sample), N_strata = table(data_frame$transect))
+  
   random_estimates <- get_mean_se(data_frame$TOC, random_sample)
   #local_pivotal_estimates <- get_mean_se(population, local_pivotal_sample)
   
-  cbind(stratified_estimates, random_estimates)
+  cbind(random_estimates, prop_stratified_estimates, opt_stratified_estimates)
 }
 #compute the estimand, i.e. the true mean in the rangeland topsoil data
 true_rangeland_mean <- mean(rangeland_data_topsoil$TOC)
@@ -411,7 +426,7 @@ mad_rangeland <- apply(abs(rangeland_sims - true_rangeland_mean), c(1,2), median
 rangeland_results_frame <- rbind(coverage_rangeland, ci_width_rangeland, rmse_rangeland, mad_rangeland) %>%
   as_tibble() %>%
   mutate(property = c("coverage", "ci width", "RMSE", "MAD")) %>%
-  select(property, random_estimates, stratified_estimates)
+  select(property, random_estimates, prop_stratified_estimates, opt_stratified_estimates)
 
 
 #run simulations on the cropland data, considering stratification by site compared to randomly resampling from all points.
