@@ -111,6 +111,34 @@ carbon_table <- carbon_means_long %>%
   group_by(upper_depth) %>%
   summarize(mean_diff_stock = mean(C_stock_H - C_stock_R, na.rm = T), mean_diff_per_C = mean(per_C_H - per_C_R, na.rm = T))
 
+#plot carbon change
+carbon_pct_change_boxplot <- ggplot(data = carbon_means_long %>% mutate(Treatment = ifelse(treatment == "H", "Hedgerow", "Row")), aes(x = as_factor(upper_depth), y = per_C, fill = Treatment)) +
+  geom_boxplot() +
+  facet_grid(~ soil) +
+  xlab("Depth (cm)") +
+  ylab("Percent SOC") +
+  theme_bw() +
+  theme(text = element_text(size = 16))
+
+#I've spot checked that this aligns with soil_means$profile_carbon, as it should
+wp_carbon_stocks <- carbon_means_long %>%
+  group_by(site_name, treatment, soil) %>%
+  summarize(wp_stock = sum(C_stock)) %>%
+  ungroup()
+  
+#mean difference in stocks
+mean_stock_difference <- wp_carbon_stocks %>% 
+  pivot_wider(names_from = treatment, values_from = wp_stock, names_prefix = "wp_stock_") %>%
+  summarize(mean_diff = mean(wp_stock_H - wp_stock_R, na.rm = T), sd_diff = sd(wp_stock_H - wp_stock_R, na.rm = T))
+
+carbon_stock_change_boxplot <- ggplot(data = wp_carbon_stocks %>% mutate(Treatment = ifelse(treatment == "H", "Hedgerow", "Row")), aes(x = soil, y = wp_stock, fill = Treatment)) +
+  geom_boxplot() +
+  xlab("Depth (cm)") +
+  ylab("SOC Stock (t / ha)") +
+  theme_bw() +
+  theme(text = element_text(size = 16))
+  
+
 
 #PCAs of topsoil and subsoil data
 topsoil_matrix <- topsoil_data %>%
@@ -132,11 +160,11 @@ prop_explained <- top_pca$sdev^2 / sum(top_pca$sdev^2)
 plot(prop_explained, type = 'b')
 
 #topsoil PCA plot
-plot(top_pca$x, xlim = c(-6,6),ylim=c(-6,6), col = brewer.pal(4, 'Dark2')[topsoil_data$soil_type], pch = ifelse(topsoil_data$treatment == "H", 19, 17), lwd = 1.5, cex = 1.5)
+plot(top_pca$x, xlim = c(-11,6),ylim=c(-6,6), col = brewer.pal(4, 'Dark2')[topsoil_data$soil_type], pch = ifelse(topsoil_data$treatment == "H", 19, 17), lwd = 1.5, cex = 1.5)
 arrows(x0 = 0, y0 = 0, x1 = top_pca$rotation[,1]*10, y1 = top_pca$rotation[,2]*10, lwd = 1.5, length = .1)
 text(x = top_pca$rotation[,1]*12, y = top_pca$rotation[,2]*11, labels = pca_labels, lwd = 1.5)
-legend(x = 3, y = 6, col = brewer.pal(4, 'Dark2'), pch = 19, legend = c("Yolo", "Brentwood", "Capay", "Corning"))
-legend(x = -6, y = 6, pch = c(19, 17), legend = c("Hedgerow","Crop"))
+legend(x = 2, y = 6, col = brewer.pal(4, 'Dark2'), pch = 19, legend = c("Yolo", "Brentwood", "Capay", "Corning"))
+legend(x = -10, y = 6, pch = c(19, 17), legend = c("Hedgerow","Crop"))
 
 #subsoil PCA plot
 plot(sub_pca$x, xlim = c(-6,6),ylim=c(-6,6), col = brewer.pal(4, 'Dark2')[subsoil_data$soil_type], pch = ifelse(subsoil_data$treatment == "H", 19, 17), lwd = 1.5, cex = 1.5)
