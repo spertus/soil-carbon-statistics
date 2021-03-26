@@ -120,6 +120,28 @@ carbon_pct_change_boxplot <- ggplot(data = carbon_means_long %>% mutate(Treatmen
   theme_bw() +
   theme(text = element_text(size = 16))
 
+#total carbon ANOVAs
+total_var <- carbon_data %>%
+  group_by(upper_depth) %>%
+  summarize(total_var = var(C_Mg_ha, na.rm = TRUE)) 
+treatment_var <- carbon_data %>% 
+  group_by(upper_depth, treatment) %>%
+  summarize(within_treatment_variance = var(C_Mg_ha, na.rm = TRUE)) %>%
+  group_by(upper_depth) %>%
+  summarize(mean(within_treatment_variance, na.rm = TRUE))
+site_var <- carbon_data %>% 
+  group_by(upper_depth, site) %>%
+  summarize(within_site_variance = var(C_Mg_ha, na.rm = TRUE)) %>%
+  group_by(upper_depth) %>%
+  summarize(mean(within_site_variance, na.rm = TRUE))
+soil_type_var <- carbon_data %>%
+  group_by(upper_depth, soil_type) %>%
+  summarize(within_soil_type_variance = var(C_Mg_ha, na.rm = TRUE)) %>%
+  group_by(upper_depth) %>%
+  summarize(mean(within_soil_type_variance, na.rm = TRUE))
+
+anova(lm(per_C ~ treatment + as.factor(soil_type) + as_factor(site), data = carbon_data, subset = upper_depth == 0))
+
 #I've spot checked that this aligns with soil_means$profile_carbon, as it should
 wp_carbon_stocks <- carbon_means_long %>%
   group_by(site_name, treatment, soil) %>%
@@ -129,12 +151,12 @@ wp_carbon_stocks <- carbon_means_long %>%
 #mean difference in stocks
 mean_stock_difference <- wp_carbon_stocks %>% 
   pivot_wider(names_from = treatment, values_from = wp_stock, names_prefix = "wp_stock_") %>%
-  summarize(mean_diff = mean(wp_stock_H - wp_stock_R, na.rm = T), sd_diff = sd(wp_stock_H - wp_stock_R, na.rm = T))
+  summarize(mean_diff = mean(wp_stock_H - wp_stock_R, na.rm = T), sd_diff = sd(wp_stock_H - wp_stock_R, na.rm = T), std_error_diff = sd(wp_stock_H - wp_stock_R, na.rm = T) / sqrt(n())) 
 
 carbon_stock_change_boxplot <- ggplot(data = wp_carbon_stocks %>% mutate(Treatment = ifelse(treatment == "H", "Hedgerow", "Row")), aes(x = soil, y = wp_stock, fill = Treatment)) +
   geom_boxplot() +
   xlab("Depth (cm)") +
-  ylab("SOC Stock (t / ha)") +
+  ylab("SOC Stock (Mg / ha)") +
   theme_bw() +
   theme(text = element_text(size = 16))
   
@@ -278,6 +300,7 @@ diff_means <- apply(diff_matrix, 2, mean)
 
 #ANOVA test statistic 
 #for an example of this see the permuter github page https://github.com/statlab/permuter/blob/master/vignettes/examples_chapters1_4.Rmd
+#this function returns the same one-way ANOVA test statistic used in permuter
 get_ANOVA_soiltype <- function(dependent_variable){
   block <- soil_type
   group_means <- tapply(dependent_variable, block, mean)
@@ -287,7 +310,27 @@ get_ANOVA_soiltype <- function(dependent_variable){
 original_ANOVAs <- apply(diff_matrix, 2, get_ANOVA_soiltype)
 
 #test for main effect of treatment and interaction with soil health 
-paired_perm_dist <- apply(diff_matrix, 2, one_sample, reps = 10000)
+#lockstep 1-sample test
+#takes in a matrix of values or differences (in the case of a one sample test), generates permutation draws by sign flips, and returns a matrix of reps permutations of the mean
+#inputs:
+  #delta_matrix: a matrix of differences in paired outcomes. Number of rows is number of pairs, number of columns is number of variables
+  #reps: number of draws from permutation distribution
+#outputs:
+  #permutation_means: a matrix of draws from the permutation distribution of the difference in means, number of rows is reps, number of columns is ncol(delta_matrix)
+lockstep_one_sample <- function(delta_matrix, reps = 1000){
+  n_rows <- nrow(delta_matrix)
+  permutation_means <- matrix(NA, nrow = reps, ncol = ncol(delta_matrix))
+  for(b in 1:reps){
+    sign_flip <- 1 - 2 * rbinom(n = n_rows, size = 1, prob = 0.5)
+    permutation_means[b,] <- apply(sign_flip * delta_matrix, 2, mean)
+  }
+  permutation_means
+}
+
+#lockstep ANOVA
+
+
+paired_perm_dist <- lockstep_one_sample(diff_matrix, reps = 10000)
 interaction_perm_dist <- apply(diff_matrix, 2, function(x){k_sample(x = x, group = as.numeric(topsoil_means_differences$soil_type), reps = 10000)})
 paired_p_values <- rep(1, length(diff_means))
 interaction_p_values <- rep(1, length(diff_means))
