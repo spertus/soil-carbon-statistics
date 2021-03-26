@@ -75,8 +75,21 @@ ggplot(cropland_master, aes(TC)) +
 #summary tables
 rangeland_summary <- rangeland_master %>% 
   group_by(depth, transect) %>%
-  summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T))
+  summarize(mean_TOC = mean(TOC, na.rm = T), sd_TOC = sd(TOC, na.rm = T)) %>%
+  mutate(sd_TOC = paste("(", round(sd_TOC,2), ")", sep = "")) %>%
+  mutate(mean_TOC = round(mean_TOC, 2)) %>%
+  unite(col = "mean (SD)", mean_TOC, sd_TOC, sep = " ") %>%
+  pivot_wider(names_from = transect, values_from = "mean (SD)")
 
+#rangeland data combined across transects
+rangeland_summary_overall <- rangeland_master %>% 
+  group_by(depth) %>%
+  summarize(mean_TOC = mean(TOC, na.rm = T), sd_TOC = sd(TOC, na.rm = T)) %>%
+  mutate(sd_TOC = paste("(", round(sd_TOC,2), ")", sep = "")) %>%
+  mutate(mean_TOC = round(mean_TOC, 2)) %>%
+  unite(col = "mean (SD)", mean_TOC, sd_TOC, sep = " ")
+
+#note cropland is total carbon not total organic carbon
 cropland_summary <- cropland_master %>% 
   group_by(depth, site) %>%
   summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T))
@@ -303,7 +316,7 @@ power_change_rangeland <- rangeland_master %>%
   mutate(power_full_compositing = get_power_two_sample(n_1 = max_sample_size, k_1 = 1, n_2 = max_sample_size, k_2 = 1, mu_1 = mu, sigma_p_1 = sigma_p, mu_2 = mu + 0.5, sigma_p_2 = sigma_p, sigma_delta = sigma_delta_costech))
   
 
-#power of a permutation test to detect topsoil change
+########### power of a permutation test to detect topsoil change #########3
 topsoil_TOC_rangeland <- rangeland_master %>% 
   filter(depth == "a" & !is.na(TOC)) %>%
   pull(TOC) 
@@ -427,51 +440,6 @@ rangeland_results_frame <- rbind(coverage_rangeland, ci_width_rangeland, rmse_ra
   as_tibble() %>%
   mutate(property = c("coverage", "ci width", "RMSE", "MAD")) %>%
   select(property, random_estimates, prop_stratified_estimates, opt_stratified_estimates)
-
-
-#run simulations on the cropland data, considering stratification by site compared to randomly resampling from all points.
-crop_data_topsoil <- cropland_master %>%
-  filter(depth == "a") %>%
-  filter(!is.na(TC))
-
-run_cropland_sim <- function(data_frame){
-  N_strata <- as.numeric(table(data_frame$site))
-  #sample size in each strata should be about proportional to the size of each strata
-  n_strata <- round(n * N_strata / sum(N_strata))
-  if(sum(n_strata) < n){
-    n_strata[length(n_strata)] <- n_strata[length(n_strata)] + 1
-  } 
-  if(sum(n_strata) > n){
-    n_strata[length(n_strata)] <- n_strata[length(n_strata)] - 1
-  }
-  proportional_stratified_sample <- strata(data = data_frame, stratanames = "site", size = n_strata, method = "srswr")
-  
-  random_sample <- sample(1:nrow(data_frame), size = n, replace = FALSE)
-  
-  stratified_estimates <- get_mean_se_stratified(data_frame$TC, N_strata, proportional_stratified_sample$ID_unit, proportional_stratified_sample$Stratum)
-  random_estimates <- get_mean_se(data_frame$TC, random_sample)
-  #local_pivotal_estimates <- get_mean_se(population, local_pivotal_sample)
-  
-  cbind(stratified_estimates, random_estimates)
-}
-
-
-true_cropland_mean <- mean(crop_data_topsoil$TC)
-
-crop_sims <- replicate(n = 1000, run_cropland_sim(data_frame = crop_data_topsoil))
-coverage_crop <- apply(crop_sims[1,,] - qnorm(p = .975) * crop_sims[2,,] <= true_cropland_mean & true_cropland_mean <= crop_sims[1,,] + qnorm(p = .975) * crop_sims[2,,], 1, mean)
-ci_width_crop <- apply(2 * qnorm(p = .975) * crop_sims[2,,], 1, mean)
-se_crop <- apply(crop_sims, c(1,2), sd)[1,]
-se_hat_crop <- apply(crop_sims, c(1,2), mean)[2,]
-mse_crop <- apply((crop_sims - true_cropland_mean)^2, c(1,2), mean)[1,]
-#ratio of mse compared to simple random sampling
-mse_crop <- mse_crop / mse_crop[2]
-
-crop_results_frame <- rbind(coverage_crop, ci_width_crop, mse_crop) %>%
-  as_tibble() %>%
-  mutate(property = c("coverage", "ci width", "relative MSE")) %>%
-  select(property, random_estimates, stratified_estimates)
-
 
 
 
