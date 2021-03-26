@@ -8,6 +8,7 @@ library(car)
 library(M3C)
 library(RColorBrewer)
 set.seed(1337)
+source("functions.R")
 
 #this has only topsoil data, but includes physical indicators of soil health
 #Site FBF is missing all biological data, we drop it.
@@ -197,10 +198,10 @@ text(x = sub_pca$rotation[,1]*12, y = sub_pca$rotation[,2]*11, labels = pca_labe
 #parametric manovas based on Gaussian assumptions
 #create matrix of soil health variables from means within plots
 topmeans_matrix <- topsoil_means %>%
-  select(all_of(c(soil_health_vars)), macroagg, microagg, infiltration_dry, infiltration_wet, surface_hardness) %>%
+  select(all_of(c(soil_health_vars)), macroagg, microagg, infiltration_dry, infiltration_wet, surface_hardness, -profile_carbon) %>%
   as.matrix()
 submeans_matrix <- subsoil_means %>%
-  select(all_of(soil_health_vars), subsurface_hardness) %>%
+  select(all_of(soil_health_vars), subsurface_hardness, -profile_carbon) %>%
   as.matrix()
 carbon_matrix <- carbon_means %>%
   select(C_stock_0, C_stock_10, C_stock_20, C_stock_50, C_stock_75) %>%
@@ -209,8 +210,8 @@ carbon_matrix <- carbon_means %>%
 top_corr_matrix <- cor(topmeans_matrix, use = "complete.obs", method = 'spearman')
 sub_corr_matrix <- cor(submeans_matrix, use = "complete.obs", method = 'spearman')
 total_corr_matrix <- cor(cbind(topmeans_matrix, submeans_matrix, carbon_matrix), use = "complete.obs", method = "spearman")
-varnames_top <- c("Percent C", "Percent N", "Whole Profile SOC", "POXc", "EOC", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", "Macroaggregates", "Microaggregates", "Dry Infiltration", "Wet Infiltration", "Surface Hardness")
-varnames_sub <- c("Percent C", "Percent N", "Whole Profile SOC", "POXc", "EOC", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", " Surface Hardness")
+varnames_top <- c("Percent C", "Percent N", "POXc", "EOC", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", "Macroaggregates", "Microaggregates", "Dry Infiltration", "Wet Infiltration", "Surface Hardness")
+varnames_sub <- c("Percent C", "Percent N", "POXc", "EOC", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", " Surface Hardness")
 varnames_carbon <- c("C Stock 0-10", "C Stock 10-20", "C Stock 20-50", "C Stock 50-75", "C Stock 75-100")
 colnames(top_corr_matrix) <- rownames(top_corr_matrix) <- varnames_top
 colnames(sub_corr_matrix) <- rownames(sub_corr_matrix) <- varnames_sub
@@ -297,51 +298,7 @@ diff_matrix_carbon <- carbon_means_differences %>%
 diff_matrix <- cbind(diff_matrix_top, diff_matrix_sub, diff_matrix_carbon)
 
 diff_means <- apply(diff_matrix, 2, mean)
-
-#ANOVA test statistic 
-#for an example of this see the permuter github page https://github.com/statlab/permuter/blob/master/vignettes/examples_chapters1_4.Rmd
-#this function returns the same one-way ANOVA test statistic used in permuter
-#inputs:
-  #dependent_variable: the dependent variable (outcome of interest)
-  #block: the blocks (groups) that describe the dependent variable0
-#outputs:
-  #a permutation equivalent of the one-way ANOVA test statistic
-get_ANOVA <- function(dependent_variable, block){
-  group_means <- tapply(dependent_variable, block, mean)
-  group_sizes <- as.numeric(table(block))
-  sum(group_sizes * group_means^2)
-}
 original_ANOVAs <- apply(diff_matrix, 2, get_ANOVA, block = soil_type)
-
-#test for main effect of treatment and interaction with soil health 
-#lockstep 1-sample test
-#takes in a matrix of values or differences (in the case of a one sample test), generates permutation draws by sign flips, and returns a matrix of reps permutations of the mean
-#inputs:
-  #delta_matrix: a matrix of differences in paired outcomes. Number of rows is number of pairs, number of columns is number of variables
-  #reps: number of draws from permutation distribution
-#outputs:
-  #permutation_means: a matrix of draws from the permutation distribution of the difference in means, number of rows is reps, number of columns is ncol(delta_matrix)
-lockstep_one_sample <- function(delta_matrix, reps = 1000){
-  n_rows <- nrow(delta_matrix)
-  permutation_means <- matrix(NA, nrow = reps, ncol = ncol(delta_matrix))
-  for(b in 1:reps){
-    sign_flip <- 1 - 2 * rbinom(n = n_rows, size = 1, prob = 0.5)
-    permutation_means[b,] <- apply(sign_flip * delta_matrix, 2, mean)
-  }
-  permutation_means
-}
-
-#lockstep ANOVA
-lockstep_ANOVA <- function(delta_matrix, group, reps = 1000){
-  n_rows <- nrow(delta_matrix)
-  K <- length(group)
-  permutation_ANOVAs <- matrix(NA, nrow = reps, ncol = ncol(delta_matrix))
-  for(b in 1:reps){
-    shuffled_group <- sample(group, size = K, replace = FALSE)
-    permutation_ANOVAs[b,] <- apply(delta_matrix, 2, get_ANOVA, block = shuffled_group)
-  }
-  permutation_ANOVAs
-}
 
 paired_perm_dist <- lockstep_one_sample(diff_matrix, reps = 10000)
 interaction_perm_dist <- lockstep_ANOVA(diff_matrix, group = soil_type, reps = 1000)
@@ -353,7 +310,7 @@ for(i in 1:length(paired_p_values)){
 }
 #p-value for the intersection null, that there is no effect on any SH variable
 #nonparametric one-way MANOVA
-combined_paired_p_value <- npc(diff_means, distr = paired_perm_dist, combine = "fisher", alternatives = "two-sided")
+combined_paired_p_value <- npc(diff_means, distr = paired_perm_dist, combine = "fisher", alternative = "two-sided")
 combined_interaction_p_value <- npc(original_ANOVAs, distr = interaction_perm_dist, combine = "fisher", alternatives = "two-sided")
 
 #p-values for partial tests, adjusted for multiplicity by closed testing.
