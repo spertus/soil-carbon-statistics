@@ -45,7 +45,11 @@ simulate_truth <- function(size = c(250,600), nugget = .01, sill = .05, range = 
 
 ############ function to plot a surface as a heatmap###############
 plot_surface <- function(surface){
-  ggplot(data = surface, aes(x = x, y = y, fill = z)) + geom_raster()
+  ggplot(data = surface, aes(x = x, y = y, fill = z)) + 
+    geom_raster() +
+    xlab("East-West") +
+    ylab("North-South") +
+    labs(fill = "% SOC")
 }
 
 ############### function to add samples at depth, given surface samples ##############
@@ -154,7 +158,10 @@ collect_sample <- function(surface, design = "transect", n_samp = 9, n_strata = 
 plot_surface_samples <- function(surface, samples){
   ggplot(data = surface, aes(x = x, y = y, fill = z)) + 
     geom_raster() + 
-    geom_point(data = samples, aes(x = x, y = y), size = 1.3, colour = "red")
+    geom_point(data = samples, aes(x = x, y = y), size = 1.5, colour = "red") +
+    xlab("East-West") +
+    ylab("North-South") +
+    labs(fill = "% SOC")
 }
 
 
@@ -611,4 +618,67 @@ get_power_two_sample <- function(n_1 = NULL, k_1 = NULL, n_2 = NULL, k_2 = NULL,
   } else {
     stop("Supply either sample sizes (n_1 and n_2) or a targeted type 2 error rate (beta)!")
   }
+}
+
+
+#ANOVA test statistic 
+#for an example of this see the permuter github page https://github.com/statlab/permuter/blob/master/vignettes/examples_chapters1_4.Rmd
+#this function returns the same one-way ANOVA test statistic used in permuter
+#inputs:
+#dependent_variable: the dependent variable (outcome of interest)
+#block: the blocks (groups) that describe the dependent variable0
+#outputs:
+#a permutation equivalent of the one-way ANOVA test statistic
+get_ANOVA <- function(dependent_variable, block){
+  group_means <- tapply(dependent_variable, block, mean)
+  group_sizes <- as.numeric(table(block))
+  sum(group_sizes * group_means^2)
+}
+
+#test for main effect of treatment and interaction with soil health 
+#lockstep 1-sample test
+#takes in a matrix of values or differences (in the case of a one sample test), generates permutation draws by sign flips, and returns a matrix of reps permutations of the mean
+#inputs:
+#delta_matrix: a matrix of differences in paired outcomes. Number of rows is number of pairs, number of columns is number of variables
+#reps: number of draws from permutation distribution
+#outputs:
+#permutation_means: a matrix of draws from the permutation distribution of the difference in means, number of rows is reps, number of columns is ncol(delta_matrix)
+lockstep_one_sample <- function(delta_matrix, reps = 1000){
+  n_rows <- nrow(delta_matrix)
+  permutation_means <- matrix(NA, nrow = reps, ncol = ncol(delta_matrix))
+  for(b in 1:reps){
+    sign_flip <- 1 - 2 * rbinom(n = n_rows, size = 1, prob = 0.5)
+    permutation_means[b,] <- apply(sign_flip * delta_matrix, 2, mean)
+  }
+  permutation_means
+}
+
+#lockstep ANOVA
+#inputs:
+#outcome_matrix: a numeric matrix of outcomes (dependent variables) to be assessed, observations in rows, variables in columns
+#group: a categorical vector of group assignments (independent variable)
+#reps: the number of permutations to draw
+#outputs:
+#a reps by ncol(outcome_matrix) matrix of draws from the permutation distributions of each partial test
+lockstep_ANOVA <- function(delta_matrix, group, reps = 1000){
+  n_rows <- nrow(delta_matrix)
+  K <- length(group)
+  permutation_ANOVAs <- matrix(NA, nrow = reps, ncol = ncol(delta_matrix))
+  for(b in 1:reps){
+    shuffled_group <- sample(group, size = K, replace = FALSE)
+    permutation_ANOVAs[b,] <- apply(delta_matrix, 2, get_ANOVA, block = shuffled_group)
+  }
+  permutation_ANOVAs
+}
+
+
+#get two-sided pvalues for a vector of test statistics and matrix of permutations
+#inputs:
+#test_statistics: a length V vector of "original" test statistics, usually computed on unpermuted data 
+#permutations: a matrix of test statistics computed from permuted data
+#output:
+#a length V vector of conservative permutation p-values
+get_perm_p_value <- function(test_statistics, permutations){
+  B <- nrow(permutations)
+  pmin((1/2 + colSums(t(t(abs(permutations)) > test_statistics))) / (B + 1), 1)
 }
