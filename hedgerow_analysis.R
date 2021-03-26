@@ -301,13 +301,17 @@ diff_means <- apply(diff_matrix, 2, mean)
 #ANOVA test statistic 
 #for an example of this see the permuter github page https://github.com/statlab/permuter/blob/master/vignettes/examples_chapters1_4.Rmd
 #this function returns the same one-way ANOVA test statistic used in permuter
-get_ANOVA_soiltype <- function(dependent_variable){
-  block <- soil_type
+#inputs:
+  #dependent_variable: the dependent variable (outcome of interest)
+  #block: the blocks (groups) that describe the dependent variable0
+#outputs:
+  #a permutation equivalent of the one-way ANOVA test statistic
+get_ANOVA <- function(dependent_variable, block){
   group_means <- tapply(dependent_variable, block, mean)
   group_sizes <- as.numeric(table(block))
   sum(group_sizes * group_means^2)
 }
-original_ANOVAs <- apply(diff_matrix, 2, get_ANOVA_soiltype)
+original_ANOVAs <- apply(diff_matrix, 2, get_ANOVA, block = soil_type)
 
 #test for main effect of treatment and interaction with soil health 
 #lockstep 1-sample test
@@ -328,10 +332,19 @@ lockstep_one_sample <- function(delta_matrix, reps = 1000){
 }
 
 #lockstep ANOVA
-
+lockstep_ANOVA <- function(delta_matrix, group, reps = 1000){
+  n_rows <- nrow(delta_matrix)
+  K <- length(group)
+  permutation_ANOVAs <- matrix(NA, nrow = reps, ncol = ncol(delta_matrix))
+  for(b in 1:reps){
+    shuffled_group <- sample(group, size = K, replace = FALSE)
+    permutation_ANOVAs[b,] <- apply(delta_matrix, 2, get_ANOVA, block = shuffled_group)
+  }
+  permutation_ANOVAs
+}
 
 paired_perm_dist <- lockstep_one_sample(diff_matrix, reps = 10000)
-interaction_perm_dist <- apply(diff_matrix, 2, function(x){k_sample(x = x, group = as.numeric(topsoil_means_differences$soil_type), reps = 10000)})
+interaction_perm_dist <- lockstep_ANOVA(diff_matrix, group = soil_type, reps = 1000)
 paired_p_values <- rep(1, length(diff_means))
 interaction_p_values <- rep(1, length(diff_means))
 for(i in 1:length(paired_p_values)){
