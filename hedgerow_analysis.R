@@ -56,7 +56,7 @@ soil_means <- hr_data %>%
     silt = mean(silt),
     silt_clay = mean(silt_clay),
     BD = mean(BD),
-    pH = mean(pH), #this might require a modified average
+    pH = -log10(mean(10^(-pH))),
     per_N = mean(per_N),
     per_C = mean(per_C),
     POXc = mean(POXc),
