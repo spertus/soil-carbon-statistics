@@ -125,12 +125,14 @@ ggplot(cropland_BD, aes(bd)) +
   theme(text = element_text(size = 16))
 
 rangeland_summary_bd <- rangeland_BD %>%
-  group_by(depth, transect) %>%
-  summarize(mean_bd = mean(bd, na.rm = TRUE), sd_bd = sd(bd, na.rm = TRUE))
+  group_by(depth) %>%
+  summarize(mean_bd = mean(bd, na.rm = TRUE), sd_bd = sd(bd, na.rm = TRUE)) %>%
+  mutate(cv_bd = sd_bd / mean_bd)
 
 cropland_summary_bd <- cropland_BD %>%
-  group_by(depth, site) %>%
-  summarize(mean_bd = mean(bd, na.rm = TRUE), sd_bd = sd(bd, na.rm = TRUE))
+  group_by(depth) %>%
+  summarize(mean_bd = mean(bd, na.rm = TRUE), sd_bd = sd(bd, na.rm = TRUE)) %>%
+  mutate(cv_bd = sd_bd / mean_bd)
 
 
 
