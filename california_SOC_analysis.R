@@ -294,9 +294,12 @@ sample_size <- 60
 max_budget <- 20 * sample_size + 13.6 * sample_size
 #sample size if we measure once and devote the rest of the budget to sampling
 max_sample_size <- floor((max_budget - 13.6) / 20)
-#measurement error of a costech
+#measurement errors of costech and solitoc
 sigma_delta_costech <- median_sigma_delta %>% 
   filter(machine == "costech") %>%
+  pull(sigma_delta)
+sigma_delta_solitoc <- median_sigma_delta %>% 
+  filter(machine == "solitoc") %>%
   pull(sigma_delta)
 
 #precision of the sample mean 
@@ -310,18 +313,46 @@ precision_rangeland <- rangeland_master %>%
   mutate(optimal_composite_size_commercial = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 13.60)) %>%
   mutate(optimal_composite_size_inhouse = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 2.78))
 
-#power of two-sample t-test to detect a half-percentage point change in TOC 
-power_change_rangeland <- rangeland_master %>%
-  group_by(depth) %>%
-  summarize(mu = mean(TC, na.rm = T), sigma_p = sd(TC, na.rm = T)) %>%
-  mutate(power_no_compositing = get_power_two_sample(n_1 = sample_size, k_1 = sample_size, n_2 = sample_size, k_2 = sample_size, mu_1 = mu, sigma_p_1 = sigma_p, mu_2 = mu + 0.5, sigma_p_2 = sigma_p, sigma_delta = sigma_delta_costech)) %>%
-  mutate(power_full_compositing = get_power_two_sample(n_1 = max_sample_size, k_1 = 1, n_2 = max_sample_size, k_2 = 1, mu_1 = mu, sigma_p_1 = sigma_p, mu_2 = mu + 0.5, sigma_p_2 = sigma_p, sigma_delta = sigma_delta_costech))
-  
 
-########### power of a permutation test to detect topsoil change #########3
+#power of two-sample t-test to detect a range of changes in rangeland topsoil
 topsoil_TOC_rangeland <- rangeland_master %>% 
   filter(depth == "a" & !is.na(TOC)) %>%
   pull(TOC) 
+
+mu_0 <- mean(topsoil_TOC_rangeland)
+sigma_p <- sd(topsoil_TOC_rangeland)
+mu_1 <- mu_0 + seq(.1,1,by=.01)
+delta <- mu_1 - mu_0
+
+power_change_rangeland_costech <- expand.grid(
+  sample_size = c(30,60,90),
+  mu_0 = mu_0, 
+  sigma_p = sigma_p, 
+  sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc),
+  delta = seq(0,1,by=.01)
+  ) %>%
+  mutate(Machine = ifelse(sigma_delta == sigma_delta_costech, "Costech", "SoliTOC")) %>%
+  mutate(budget = 20 * sample_size + 13.6 * sample_size) %>%
+  mutate(max_sample_size = floor((budget - 13.6) / 20)) %>%
+  mutate(opt_n = get_minimum_error(sigma_p = sigma_p, mu = mu_0, sigma_delta = sigma_delta, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = budget)$n) %>%
+  mutate(opt_k = get_minimum_error(sigma_p = sigma_p, mu = mu_0, sigma_delta = sigma_delta, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = budget)$k) %>%
+  mutate(power_no_compositing = get_power_two_sample(n_1 = sample_size, k_1 = sample_size, n_2 = sample_size, k_2 = sample_size, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
+  mutate(power_full_compositing = get_power_two_sample(n_1 = max_sample_size, k_1 = 1, n_2 = max_sample_size, k_2 = 1, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
+  mutate(power_optimal_compositing = get_power_two_sample(n_1 = opt_n, k_1 = opt_k, n_2 = opt_n, k_2 = opt_k, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
+  pivot_longer(cols = starts_with("power_"), names_to = "Compositing", values_to = "power", names_prefix = "power_") %>%
+  mutate(Compositing = ifelse(Compositing == "full_compositing", "Full", ifelse(Compositing == "no_compositing", "None", "Optimal"))) %>%
+  mutate(sample_size = paste("n =", sample_size))
+
+ggplot(power_change_rangeland_costech, aes(x = delta, y = power, color = Compositing)) +
+  geom_line(size = 1.5) +
+  facet_grid(sample_size ~ Machine) +
+  xlab("%TOC Change") +
+  ylab("Power of Two-sample t-test") +
+  xlim(0,1) +
+  theme_bw() +
+  theme(text = element_text(size = 16))
+
+########### power of a permutation test to detect topsoil change #########
   
 #number of simulations to run
 n_sims <- 400
