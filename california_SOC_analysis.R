@@ -49,6 +49,10 @@ replicates_comparison <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", s
   rename(TC_solitoc = TC_soliTOC, TOC_solitoc = TOC_soliTOC) %>%
   mutate_at(vars(starts_with(c("TC_", "TOC_"))), as.numeric)
 
+combined_master <- rangeland_master %>% 
+  select(site, soil_type, depth, TC) %>%
+  bind_rows(cropland_master %>% select(site, soil_type, depth, TC)) %>%
+  mutate(land_use = ifelse(site == "PAIC", "Rangeland", "Cropland"))
 
 ###################### TOC concentration and BD in space ######################
 
@@ -303,34 +307,47 @@ sigma_delta_solitoc <- median_sigma_delta %>%
   pull(sigma_delta)
 
 #precision of the sample mean 
-precision_rangeland <- rangeland_master %>%
-  group_by(depth) %>%
-  summarize(mu = mean(TC, na.rm = T), sigma_p = sd(TC, na.rm = T)) %>%
+precision_combined <- combined_master %>%
+  group_by(depth, site, land_use) %>%
+  summarize(mu_site = mean(TC, na.rm = T), sigma_p_site = sd(TC, na.rm = T)) %>%
+  group_by(depth, land_use) %>%
+  summarize(mu = mean(mu_site, na.rm = T), sigma_p = mean(sigma_p_site, na.rm = T)) %>%
   mutate(se_no_compositing = sqrt(get_variance(n = sample_size, k = sample_size, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech))) %>%
   mutate(se_full_compositing = sqrt(get_variance(n = max_sample_size, k = 1, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech))) %>%
   mutate(se_optimal_compositing = sqrt(get_minimum_error(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = max_budget)$optimum_variance)) %>%
   mutate(composite_efficiency_ratio = se_optimal_compositing / se_no_compositing) %>%
   mutate(optimal_composite_size_commercial = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 13.60)) %>%
-  mutate(optimal_composite_size_inhouse = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 2.78))
+  mutate(optimal_composite_size_inhouse = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 2.78)) %>%
+  arrange(land_use, depth)
 
 
 #power of two-sample t-test to detect a range of changes in rangeland topsoil
-topsoil_TOC_rangeland <- rangeland_master %>% 
-  filter(depth == "a" & !is.na(TOC)) %>%
-  pull(TOC) 
 
-mu_0 <- mean(topsoil_TOC_rangeland)
-sigma_p <- sd(topsoil_TOC_rangeland)
-mu_1 <- mu_0 + seq(.1,1,by=.01)
-delta <- mu_1 - mu_0
+mu_0_rangeland <- precision_combined %>% filter(depth == "a", land_use == "Rangeland") %>% pull(mu)
+sigma_p_rangeland <- precision_combined %>% filter(depth == "a", land_use == "Rangeland") %>% pull(sigma_p)
+mu_0_cropland <- precision_combined %>% filter(depth == "a", land_use == "Cropland") %>% pull(mu)
+sigma_p_cropland <- precision_combined %>% filter(depth == "a", land_use == "Cropland") %>% pull(sigma_p)
 
-power_change_rangeland_costech <- expand.grid(
+rangeland_grid <- expand.grid(
+  land_use = "Rangeland",
   sample_size = c(30,60,90),
-  mu_0 = mu_0, 
-  sigma_p = sigma_p, 
+  mu_0 = mu_0_rangeland, 
+  sigma_p = sigma_p_rangeland, 
   sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc),
   delta = seq(0,1,by=.01)
-  ) %>%
+)
+cropland_grid <- expand.grid(
+  land_use = "Cropland",
+  sample_size = c(30,60,90),
+  mu_0 = mu_0_cropland, 
+  sigma_p = sigma_p_cropland, 
+  sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc),
+  delta = seq(0,1,by=.01)
+)
+
+
+power_change_topsoil <- rangeland_grid %>%
+  bind_rows(cropland_grid) %>%
   mutate(Machine = ifelse(sigma_delta == sigma_delta_costech, "Costech", "SoliTOC")) %>%
   mutate(budget = 20 * sample_size + 13.6 * sample_size) %>%
   mutate(max_sample_size = floor((budget - 13.6) / 20)) %>%
@@ -343,9 +360,9 @@ power_change_rangeland_costech <- expand.grid(
   mutate(Compositing = ifelse(Compositing == "full_compositing", "Full", ifelse(Compositing == "no_compositing", "None", "Optimal"))) %>%
   mutate(sample_size = paste("n =", sample_size))
 
-ggplot(power_change_rangeland_costech, aes(x = delta, y = power, color = Compositing)) +
+ggplot(power_change_topsoil, aes(x = delta, y = power, color = Compositing)) +
   geom_line(size = 1.5) +
-  facet_grid(sample_size ~ Machine) +
+  facet_grid(sample_size ~ land_use + Machine) +
   xlab("%TOC Change") +
   ylab("Power of Two-sample t-test") +
   xlim(0,1) +
