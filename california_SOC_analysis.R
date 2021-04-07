@@ -49,6 +49,12 @@ replicates_comparison <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", s
   rename(TC_solitoc = TC_soliTOC, TOC_solitoc = TOC_soliTOC) %>%
   mutate_at(vars(starts_with(c("TC_", "TOC_"))), as.numeric)
 
+standards_comparison <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Standards_Comparison") %>%
+  rename(TC = `TC%`, N = `N%`)
+
+
+
+
 combined_master <- rangeland_master %>% 
   select(site, soil_type, depth, TC) %>%
   bind_rows(cropland_master %>% select(site, soil_type, depth, TC)) %>%
@@ -244,6 +250,25 @@ assay_density_plot_rejected <- ggplot(reps_long_both %>% filter(rejected == 1, c
   theme_bw() +
   scale_fill_discrete(name = "Machine") +
   theme(text = element_text(size = 16), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.title.y = element_blank())
+
+
+#standards comparison
+known_standards <- standards_comparison %>%
+  group_by(sample_ID) %>%
+  summarize(known_TC = first(known_TC))
+standards_comparison <- standards_comparison %>%
+  mutate(known_TC = ifelse(sample_ID == "EML", 1.86, 0.926))
+
+standards_density_plot <- ggplot(standards_comparison, aes(TC, fill = machine)) +
+  geom_density(alpha = .5) +
+  geom_vline(data = standards_comparison %>% filter(sample_ID == "EML"), aes(xintercept = 1.86)) +
+  geom_vline(data = standards_comparison %>% filter(sample_ID == "LECO"), aes(xintercept = 0.926)) +
+  facet_grid(~ sample_ID, scales = "free") +
+  xlim(0.8, 2.2) +
+  xlab("% Total Carbon") +
+  ylab("") +
+  theme_bw()
+
 
 ############# spatial correlation of TOC concentrations at rangeland ##########
 #first just do for a single transect
