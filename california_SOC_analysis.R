@@ -181,8 +181,9 @@ median_sigma_delta <- assay_error_long %>%
 #nonparametric analysis of no difference in labs/machines:
 reps_long_TC <- replicates_comparison %>% 
   select(site, sample_number, TC_solitoc, TC_costech) %>%
-  pivot_longer(cols = c("TC_solitoc", "TC_costech"), names_prefix = "TC_", names_to = "machine", values_to = "TC") %>%
-  na.omit()
+  pivot_longer(cols = c("TC_solitoc", "TC_costech"), names_prefix = "TC_", names_to = "machine", values_to = "carbon") %>%
+  na.omit() %>% 
+  mutate(carbon_type = "TC")
 
 #there are only a few measurements for TOC on the costech
 reps_long_TOC <- replicates_comparison %>% 
@@ -190,14 +191,19 @@ reps_long_TOC <- replicates_comparison %>%
   group_by(sample_number) %>%
   filter(sum(!is.na(TOC_costech)) >= 2) %>%
   ungroup() %>%
-  pivot_longer(cols = c("TOC_solitoc", "TOC_costech"), names_prefix = "TOC_", names_to = "machine", values_to = "TOC") %>%
-  na.omit()
+  pivot_longer(cols = c("TOC_solitoc", "TOC_costech"), names_prefix = "TOC_", names_to = "machine", values_to = "carbon") %>%
+  na.omit() %>% 
+  mutate(carbon_type = "TOC")
 
+#combined TC and TOC reps
+reps_long_both <- reps_long_TOC %>%
+  bind_rows(reps_long_TC) %>% 
+  mutate(identifier = paste(site, sample_number, carbon_type,  sep = "_"))
 
 
 
 B <- 10000
-strata <- as_factor(reps_long_TOC$sample_number)
+strata <- as_factor(reps_long_both$identifier)
 num_strata <- length(unique(strata))
 #test statistic is difference in means between labs
 diff_means <- rep(0, num_strata)
@@ -206,31 +212,33 @@ null_distributions <- matrix(0, ncol = num_strata, nrow = B)
 p_values <- rep(0, num_strata)
 #iterate across strata (samples)
 for(k in 1:num_strata){
-  solitoc_TOC <- reps_long_TOC$TOC[reps_long_TOC$machine == "solitoc" & strata == levels(strata)[k]]
-  costech_TOC <- reps_long_TOC$TOC[reps_long_TOC$machine == "costech" & strata == levels(strata)[k]]
-  diff_means[k] <- mean(solitoc_TOC) - mean(costech_TOC)
-  pooled_ses[k] <- sqrt(var(solitoc_TOC) / length(solitoc_TOC) + var(costech_TOC) / length(solitoc_TOC))
-  null_distributions[,k] <- two_sample(x = solitoc_TOC, y = costech_TOC, reps = B)
+  solitoc_carbon <- reps_long_both$carbon[reps_long_both$machine == "solitoc" & strata == levels(strata)[k]]
+  costech_carbon <- reps_long_both$carbon[reps_long_both$machine == "costech" & strata == levels(strata)[k]]
+  diff_means[k] <- mean(solitoc_carbon) - mean(costech_carbon)
+  pooled_ses[k] <- sqrt(var(solitoc_carbon) / length(solitoc_carbon) + var(costech_carbon) / length(solitoc_carbon))
+  null_distributions[,k] <- two_sample(x = solitoc_carbon, y = costech_carbon, reps = B)
   p_values[k] <- mean(abs(diff_means[k]) <= abs(null_distributions[,k])) 
 }
 
-npc_p_value <- npc(diff_means, distr = null_distributions, combine=  "fisher", alternatives = "two-sided")
+#this is a non-parametric test of whether *any* of the measurements are significantly different, using nonparametric combination of tests
+npc_p_value <- npc(diff_means, distr = null_distributions, combine = "fisher", alternatives = "two-sided")
 
-reps_long_TOC <- reps_long_TOC %>%
-  mutate(rejected = ifelse(sample_number %in% levels(strata)[p_values < .05], 1, 0))
+reps_long_both <- reps_long_both %>%
+  mutate(rejected = ifelse(identifier %in% levels(strata)[p_values < .05], 1, 0))
 
 #plot assay densities stratified by sample number
-assay_density_plot_accepted <- ggplot(reps_long_TOC %>% filter(rejected == 0), aes(TOC, fill = machine)) +
+assay_density_plot_accepted <- ggplot(reps_long_both %>% filter(rejected == 0), aes(carbon, fill = machine)) +
   geom_density(alpha = .5) +
-  facet_grid(sample_number ~ ., scales = "free") +
+  facet_wrap(~ identifier, scales = "free_y") +
+  xlim(0,6) +
   xlab("Percent Organic Carbon") +
   ggtitle("Similar Assays") +
   theme_bw() +
   scale_fill_discrete(name = "Machine") +
   theme(text = element_text(size = 16), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.title.y = element_blank())
-assay_density_plot_rejected <- ggplot(reps_long_TOC %>% filter(rejected == 1), aes(TOC, fill = machine)) +
+assay_density_plot_rejected <- ggplot(reps_long_both %>% filter(rejected == 1, carbon_type == "TOC"), aes(carbon, fill = machine)) +
   geom_density(alpha = .5) +
-  facet_grid(sample_number ~ ., scales = "free") +
+  facet_wrap(~ identifier, scales = "free_y") +
   xlab("Percent Organic Carbon") +
   ggtitle("Significantly Different Assays") +
   theme_bw() +
@@ -363,10 +371,11 @@ power_change_topsoil <- rangeland_grid %>%
 ggplot(power_change_topsoil, aes(x = delta, y = power, color = Compositing)) +
   geom_line(size = 1.5) +
   facet_grid(sample_size ~ land_use + Machine) +
-  xlab("%TOC Change") +
-  ylab("Power of Two-sample t-test") +
+  xlab("%TC Change") +
+  ylab("Power of two-sample t-test") +
   xlim(0,1) +
   theme_bw() +
+  scale_x_continuous(labels = c("0","0.25", "0.50", "0.75", "1")) +
   theme(text = element_text(size = 16))
 
 ########### power of a permutation test to detect topsoil change #########
