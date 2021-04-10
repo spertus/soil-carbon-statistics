@@ -64,21 +64,24 @@ combined_master <- rangeland_master %>%
 
 #stacked histograms for rangeland data
 ggplot(rangeland_master, aes(TC)) +
-  geom_histogram() +
-  facet_grid(depth_long ~ transect) +
-  xlab("Percent Total Carbon") +
+  geom_histogram(binwidth = 0.25) +
+  facet_grid(depth ~ transect) +
+  xlab("% Total Carbon (TC)") +
   ylab("Number of Samples") +
+  ylim(0,23) +
   theme_bw() +
   theme(text = element_text(size = 16))
 
 
 #stacked histograms for cropland data
 ggplot(cropland_master, aes(TC)) +
-  geom_histogram() +
+  geom_histogram(binwidth = 0.25) +
   facet_grid(depth ~ site) +
-  xlab("Percent Total Carbon") +
+  xlab("% Total Carbon (TC)") +
   ylab("Number of Samples") +
   theme_bw() +
+  xlim(0,8) +
+  ylim(0,23) +
   theme(text = element_text(size = 16))
 
 
@@ -116,21 +119,23 @@ anova(cropland_model)
 #bulk densities
 #NOTE: histograms are not disaggregated by location, which drives variation
 ggplot(rangeland_BD, aes(bd)) +
-  geom_histogram() +
-  facet_grid(depth_long ~ .) +
+  geom_histogram(binwidth = 0.05) +
+  facet_grid(depth ~ .) +
   xlab("Bulk Density") +
   ylab("Number of samples") +
-  xlim(.8, 2.5) +
+  scale_x_continuous(breaks = c(0.8, 1.2, 1.6, 2.0, 2.4), limits = c(0.8,2.4)) +
+  scale_y_continuous(breaks = c(0,2,4,6,8,10), limits = c(0,10)) +
   theme_bw() +
-  theme(text = element_text(size = 16))
+  theme(text = element_text(size = 16), panel.grid.minor = element_blank())
 
 
 ggplot(cropland_BD, aes(bd)) +
-  geom_histogram() +
+  geom_histogram(binwidth = 0.05) +
   facet_grid(depth ~ .) +
   xlab("Bulk Density") +
   ylab("Number of Samples") +
-  xlim(.8, 2.5) +
+  scale_x_continuous(breaks = c(0.8, 1.2, 1.6, 2.0, 2.4), limits = c(0.8,2.4)) +
+  scale_y_continuous(breaks = c(0,2,4,6,8,10), limits = c(0,10)) +
   theme_bw() +
   theme(text = element_text(size = 16))
 
@@ -139,10 +144,13 @@ rangeland_summary_bd <- rangeland_BD %>%
   summarize(mean_bd = mean(bd, na.rm = TRUE), sd_bd = sd(bd, na.rm = TRUE)) %>%
   mutate(cv_bd = sd_bd / mean_bd)
 
+#averages within sites
 cropland_summary_bd <- cropland_BD %>%
-  group_by(depth) %>%
+  group_by(depth, site) %>%
   summarize(mean_bd = mean(bd, na.rm = TRUE), sd_bd = sd(bd, na.rm = TRUE)) %>%
-  mutate(cv_bd = sd_bd / mean_bd)
+  mutate(cv_bd = sd_bd / mean_bd) %>% 
+  group_by(depth) %>% 
+  summarize(mean_bd = mean(mean_bd, na.rm = TRUE), sd_bd = sd(sd_bd, na.rm = TRUE), cv_bd = mean(cv_bd, na.rm = TRUE))
 
 
 
