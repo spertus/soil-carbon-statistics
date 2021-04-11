@@ -413,32 +413,47 @@ ggplot(power_change_topsoil, aes(x = delta, y = power, color = Compositing)) +
 
 ########### power of a permutation test to detect topsoil change #########
   
-#number of simulations to run
-n_sims <- 400
-#number of samples to take from each plot
-sample_size <- 90
-#fixed effect
-shift <- seq(0, 2, by=.1)
-#container for p values
-perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
-normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
-for(i in 1:n_sims){
-  for(j in 1:length(shift)){
-    sample_1 <- sample(topsoil_TOC_rangeland, size = sample_size, replace = TRUE)
-    sample_2 <- sample(topsoil_TOC_rangeland + shift[j], size = sample_size, replace = TRUE)
-    diff_mean <- mean(sample_1) - mean(sample_2)
-    normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
-    perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 200), alternative = "two-sided")
-  }
+effect_grid = seq(0,2,by=.1)
+run_twosample_sims <- function(sample_size, n_sims = 400){
+ shift <- effect_grid
+ perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+ normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+ for(i in 1:n_sims){
+   for(j in 1:length(shift)){
+     sample_1 <- sample(topsoil_TOC_rangeland, size = sample_size, replace = TRUE)
+     sample_2 <- sample(topsoil_TOC_rangeland + shift[j], size = sample_size, replace = TRUE)
+     diff_mean <- mean(sample_1) - mean(sample_2)
+     normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
+     perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 500), alternative = "two-sided")
+   }
+ }
+ normal_power_shift <- colMeans(normal_p_values < .05)
+ perm_power_shift <- colMeans(perm_p_values < .05)
+ cbind("normal" = normal_power_shift, "permutation" = perm_power_shift)
 }
 
-normal_power_shift <- colMeans(normal_p_values < .05)
-perm_power_shift <- colMeans(perm_p_values < .05)
+#these take a while to run, we can save them as an object
+#power_5 <- run_twosample_sims(sample_size = 5)
+#power_10 <- run_twosample_sims(sample_size = 10)
+#power_30 <- run_twosample_sims(sample_size = 30)
+#power_90 <- run_twosample_sims(sample_size = 90)
+# power_frame <- bind_rows(
+#   as.data.frame(power_5) %>% mutate(sample_size = 5, effect_size = effect_grid),
+#   as.data.frame(power_10) %>% mutate(sample_size = 10, effect_size = effect_grid),
+#   as.data.frame(power_30) %>% mutate(sample_size = 30, effect_size = effect_grid),
+#   as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid)) %>%
+#   rename("t test" = normal, "Permutation test" = permutation) %>%
+#   pivot_longer(cols = c("t test", "Permutation test"), names_to = "Test", values_to = "Power")
+#save(power_frame, file = "power_frame")
+load("power_frame")
 
-#the normal theory and permutation power functions are almost identical
-plot(x = shift, y = perm_power_shift, type = 'l', col = 'blue', lwd = 3, ylim = c(0,1), bty = "n", xlab = "Change in %SOC", ylab = "Power", main = "Power for n = 90", cex.lab = 1.5, cex.main = 1.5, cex.axis = 1.5)
-points(x = shift, y = normal_power_shift, type = 'l', col = 'red', lwd = 3)
-legend(x = .8, y = .4, lwd = 3, legend = c("t-test", "Permutation test"), col = c("red", "blue"), cex = 1.5)
+ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Test)) +
+  geom_line(size = 1.5) +
+  facet_wrap(~ sample_size) +
+  theme_bw() +
+  scale_y_continuous(labels = scales::percent) +
+  xlab("Effect size (additional % TOC)") +
+  theme(text = element_text(size = 16))
 
 ############## analyze advantages of stratified versus uniform random sampling ###########
 #we will empirically investigate the advantages of stratified sampling in these settings
