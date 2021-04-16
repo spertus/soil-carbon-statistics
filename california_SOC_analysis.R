@@ -13,7 +13,7 @@ rangeland_master <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet 
   mutate(TIC = ifelse(TIC == "NA", NA, TIC)) %>%
   mutate(TC = ifelse(TC == "NA", NA, TC)) %>%
   mutate(TOC = as.numeric(TOC), TIC = as.numeric(TIC), TC = as.numeric(TC), sample_number = as.numeric(sample_number)) %>%
-  mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
+  mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm")) 
 
 rangeland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
@@ -57,17 +57,26 @@ standards_comparison <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sh
 combined_master <- rangeland_master %>% 
   select(site, soil_type, depth, TC) %>%
   bind_rows(cropland_master %>% select(site, soil_type, depth, TC)) %>%
-  mutate(land_use = ifelse(site == "PAIC", "Rangeland", "Cropland"))
+  mutate(land_use = ifelse(site == "RANGE", "Rangeland", "Cropland"))
 
 ###################### TOC concentration and BD in space ######################
 
-#stacked histograms for rangeland data
+#stacked TC histograms for rangeland data
 ggplot(rangeland_master, aes(TC)) +
   geom_histogram(binwidth = 0.25) +
   facet_grid(depth ~ transect) +
   xlab("% Total Carbon (TC)") +
   ylab("Number of Samples") +
   ylim(0,23) +
+  theme_bw() +
+  theme(text = element_text(size = 16))
+
+#TOC histogram for rangeland
+ggplot(rangeland_master, aes(TOC)) +
+  geom_histogram(binwidth = 0.25) +
+  facet_grid(depth ~ transect) +
+  xlab("% Total Organic Carbon (TOC)") +
+  ylab("Number of Samples") +
   theme_bw() +
   theme(text = element_text(size = 16))
 
@@ -82,7 +91,6 @@ ggplot(cropland_master, aes(TC)) +
   xlim(0,8) +
   ylim(0,23) +
   theme(text = element_text(size = 16))
-
 
 #summary tables
 rangeland_summary <- rangeland_master %>% 
@@ -107,6 +115,20 @@ cropland_summary <- cropland_master %>%
   summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T))
 
 
+#average and CV total carbon by depth, site for table 1
+combined_TC <- rangeland_master %>%
+  select(site, depth, TC) %>%
+  bind_rows(cropland_master %>% select(site, depth, TC))
+
+table_1 <- combined_TC %>%
+  group_by(site, depth) %>%
+  summarize(mean_TC = mean(TC, na.rm = T), cv_TC = sd(TC, na.rm = T) / mean(TC, na.rm = T)) %>% 
+  mutate(cv_TC = paste("(", round(cv_TC,2), ")", sep = "")) %>%
+  mutate(mean_TC = round(mean_TC, 2)) %>%
+  unite(col = "mean (CV)", mean_TC, cv_TC, sep = " ") %>%
+  pivot_wider(names_from = site, values_from = "mean (CV)")
+  
+
 #linear models
 rangeland_model <- lm(TC ~ transect*depth, data = rangeland_master)
 cropland_model <- lm(TC ~ site*depth, data = cropland_master)
@@ -123,11 +145,23 @@ ggplot(rangeland_BD, aes(bd)) +
   xlab("Bulk Density") +
   ylab("Number of samples") +
   scale_x_continuous(breaks = c(0.8, 1.2, 1.6, 2.0, 2.4), limits = c(0.8,2.4)) +
-  scale_y_continuous(breaks = c(0,2,4,6,8,10), limits = c(0,10)) +
+  scale_y_continuous(breaks = c(0,2,4,6), limits = c(0,6)) +
+  theme_bw() +
+  theme(text = element_text(size = 16), panel.grid.minor = element_blank())
+
+#cropland bulk density for site 7
+ggplot(cropland_BD %>% filter(site == "CROP7"), aes(bd)) +
+  geom_histogram(binwidth = 0.05) +
+  facet_grid(depth ~ .) +
+  xlab("Bulk Density") +
+  ylab("Number of samples") +
+  scale_x_continuous(breaks = c(0.8, 1.2, 1.6, 2.0, 2.4), limits = c(0.8,2.4)) +
+  scale_y_continuous(breaks = c(0,2,4,6), limits = c(0,6)) +
   theme_bw() +
   theme(text = element_text(size = 16), panel.grid.minor = element_blank())
 
 
+#all cropland bulk density
 ggplot(cropland_BD, aes(bd)) +
   geom_histogram(binwidth = 0.05) +
   facet_grid(depth ~ .) +
