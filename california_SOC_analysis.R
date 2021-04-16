@@ -13,7 +13,7 @@ rangeland_master <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet 
   mutate(TIC = ifelse(TIC == "NA", NA, TIC)) %>%
   mutate(TC = ifelse(TC == "NA", NA, TC)) %>%
   mutate(TOC = as.numeric(TOC), TIC = as.numeric(TIC), TC = as.numeric(TC), sample_number = as.numeric(sample_number)) %>%
-  mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm")) 
+  mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
 rangeland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
@@ -31,7 +31,7 @@ rangeland_BD <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "R
   mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
 #data from various croplands around California
-cropland_master <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_All_Costech") 
+cropland_master <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_All_Costech")
 
 cropland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
   mutate(sample_number = as.numeric(sample_number)) %>%
@@ -95,44 +95,41 @@ ggplot(cropland_master, aes(TC)) +
 #summary tables
 rangeland_summary <- rangeland_master %>% 
   group_by(depth, transect) %>%
-  summarize(mean_TOC = mean(TOC, na.rm = T), sd_TOC = sd(TOC, na.rm = T)) %>%
-  mutate(sd_TOC = paste("(", round(sd_TOC,2), ")", sep = "")) %>%
-  mutate(mean_TOC = round(mean_TOC, 2)) %>%
-  unite(col = "mean (SD)", mean_TOC, sd_TOC, sep = " ") %>%
+  summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T)) %>%
+  mutate(sd_TC = paste("(", round(sd_TC,2), ")", sep = "")) %>%
+  mutate(mean_TC = round(mean_TC, 2)) %>%
+  unite(col = "mean (SD)", mean_TC, sd_TC, sep = " ") %>%
   pivot_wider(names_from = transect, values_from = "mean (SD)")
 
 #rangeland data combined across transects
 rangeland_summary_overall <- rangeland_master %>% 
   group_by(depth) %>%
-  summarize(mean_TOC = mean(TOC, na.rm = T), sd_TOC = sd(TOC, na.rm = T)) %>%
-  mutate(sd_TOC = paste("(", round(sd_TOC,2), ")", sep = "")) %>%
-  mutate(mean_TOC = round(mean_TOC, 2)) %>%
-  unite(col = "mean (SD)", mean_TOC, sd_TOC, sep = " ")
+  summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T))
 
 #note cropland is total carbon not total organic carbon
 cropland_summary <- cropland_master %>% 
   group_by(depth, site) %>%
   summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T))
-
+cropland_summary_overall <- cropland_summary %>%
+  group_by(depth) %>%
+  summarize(mean_TC = mean(mean_TC, na.rm = T), sd_TC = mean(sd_TC, na.rm = T))
 
 #average and CV total carbon by depth, site for table 1
-combined_TC <- rangeland_master %>%
-  select(site, depth, TC) %>%
-  bind_rows(cropland_master %>% select(site, depth, TC))
-
-table_1 <- combined_TC %>%
-  group_by(site, depth) %>%
+table_1 <- combined_master %>%
+  group_by(site, depth, land_use) %>%
   summarize(mean_TC = mean(TC, na.rm = T), cv_TC = sd(TC, na.rm = T) / mean(TC, na.rm = T)) %>% 
+  group_by(depth, land_use) %>%
+  summarize(mean_TC = mean(mean_TC, na.rm = T), cv_TC = mean(cv_TC, na.rm = T)) %>%
   mutate(cv_TC = paste("(", round(cv_TC,2), ")", sep = "")) %>%
   mutate(mean_TC = round(mean_TC, 2)) %>%
   unite(col = "mean (CV)", mean_TC, cv_TC, sep = " ") %>%
-  pivot_wider(names_from = site, values_from = "mean (CV)")
-  
+  pivot_wider(names_from = land_use, values_from = "mean (CV)")
+
+
 
 #linear models
 rangeland_model <- lm(TC ~ transect*depth, data = rangeland_master)
 cropland_model <- lm(TC ~ site*depth, data = cropland_master)
-
 anova(rangeland_model)
 anova(cropland_model)
 
@@ -188,6 +185,24 @@ cropland_summary_bd <- cropland_BD %>%
 
 
 ############## replicates and assay error ##############
+#compare variation due to sampling and variation due to assay
+#note that samples were specifically selected along a grid of carbon concentrations
+#this means that sampling heterogeneity is likely to be artificially inflated in the replicate data.
+replicates_long <- rangeland_solitoc_reps %>% 
+  bind_rows(cropland_solitoc_reps) %>%
+  bind_rows(rangeland_costech_reps) %>%
+  bind_rows(cropland_costech_reps)
+average_error_sd <- replicates_long %>% 
+  group_by(machine, sample_number) %>%
+  summarize(sd_estimate = sd(TC, na.rm = T)) %>%
+  group_by(machine) %>%
+  summarize(within_sd = mean(sd_estimate, na.rm = T))
+#ratio of costech assay sd to plot sd in range or cropland topsoil
+average_error_sd$within_sd[average_error_sd$machine == "costech"] / rangeland_summary_overall$sd_TC[rangeland_summary_overall$depth == "a"]
+average_error_sd$within_sd[average_error_sd$machine == "costech"] / cropland_summary_overall$sd_TC[cropland_summary_overall$depth == "a"]
+
+
+#compute percent error on each replicated sample
 assay_error <- replicates_comparison %>%
   group_by(site, sample_number) %>%
   summarize(
