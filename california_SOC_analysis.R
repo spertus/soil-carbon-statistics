@@ -7,52 +7,51 @@ library(geoR)
 source("functions.R")
 
 ########### read in data from excel spreadsheet(s) ##############
-rangeland_master <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
+#note that some of the conversions to numeric cause NA warnings, I have spot checked these against the excel files, there does not appear to be a real issue.
+rangeland_master <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TIC = ifelse(TIC == "NA", NA, TIC)) %>%
   mutate(TC = ifelse(TC == "NA", NA, TC)) %>%
   mutate(TOC = as.numeric(TOC), TIC = as.numeric(TIC), TC = as.numeric(TC), sample_number = as.numeric(sample_number)) %>%
   mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
-rangeland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
+rangeland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "solitoc")
 
-rangeland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_Reps_Costech") %>%
+rangeland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Rangeland_Reps_Costech") %>%
   mutate(TC = ifelse(TC == "NA", NA, TC), TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TC = as.numeric(TC), TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "costech")
 
-rangeland_BD <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Rangeland_BD") %>%
+rangeland_BD <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Rangeland_BD") %>%
   rename('bd' = 'bulk_density_g/cm3') %>%
   mutate(bd = as.numeric(bd)) %>%
   mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
 #data from various croplands around California
-cropland_master <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_All_Costech") 
+cropland_master <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_All_Costech") 
 
-cropland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
+cropland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
   mutate(sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "solitoc")
 
-cropland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_Reps_Costech") %>%
+cropland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_Reps_Costech") %>%
   mutate(TC = ifelse(TC == "NA", NA, TC), TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TC = as.numeric(TC), TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "costech")
 
-cropland_BD <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Cropland_BD")  %>%
+cropland_BD <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_BD")  %>%
   rename('bd' = 'bulk_density_g/cm3') %>%
   mutate(bd = as.numeric(bd))
 
-replicates_comparison <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Replicate_Comparison") %>% 
+replicates_comparison <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Replicate_Comparison") %>% 
   rename(TC_solitoc = TC_soliTOC, TOC_solitoc = TOC_soliTOC) %>%
   mutate_at(vars(starts_with(c("TC_", "TOC_"))), as.numeric)
 
-standards_comparison <- read_excel("R_Heterogeneity_Master_PS_03112021.xlsx", sheet = "Standards_Comparison") %>%
+standards_comparison <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Standards_Comparison") %>%
   rename(TC = `TC%`, N = `N%`)
-
-
 
 
 combined_master <- rangeland_master %>% 
@@ -371,19 +370,19 @@ sigma_p_cropland <- precision_combined %>% filter(depth == "a", land_use == "Cro
 
 rangeland_grid <- expand.grid(
   land_use = "Rangeland",
-  sample_size = c(30,60,90),
+  sample_size = c(5,10,30,90),
   mu_0 = mu_0_rangeland, 
   sigma_p = sigma_p_rangeland, 
   sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc),
-  delta = seq(0,1,by=.01)
+  delta = seq(0,1.5,by=.01)
 )
 cropland_grid <- expand.grid(
   land_use = "Cropland",
-  sample_size = c(30,60,90),
+  sample_size = c(5,10,30,90),
   mu_0 = mu_0_cropland, 
   sigma_p = sigma_p_cropland, 
   sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc),
-  delta = seq(0,1,by=.01)
+  delta = seq(0,1.5,by=.01)
 )
 
 
@@ -398,17 +397,16 @@ power_change_topsoil <- rangeland_grid %>%
   mutate(power_full_compositing = get_power_two_sample(n_1 = max_sample_size, k_1 = 1, n_2 = max_sample_size, k_2 = 1, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
   mutate(power_optimal_compositing = get_power_two_sample(n_1 = opt_n, k_1 = opt_k, n_2 = opt_n, k_2 = opt_k, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
   pivot_longer(cols = starts_with("power_"), names_to = "Compositing", values_to = "power", names_prefix = "power_") %>%
-  mutate(Compositing = ifelse(Compositing == "full_compositing", "Full", ifelse(Compositing == "no_compositing", "None", "Optimal"))) %>%
-  mutate(sample_size = paste("n =", sample_size))
+  mutate(Compositing = ifelse(Compositing == "full_compositing", "Full", ifelse(Compositing == "no_compositing", "None", "Optimal"))) 
 
 ggplot(power_change_topsoil, aes(x = delta, y = power, color = Compositing)) +
   geom_line(size = 1.5) +
   facet_grid(sample_size ~ land_use + Machine) +
   xlab("%TC Change") +
   ylab("Power of two-sample t-test") +
-  xlim(0,1) +
+  scale_y_continuous(labels = scales::percent, limits = c(0,1), breaks = c(0,.25,.5,.75,1)) +
+  xlim(0,1.5) +
   theme_bw() +
-  scale_x_continuous(labels = c("0","0.25", "0.50", "0.75", "1")) +
   theme(text = element_text(size = 16))
 
 ########### power of a permutation test to detect topsoil change #########
