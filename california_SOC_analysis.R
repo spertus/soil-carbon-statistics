@@ -178,7 +178,12 @@ rangeland_summary_bd <- rangeland_BD %>%
 cropland_summary_bd <- cropland_BD %>%
   group_by(depth, site) %>%
   summarize(mean_bd = mean(bd, na.rm = TRUE), sd_bd = sd(bd, na.rm = TRUE)) %>%
-  mutate(cv_bd = sd_bd / mean_bd) %>% 
+  mutate(cv_bd = sd_bd / mean_bd)
+
+cropland_site7_bd <- cropland_summary_bd %>% 
+  filter(site == "CROP7")
+
+average_cropland_bd <- cropland_summary_bd %>% 
   group_by(depth) %>% 
   summarize(mean_bd = mean(mean_bd, na.rm = TRUE), sd_bd = sd(sd_bd, na.rm = TRUE), cv_bd = mean(cv_bd, na.rm = TRUE))
 
@@ -197,9 +202,14 @@ average_error_sd <- replicates_long %>%
   summarize(sd_estimate = sd(TC, na.rm = T)) %>%
   group_by(machine) %>%
   summarize(within_sd = mean(sd_estimate, na.rm = T))
-#ratio of costech assay sd to plot sd in range or cropland topsoil
+#ratio of costech assay sd to plot sd in range or cropland 
+#costech and solitoc are fairly similar, though solitoc is more precise
+#topsoil
 average_error_sd$within_sd[average_error_sd$machine == "costech"] / rangeland_summary_overall$sd_TC[rangeland_summary_overall$depth == "a"]
 average_error_sd$within_sd[average_error_sd$machine == "costech"] / cropland_summary_overall$sd_TC[cropland_summary_overall$depth == "a"]
+#deep soil
+average_error_sd$within_sd[average_error_sd$machine == "costech"] / rangeland_summary_overall$sd_TC[rangeland_summary_overall$depth == "d"]
+average_error_sd$within_sd[average_error_sd$machine == "solitoc"] / cropland_summary_overall$sd_TC[cropland_summary_overall$depth == "d"]
 
 
 #compute percent error on each replicated sample
@@ -326,15 +336,15 @@ standards_density_plot <- ggplot(standards_comparison, aes(TC, fill = machine)) 
   theme_bw()
 
 
-############# spatial correlation of TOC concentrations at rangeland ##########
+############# spatial correlation of TC concentrations on rangeland ##########
 #first just do for a single transect
-T_topsoil_TOC <- rangeland_master %>% 
+T_topsoil_TC <- rangeland_master %>% 
   filter(transect == "T", depth == "a") %>%
   arrange(sample_number) %>%
-  pull(TOC)
+  pull(TC)
 
 #dataframe for use with geodata
-T_topsoil_geodata <- as.geodata(data.frame(x = 1:length(T_topsoil_TOC), y = 1, TOC = T_topsoil_TOC), coords.col = 1:2, data.col = 3)
+T_topsoil_geodata <- as.geodata(data.frame(x = 1:length(T_topsoil_TC), y = 1, TC = T_topsoil_TC), coords.col = 1:2, data.col = 3)
 T_topsoil_variogram <- variog(T_topsoil_geodata, option = "bin")
 plot(T_topsoil_variogram)
 
@@ -348,13 +358,13 @@ plot_variogram <- function(rangeland_depth = "a", rangeland_transect = "T", plot
   if(!(rangeland_depth %in% c("a","b","c","d","e")) | !all(rangeland_transect %in% c("T","Mx","My","Bx","By"))){
     stop("Depth or transect is invalid! See comments.")
   }
-  TOC <- rangeland_master %>% 
+  TC <- rangeland_master %>% 
     filter(transect == rangeland_transect, depth == rangeland_depth) %>%
     arrange(sample_number) %>%
-    pull(TOC)
+    pull(TC)
   
   #dataframe for use with geodata
-  geodataframe <- as.geodata(data.frame(x = 3 * 1:length(TOC), y = 1, TOC = TOC), coords.col = 1:2, data.col = 3)
+  geodataframe <- as.geodata(data.frame(x = 3 * 1:length(TC), y = 1, TC = TC), coords.col = 1:2, data.col = 3)
   variogram <- variog(geodataframe, option = "bin")
   if(plot){
     plot(variogram, xlab = "Distance (meters)", ylab = "Semivariance", main = paste("Variogram for transect", rangeland_transect, "and depth", rangeland_depth))
@@ -515,10 +525,8 @@ rangeland_data_topsoil <- rangeland_master %>%
   filter(!is.na(TOC)) %>%
   arrange(transect)
 
-
-
 #the sample size for simulations
-n <- 90
+n <- 10
 #function to return the estimated mean and standard error given a population and sample index
 get_mean_se <- function(population, sample_index){
   c(mean(population[sample_index]), sd(population[sample_index])/sqrt(length(sample_index)))
@@ -551,9 +559,6 @@ strata_weights_opt <- N_strata * sigma_strata / sum(N_strata * sigma_strata)
 n_strata_opt <- round_strata_sizes(n * strata_weights_opt)
 
 
-
-
-  
 #function to run a single simulation on the rangeland data
 run_rangeland_sim <- function(data_frame){
   proportional_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata_prop, method = "srswr")
