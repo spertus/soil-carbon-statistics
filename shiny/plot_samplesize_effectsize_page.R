@@ -6,7 +6,7 @@ basicPage(
   sidebarPanel(
              sliderInput("mu_2_n_Delta", label = "Input a range of average %SOC in plot 2 (\\(\\mu_2\\))", min = 0, max = 10, value = c(2, 4), step = 0.25),
              numericInput("mu_1_n_Delta", "Input average %SOC in plot 1 (\\(\\mu_1\\))", value = 1),
-             numericInput("power_n_Delta", "Input the desired power (\\(\\beta\\))", value = 0.8),
+             numericInput("power_n_Delta", "Input the desired power (\\(1 - \\beta\\))", value = 0.8),
              numericInput("sigma_p_1_n_Delta", "Input heterogeneity of %SOC in plot 1 (\\(\\sigma_{p1}\\))", value = 1.00),
              numericInput("sigma_p_2_n_Delta", "Input heterogeneity of %SOC in plot 2 (\\(\\sigma_{p2}\\))", value = 1.00),
              numericInput("sigma_delta_n_Delta", "Input assay uncertainty (\\(\\sigma_\\delta\\))", value = 0)

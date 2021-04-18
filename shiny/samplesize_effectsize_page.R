@@ -6,7 +6,7 @@ basicPage(
   sidebarPanel(
              numericInput("mu_1_samplesize_power", "Input average %SOC in plot 1 (\\(\\mu_1\\))", value = 1),
              numericInput("mu_2_samplesize_power", "Input average %SOC in plot 2 (\\(\\mu_1\\))", value = 1.5),
-             numericInput("power_samplesize_power", "Input the desired power (\\(\\beta\\))", value = 0.8),
+             numericInput("power_samplesize_power", "Input the desired power (\\(1 - \\beta\\))", value = 0.8),
              numericInput("sigma_p_1_samplesize_power", "Input heterogeneity of %SOC in plot 1 (\\(\\sigma_{p1}\\))", value = 1.00),
              numericInput("sigma_p_2_samplesize_power", "Input heterogeneity of %SOC in plot 2 (\\(\\sigma_{p2}\\))", value = 1.00),
              numericInput("sigma_delta_samplesize_power", "Input assay uncertainty (\\(\\sigma_\\delta\\))", value = 0)
