@@ -209,7 +209,7 @@ average_error_sd$within_sd[average_error_sd$machine == "costech"] / rangeland_su
 average_error_sd$within_sd[average_error_sd$machine == "costech"] / cropland_summary_overall$sd_TC[cropland_summary_overall$depth == "a"]
 #deep soil
 average_error_sd$within_sd[average_error_sd$machine == "costech"] / rangeland_summary_overall$sd_TC[rangeland_summary_overall$depth == "d"]
-average_error_sd$within_sd[average_error_sd$machine == "solitoc"] / cropland_summary_overall$sd_TC[cropland_summary_overall$depth == "d"]
+average_error_sd$within_sd[average_error_sd$machine == "costech"] / cropland_summary_overall$sd_TC[cropland_summary_overall$depth == "d"]
 
 
 #compute percent error on each replicated sample
@@ -467,6 +467,18 @@ ggplot(power_change_topsoil, aes(x = delta, y = power, color = Compositing)) +
   xlim(0,1.5) +
   theme_bw() +
   theme(text = element_text(size = 16))
+
+#sample size needed to detect a 0.5% change in CROP4 topsoil topsoil
+crop4_stats <- combined_master %>% 
+  filter(site == "CROP4", depth == "a") %>%
+  summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T))
+
+crop4_mean <- crop4_stats$mean_TC
+crop4_sd <- crop4_stats$sd_TC
+
+power_crop4 <- get_power_two_sample(beta = 1-0.8, mu_1 = crop4_mean, mu_2 = crop4_mean + 0.5, sigma_p_1 = crop4_sd, sigma_p_2 = crop4_sd, alpha = 0.05, sigma_delta = sigma_delta_solitoc)
+
+
 
 ########### power of a permutation test to detect topsoil change #########
   
