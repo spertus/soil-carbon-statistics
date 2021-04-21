@@ -95,10 +95,10 @@ ggplot(cropland_master, aes(TC)) +
 #summary tables
 rangeland_summary <- rangeland_master %>% 
   group_by(depth, transect) %>%
-  summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T)) %>%
-  mutate(sd_TC = paste("(", round(sd_TC,2), ")", sep = "")) %>%
+  summarize(mean_TC = mean(TC, na.rm = T), cv_TC = sd(TC, na.rm = T) / mean(TC, na.rm = T)) %>%
+  mutate(cv_TC = paste("(", round(cv_TC,2), ")", sep = "")) %>%
   mutate(mean_TC = round(mean_TC, 2)) %>%
-  unite(col = "mean (SD)", mean_TC, sd_TC, sep = " ") %>%
+  unite(col = "mean (SD)", mean_TC, cv_TC, sep = " ") %>%
   pivot_wider(names_from = transect, values_from = "mean (SD)")
 
 #rangeland data combined across transects
@@ -197,19 +197,24 @@ replicates_long <- rangeland_solitoc_reps %>%
   bind_rows(cropland_solitoc_reps) %>%
   bind_rows(rangeland_costech_reps) %>%
   bind_rows(cropland_costech_reps)
-average_error_sd <- replicates_long %>% 
-  group_by(machine, sample_number) %>%
-  summarize(sd_estimate = sd(TC, na.rm = T)) %>%
-  group_by(machine) %>%
-  summarize(within_sd = mean(sd_estimate, na.rm = T))
+average_error_var <- replicates_long %>% 
+  group_by(machine, sample_number, depth, site) %>%
+  summarize(var_estimate = var(TC, na.rm = T)) %>%
+  group_by(machine, depth) %>%
+  summarize(within_var = mean(var_estimate, na.rm = T), samples = n()) %>% 
+  pivot_wider(names_from = machine, values_from = within_sd)
 #ratio of costech assay sd to plot sd in range or cropland 
 #costech and solitoc are fairly similar, though solitoc is more precise
-#topsoil
-average_error_sd$within_sd[average_error_sd$machine == "costech"] / rangeland_summary_overall$sd_TC[rangeland_summary_overall$depth == "a"]
-average_error_sd$within_sd[average_error_sd$machine == "costech"] / cropland_summary_overall$sd_TC[cropland_summary_overall$depth == "a"]
-#deep soil
-average_error_sd$within_sd[average_error_sd$machine == "costech"] / rangeland_summary_overall$sd_TC[rangeland_summary_overall$depth == "d"]
-average_error_sd$within_sd[average_error_sd$machine == "costech"] / cropland_summary_overall$sd_TC[cropland_summary_overall$depth == "d"]
+#proportions of assay heterogeneity as proportions of field heterogeneity
+assay_field_proportions <- combined_master %>%
+  group_by(site, depth, land_use) %>%
+  summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T)) %>% 
+  group_by(depth, land_use) %>%
+  summarize(sd_TC = mean(sd_TC, na.rm = T)) %>%
+  left_join(average_error_sd, by = "depth") %>%
+  mutate(error_prop_solitoc = solitoc / sd_TC) %>%
+  mutate(error_prop_costech = costech / sd_TC) %>%
+  arrange(land_use, depth)
 
 
 #compute percent error on each replicated sample
