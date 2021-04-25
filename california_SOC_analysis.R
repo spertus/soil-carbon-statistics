@@ -486,6 +486,9 @@ power_crop4 <- get_power_two_sample(beta = 1-0.8, mu_1 = crop4_mean, mu_2 = crop
 
 
 ########### power of a permutation test to detect topsoil change #########
+topsoil_TC_rangeland <- rangeland_master %>% 
+  filter(depth == "a") %>%
+  pull(TC)
   
 effect_grid = seq(0,2,by=.1)
 run_twosample_sims <- function(sample_size, n_sims = 400){
@@ -494,8 +497,8 @@ run_twosample_sims <- function(sample_size, n_sims = 400){
  normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
  for(i in 1:n_sims){
    for(j in 1:length(shift)){
-     sample_1 <- sample(topsoil_TOC_rangeland, size = sample_size, replace = TRUE)
-     sample_2 <- sample(topsoil_TOC_rangeland + shift[j], size = sample_size, replace = TRUE)
+     sample_1 <- sample(topsoil_TC_rangeland, size = sample_size, replace = TRUE)
+     sample_2 <- sample(topsoil_TC_rangeland + shift[j], size = sample_size, replace = TRUE)
      diff_mean <- mean(sample_1) - mean(sample_2)
      normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
      perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 500), alternative = "two-sided")
@@ -507,18 +510,18 @@ run_twosample_sims <- function(sample_size, n_sims = 400){
 }
 
 #these take a while to run, we can save them as an object
-#power_5 <- run_twosample_sims(sample_size = 5)
-#power_10 <- run_twosample_sims(sample_size = 10)
-#power_30 <- run_twosample_sims(sample_size = 30)
-#power_90 <- run_twosample_sims(sample_size = 90)
-# power_frame <- bind_rows(
-#   as.data.frame(power_5) %>% mutate(sample_size = 5, effect_size = effect_grid),
-#   as.data.frame(power_10) %>% mutate(sample_size = 10, effect_size = effect_grid),
-#   as.data.frame(power_30) %>% mutate(sample_size = 30, effect_size = effect_grid),
-#   as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid)) %>%
-#   rename("t test" = normal, "Permutation test" = permutation) %>%
-#   pivot_longer(cols = c("t test", "Permutation test"), names_to = "Test", values_to = "Power")
-#save(power_frame, file = "power_frame")
+power_5 <- run_twosample_sims(sample_size = 5)
+power_10 <- run_twosample_sims(sample_size = 10)
+power_30 <- run_twosample_sims(sample_size = 30)
+power_90 <- run_twosample_sims(sample_size = 90)
+power_frame <- bind_rows(
+  as.data.frame(power_5) %>% mutate(sample_size = 5, effect_size = effect_grid),
+  as.data.frame(power_10) %>% mutate(sample_size = 10, effect_size = effect_grid),
+  as.data.frame(power_30) %>% mutate(sample_size = 30, effect_size = effect_grid),
+  as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid)) %>%
+  rename("t test" = normal, "Permutation test" = permutation) %>%
+  pivot_longer(cols = c("t test", "Permutation test"), names_to = "Test", values_to = "Power")
+save(power_frame, file = "power_frame")
 load("power_frame")
 
 ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Test)) +
