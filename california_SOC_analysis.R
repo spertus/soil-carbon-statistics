@@ -632,6 +632,17 @@ ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Tes
   theme(text = element_text(size = 16))
 
 #Two-sample tests for stratified (by transect) rangeland plot
+#function to return estimated mean and standard error given a population, sampling index, and stratification information
+get_mean_se_stratified <- function(sample, N_strata){
+  N <- sum(N_strata)
+  strata_weights <- N_strata / N
+  n_strata <- as.numeric(table(sample$transect))
+  strata_means <- tapply(sample$TC, sample$transect, mean)
+  strata_vars <- tapply(sample$TC, sample$transect, var)
+  var_estimate <- N^(-2) * sum(N_strata^2 * strata_vars / n_strata)
+  c(sum(strata_weights * strata_means), sqrt(var_estimate))
+}
+
 round_strata_sizes <- function(n_strata){
   rounded_n_strata <- floor(n_strata)
   indices <- tail(order(n_strata-rounded_n_strata), round(sum(n_strata)) - sum(rounded_n_strata))
@@ -650,12 +661,17 @@ run_stratified_twosample_sims <- function(sample_size, n_sims = 400){
     for(j in 1:length(shift)){
       locations_1 <- strata(data = topsoil_rangeland, stratanames = "transect", size = n_strata_prop, method = "srswr")
       locations_2 <- strata(data = topsoil_rangeland, stratanames = "transect", size = n_strata_prop, method = "srswr")
-      samples_1 <- getdata(topsoil_rangeland, locations_1) %>% select(TC, Stratum)
-      samples_2 <- getdata(topsoil_rangeland %>% mutate(TC = TC + shift[j]), locations_2) %>% select(TC, Stratum)
-
-      diff_mean <- mean(sample_1) - mean(sample_2)
-      normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
-      perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 500), alternative = "two-sided")
+      samples_1 <- getdata(topsoil_rangeland, locations_1) %>% select(TC, transect)
+      samples_2 <- getdata(topsoil_rangeland %>% mutate(TC = TC + shift[j]), locations_2) %>% select(TC, transect)
+      estimates_1 <- get_mean_se_stratified(sample = samples_1, N_strata = N_strata)
+      estimates_2 <- get_mean_se_stratified(sample = samples_2, N_strata = N_strata)
+      diff_mean <- estimates_1[1] - estimates_2[1]
+      pooled_se <- sqrt(estimates_1[2]^2 + estimates_2[2]^2)
+      normal_p_values[i,j] <- 2*pnorm(abs(diff_mean / pooled_se), lower.tail = FALSE)
+      group_labels <- c(rep(1, nrow(samples_1)), rep(2, nrow(samples_2)))
+      combined_TC <- c(samples_1$TC, sample_2$TC)
+      combined_strata <- c(samples_1$transect, samples_2$transect)
+      perm_p_values[i,j] <- t2p(diff_mean, stratified_two_sample(group = group_labels, response = combined_TC, stratum = combined_strata, stat = "mean", reps = 300), alternative = "two-sided")
     }
   }
   normal_power_shift <- colMeans(normal_p_values < .05)
@@ -663,7 +679,7 @@ run_stratified_twosample_sims <- function(sample_size, n_sims = 400){
   cbind("normal" = normal_power_shift, "permutation" = perm_power_shift)
 }
 
-
+stratified_power_30 <- run_stratified_twosample_sims(sample_size = 30)
 
 
 
