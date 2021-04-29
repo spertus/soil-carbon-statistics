@@ -347,67 +347,6 @@ run_ANOVA <- function(samples, include_plot_variance = TRUE, detail = FALSE){
   }    
 }
 
-############### randomization inference ###############
-
-shuffle_treatment_assignment <- function(samples){
-  #auxiliary function for permutation test: shuffle plots in a dataframe
-  #inputs:
-    #samples: a dataframe of samples as output by bundle_samples()
-  #outputs:
-    #the same dataframe with the treatment indicator shuffled
-  shuffled_plots_treatment <- samples %>% 
-    select(plot, treatment) %>%
-    distinct() %>%
-    mutate(treatment = sample(treatment, size = length(treatment), replace = FALSE))
-  
-  shuffled_samples <- samples %>%
-    select(-treatment) %>%
-    inner_join(shuffled_plots_treatment, by = "plot")
-  
-  shuffled_samples
-}
-
-get_difference_in_means <- function(samples){
-  #function for permutation test. Given a dataframe compute difference in means between trt and control
-  #inputs:
-    #samples: a dataframe of samples as output by bundle_samples()
-  #outputs:
-    #the difference in means between treatment and control plots (averaged over plots and cores)
-  difference_in_means <- samples %>%
-    group_by(treatment) %>%
-    summarize(trt_mean = mean(measurement_mean)) %>%
-    pivot_wider(names_from = treatment, values_from = trt_mean) %>%
-    mutate(difference_in_means = `1` - `0`) %>%
-    pull(difference_in_means)
-}
-
-
-run_permutation_analysis <- function(samples, B = 1000, bootstrap_cores = FALSE, plot = FALSE){
-  #take average over measurement for now
-  measurement_avg_samples <- samples %>%
-    group_by(sample, plot, treatment, strata) %>% 
-    summarize(measurement_mean = mean(measurement)) %>%
-    ungroup() %>%
-    mutate(plot = as_factor(plot), treatment = as_factor(treatment))
-  
-  #observed value of test statistic
-  difference_in_means <- get_difference_in_means(measurement_avg_samples)
-  
-  #permutation distribution
-  if(!bootstrap_cores){
-    permutation_distribution <- replicate(n = B, expr = get_difference_in_means(shuffle_treatment_assignment(measurement_avg_samples)))
-  } else {
-    permutation_distribution <- replicate(n = B, expr = get_difference_in_means(shuffle_treatment_assignment(bootstrap_cores(measurement_avg_samples))))
-  }
-  
-  if(plot == TRUE){
-    hist(permutation_distribution, breaks = 30, xlim = c(min(permutation_distribution, difference_in_means), max(permutation_distribution, difference_in_means)))
-    lines(c(difference_in_means, difference_in_means), c(0,B), lwd = 3, col = "red")
-  }
-  
-  #p-value for two sided test
-  data.frame(difference_in_means = difference_in_means, p_value = 1 - mean(abs(permutation_distribution) > abs(difference_in_means)))
-}
 
 
 ################ optimization of samples over budget ###############
@@ -621,6 +560,11 @@ get_power_two_sample <- function(n_1 = NULL, k_1 = NULL, n_2 = NULL, k_2 = NULL,
 }
 
 
+# helper function to shuffle population values, x
+shuffle <- function(x){sample(x, size = length(x), replace = FALSE)}
+
+
+
 #ANOVA test statistic 
 #for an example of this see the permuter github page https://github.com/statlab/permuter/blob/master/vignettes/examples_chapters1_4.Rmd
 #this function returns the same one-way ANOVA test statistic used in permuter
@@ -634,6 +578,7 @@ get_ANOVA <- function(dependent_variable, block){
   group_sizes <- as.numeric(table(block))
   sum(group_sizes * group_means^2)
 }
+
 
 #test for main effect of treatment and interaction with soil health 
 #lockstep 1-sample test
@@ -652,6 +597,7 @@ lockstep_one_sample <- function(delta_matrix, reps = 1000){
   }
   permutation_means
 }
+
 
 #lockstep ANOVA
 #inputs:
