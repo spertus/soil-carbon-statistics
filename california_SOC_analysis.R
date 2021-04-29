@@ -8,49 +8,49 @@ source("functions.R")
 
 ########### read in data from excel spreadsheet(s) ##############
 #note that some of the conversions to numeric cause NA warnings, I have spot checked these against the excel files, there does not appear to be a real issue.
-rangeland_master <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
+rangeland_master <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TIC = ifelse(TIC == "NA", NA, TIC)) %>%
   mutate(TC = ifelse(TC == "NA", NA, TC)) %>%
   mutate(TOC = as.numeric(TOC), TIC = as.numeric(TIC), TC = as.numeric(TC), sample_number = as.numeric(sample_number)) %>%
   mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
-rangeland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
+rangeland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Rangeland_Reps_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "solitoc")
 
-rangeland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Rangeland_Reps_Costech") %>%
+rangeland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Rangeland_Reps_Costech") %>%
   mutate(TC = ifelse(TC == "NA", NA, TC), TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TC = as.numeric(TC), TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "costech")
 
-rangeland_BD <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Rangeland_BD") %>%
+rangeland_BD <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Rangeland_BD") %>%
   rename('bd' = 'bulk_density_g/cm3') %>%
   mutate(bd = as.numeric(bd)) %>%
   mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
 #data from various croplands around California
-cropland_master <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_All_Costech")
+cropland_master <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Cropland_All_Costech")
 
-cropland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
+cropland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
   mutate(sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "solitoc")
 
-cropland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_Reps_Costech") %>%
+cropland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Cropland_Reps_Costech") %>%
   mutate(TC = ifelse(TC == "NA", NA, TC), TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TC = as.numeric(TC), TOC = as.numeric(TOC), sample_number = as.numeric(sample_number)) %>%
   mutate(machine = "costech")
 
-cropland_BD <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Cropland_BD")  %>%
+cropland_BD <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Cropland_BD")  %>%
   rename('bd' = 'bulk_density_g/cm3') %>%
   mutate(bd = as.numeric(bd))
 
-replicates_comparison <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Replicate_Comparison") %>% 
+replicates_comparison <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Replicate_Comparison") %>% 
   rename(TC_solitoc = TC_soliTOC, TOC_solitoc = TOC_soliTOC) %>%
   mutate_at(vars(starts_with(c("TC_", "TOC_"))), as.numeric)
 
-standards_comparison <- read_excel("R_Heterogeneity_Master_PS_04132021.xlsx", sheet = "Standards_Comparison") %>%
+standards_comparison <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Standards_Comparison") %>%
   rename(TC = `TC%`, N = `N%`)
 
 
@@ -141,8 +141,9 @@ ggplot(rangeland_BD, aes(bd)) +
   facet_grid(depth ~ .) +
   xlab("Bulk Density") +
   ylab("Number of samples") +
-  scale_x_continuous(breaks = c(0.8, 1.2, 1.6, 2.0, 2.4), limits = c(0.8,2.4)) +
-  scale_y_continuous(breaks = c(0,2,4,6), limits = c(0,6)) +
+  coord_cartesian(xlim=c(0.8,1.8)) +
+  scale_x_continuous(breaks = c(0.8, 1.0, 1.2, 1.4, 1.6, 1.8)) +
+  #scale_y_continuous(breaks = c(0,2,4,6), limits = c(0,6)) +
   theme_bw() +
   theme(text = element_text(size = 16), panel.grid.minor = element_blank())
 
@@ -152,7 +153,8 @@ ggplot(cropland_BD %>% filter(site == "CROP7"), aes(bd)) +
   facet_grid(depth ~ .) +
   xlab("Bulk Density") +
   ylab("Number of samples") +
-  scale_x_continuous(breaks = c(0.8, 1.2, 1.6, 2.0, 2.4), limits = c(0.8,2.4)) +
+  coord_cartesian(xlim=c(0.8,1.8)) +
+  scale_x_continuous(breaks = c(0.8, 1.0, 1.2, 1.4, 1.6, 1.8)) +
   scale_y_continuous(breaks = c(0,2,4,6), limits = c(0,6)) +
   theme_bw() +
   theme(text = element_text(size = 16), panel.grid.minor = element_blank())
@@ -197,11 +199,11 @@ replicates_long <- rangeland_solitoc_reps %>%
   bind_rows(cropland_solitoc_reps) %>%
   bind_rows(rangeland_costech_reps) %>%
   bind_rows(cropland_costech_reps)
-average_error_var <- replicates_long %>% 
+average_error_sd <- replicates_long %>% 
   group_by(machine, sample_number, depth, site) %>%
-  summarize(var_estimate = var(TC, na.rm = T)) %>%
+  summarize(sd_estimate = sd(TC, na.rm = T)) %>%
   group_by(machine, depth) %>%
-  summarize(within_var = mean(var_estimate, na.rm = T), samples = n()) %>% 
+  summarize(within_sd = mean(sd_estimate, na.rm = T), samples = n()) %>% 
   pivot_wider(names_from = machine, values_from = within_sd)
 #ratio of costech assay sd to plot sd in range or cropland 
 #costech and solitoc are fairly similar, though solitoc is more precise
@@ -389,6 +391,97 @@ distance <- variog_T$u
 avg_variogram <- colMeans(rbind(variog_T$v, variog_Mx$v, variog_My$v, variog_Bx$v, variog_By$v))
 
 
+############## stratified versus SRS for one-sample problem ###########
+#we will empirically investigate the advantages of stratified sampling in these settings
+#the idea is similar to a bootstrap. 
+#take the samples as a population and then simulate taking subsamples
+
+#first we analyze stratified sampling at a small scale by using the rangeland samples
+#the strata are defined by transects, which roughly correspond to different locations on the ranch
+rangeland_data_topsoil <- rangeland_master %>% 
+  filter(depth == "a") %>%
+  select(transect, sample_number, TC) %>%
+  filter(!is.na(TC)) %>%
+  arrange(transect)
+
+#the sample size for simulations
+n <- 90
+#function to return the estimated mean and standard error given a population and sample index
+get_mean_se <- function(population, sample_index){
+  c(mean(population[sample_index]), sd(population[sample_index])/sqrt(length(sample_index)))
+}
+#function to return estimated mean and standard error given a population, sampling index, and stratification information
+get_mean_se_stratified <- function(sample, N_strata){
+  N <- sum(N_strata)
+  strata_weights <- N_strata / N
+  n_strata <- as.numeric(table(sample$transect))
+  strata_means <- tapply(sample$TC, sample$transect, mean)
+  strata_vars <- tapply(sample$TC, sample$transect, var)
+  var_estimate <- N^(-2) * sum(N_strata^2 * strata_vars / n_strata)
+  c(sum(strata_weights * strata_means), sqrt(var_estimate))
+}
+
+N_strata <- as.numeric(table(rangeland_data_topsoil$transect))
+#helper function to make integer sample sizes with the sum preserved
+round_strata_sizes <- function(n_strata){
+  rounded_n_strata <- floor(n_strata)
+  indices <- tail(order(n_strata-rounded_n_strata), round(sum(n_strata)) - sum(rounded_n_strata))
+  rounded_n_strata[indices] <- rounded_n_strata[indices] + 1
+  rounded_n_strata
+}
+
+#proportional allocation to strata
+strata_weights_prop <- N_strata / length(rangeland_data_topsoil$transect)
+n_strata_prop <- round_strata_sizes(n * strata_weights_prop)
+sigma_strata <- tapply(rangeland_data_topsoil$TC, rangeland_data_topsoil$transect, sd)
+strata_weights_opt <- N_strata * sigma_strata / sum(N_strata * sigma_strata) 
+n_strata_opt <- round_strata_sizes(n * strata_weights_opt)
+
+
+#function to run a single simulation on the rangeland data
+run_rangeland_sim <- function(data_frame){
+  proportional_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata_prop, method = "srswr")
+  optimal_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata_opt, method = "srswr")
+  
+  random_sample <- sample(1:nrow(data_frame), size = n, replace = TRUE)
+  
+  prop_stratified_estimates <- get_mean_se_stratified(sample = getdata(data_frame, proportional_stratified_sample), N_strata = table(data_frame$transect))
+  opt_stratified_estimates <- get_mean_se_stratified(sample = getdata(data_frame, optimal_stratified_sample), N_strata = table(data_frame$transect))
+  
+  random_estimates <- get_mean_se(data_frame$TC, random_sample)
+  #local_pivotal_estimates <- get_mean_se(population, local_pivotal_sample)
+  
+  cbind(random_estimates, prop_stratified_estimates, opt_stratified_estimates)
+}
+#compute the estimand, i.e. the true mean in the rangeland topsoil data
+true_rangeland_mean <- mean(rangeland_data_topsoil$TC)
+
+#run simulations, replicated 1000 times
+rangeland_sims <- replicate(n = 2000, run_rangeland_sim(data_frame = rangeland_data_topsoil))
+
+#compute properties of the samples
+#the empirical coverage of 95% normal theory confidence intervals (should be 95%)
+coverage_rangeland <- apply(rangeland_sims[1,,] - qnorm(p = .975) * rangeland_sims[2,,] <= true_rangeland_mean & true_rangeland_mean <= rangeland_sims[1,,] + qnorm(p = .975) * rangeland_sims[2,,], 1, mean)
+#the width of a confidence interval, basically 4 times the SE
+ci_width_rangeland <- apply(2 * qnorm(p = .975) * rangeland_sims[2,,], 1, mean)
+#the actual standard error over simulations
+se_rangeland <- apply(rangeland_sims, c(1,2), sd)[1,]
+#the average estimated standard error
+se_hat_rangeland <- apply(rangeland_sims, c(1,2), mean)[2,]
+#the mean squared error
+rmse_rangeland <- sqrt(apply((rangeland_sims - true_rangeland_mean)^2, c(1,2), mean)[1,])
+mad_rangeland <- apply(abs(rangeland_sims - true_rangeland_mean), c(1,2), median)[1,]
+#ratio of mse compared to uniform independent random sampling
+#rmse_rangeland <- rmse_rangeland / rmse_rangeland[2]
+#compile results
+rangeland_results_frame <- rbind(coverage_rangeland, ci_width_rangeland, rmse_rangeland, mad_rangeland) %>%
+  as_tibble() %>%
+  mutate(property = c("coverage", "ci width", "RMSE", "MAD")) %>%
+  select(property, random_estimates, prop_stratified_estimates, opt_stratified_estimates)
+
+
+
+
 ############### costs and optimal compositing #############
 #Costs based on 'Cost of Carbon Analysis.xlsx' assembled by Jessica Chiartas
 #in sampling, about 20-24 samples (4 transects * 5-6 composites) costs 400$ at 25$/hr and 16hrs, so we'll take 20 USD per sample.
@@ -486,10 +579,15 @@ power_crop4 <- get_power_two_sample(beta = 1-0.8, mu_1 = crop4_mean, mu_2 = crop
 
 
 ########### power of a permutation test to detect topsoil change #########
-topsoil_TC_rangeland <- rangeland_master %>% 
+topsoil_rangeland <- rangeland_master %>% 
   filter(depth == "a") %>%
-  pull(TC)
-  
+  filter(!is.na(TC)) %>%
+  arrange(transect) %>%
+  select(transect, TC)
+
+topsoil_TC_rangeland <- topsoil_rangeland %>% pull(TC)
+
+
 effect_grid = seq(0,2,by=.1)
 run_twosample_sims <- function(sample_size, n_sims = 400){
  shift <- effect_grid
@@ -497,6 +595,7 @@ run_twosample_sims <- function(sample_size, n_sims = 400){
  normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
  for(i in 1:n_sims){
    for(j in 1:length(shift)){
+     
      sample_1 <- sample(topsoil_TC_rangeland, size = sample_size, replace = TRUE)
      sample_2 <- sample(topsoil_TC_rangeland + shift[j], size = sample_size, replace = TRUE)
      diff_mean <- mean(sample_1) - mean(sample_2)
@@ -510,18 +609,18 @@ run_twosample_sims <- function(sample_size, n_sims = 400){
 }
 
 #these take a while to run, we can save them as an object
-power_5 <- run_twosample_sims(sample_size = 5)
-power_10 <- run_twosample_sims(sample_size = 10)
-power_30 <- run_twosample_sims(sample_size = 30)
-power_90 <- run_twosample_sims(sample_size = 90)
-power_frame <- bind_rows(
-  as.data.frame(power_5) %>% mutate(sample_size = 5, effect_size = effect_grid),
-  as.data.frame(power_10) %>% mutate(sample_size = 10, effect_size = effect_grid),
-  as.data.frame(power_30) %>% mutate(sample_size = 30, effect_size = effect_grid),
-  as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid)) %>%
-  rename("t test" = normal, "Permutation test" = permutation) %>%
-  pivot_longer(cols = c("t test", "Permutation test"), names_to = "Test", values_to = "Power")
-save(power_frame, file = "power_frame")
+# power_5 <- run_twosample_sims(sample_size = 5)
+# power_10 <- run_twosample_sims(sample_size = 10)
+# power_30 <- run_twosample_sims(sample_size = 30)
+# power_90 <- run_twosample_sims(sample_size = 90)
+# power_frame <- bind_rows(
+#   as.data.frame(power_5) %>% mutate(sample_size = 5, effect_size = effect_grid),
+#   as.data.frame(power_10) %>% mutate(sample_size = 10, effect_size = effect_grid),
+#   as.data.frame(power_30) %>% mutate(sample_size = 30, effect_size = effect_grid),
+#   as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid)) %>%
+#   rename("t test" = normal, "Permutation test" = permutation) %>%
+#   pivot_longer(cols = c("t test", "Permutation test"), names_to = "Test", values_to = "Power")
+# save(power_frame, file = "power_frame")
 load("power_frame")
 
 ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Test)) +
@@ -529,96 +628,43 @@ ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Tes
   facet_wrap(~ sample_size) +
   theme_bw() +
   scale_y_continuous(labels = scales::percent) +
-  xlab("Effect size (additional % TOC)") +
+  xlab("Effect size (additional % TC)") +
   theme(text = element_text(size = 16))
 
-############## analyze advantages of stratified versus uniform random sampling ###########
-#we will empirically investigate the advantages of stratified sampling in these settings
-#the idea is similar to a bootstrap. 
-#take the samples as a population and then simulate taking subsamples
-
-#first we analyze stratified sampling at a small scale by using the rangeland samples
-#the strata are defined by transects, which roughly correspond to different locations on the ranch
-rangeland_data_topsoil <- rangeland_master %>% 
-  filter(depth == "a") %>%
-  select(transect, sample_number, TOC) %>%
-  filter(!is.na(TOC)) %>%
-  arrange(transect)
-
-#the sample size for simulations
-n <- 10
-#function to return the estimated mean and standard error given a population and sample index
-get_mean_se <- function(population, sample_index){
-  c(mean(population[sample_index]), sd(population[sample_index])/sqrt(length(sample_index)))
-}
-#function to return estimated mean and standard error given a population, sampling index, and stratification information
-get_mean_se_stratified <- function(sample, N_strata){
-  N <- sum(N_strata)
-  strata_weights <- N_strata / N
-  n_strata <- as.numeric(table(sample$transect))
-  strata_means <- tapply(sample$TOC, sample$transect, mean)
-  strata_vars <- tapply(sample$TOC, sample$transect, var)
-  var_estimate <- N^(-2) * sum(N_strata^2 * strata_vars / n_strata)
-  c(sum(strata_weights * strata_means), sqrt(var_estimate))
-}
-
-N_strata <- as.numeric(table(rangeland_data_topsoil$transect))
-#helper function to make integer sample sizes with the sum preserved
+#Two-sample tests for stratified (by transect) rangeland plot
 round_strata_sizes <- function(n_strata){
   rounded_n_strata <- floor(n_strata)
   indices <- tail(order(n_strata-rounded_n_strata), round(sum(n_strata)) - sum(rounded_n_strata))
   rounded_n_strata[indices] <- rounded_n_strata[indices] + 1
   rounded_n_strata
 }
+N_strata <- as.numeric(table(topsoil_rangeland$transect))
+strata_weights_prop <- N_strata / length(topsoil_rangeland$transect)
 
-#proportional allocation to strata
-strata_weights_prop <- N_strata / length(rangeland_data_topsoil$transect)
-n_strata_prop <- round_strata_sizes(n * strata_weights_prop)
-sigma_strata <- tapply(rangeland_data_topsoil$TOC, rangeland_data_topsoil$transect, sd)
-strata_weights_opt <- N_strata * sigma_strata / sum(N_strata * sigma_strata) 
-n_strata_opt <- round_strata_sizes(n * strata_weights_opt)
+run_stratified_twosample_sims <- function(sample_size, n_sims = 400){
+  n_strata_prop <- round_strata_sizes(sample_size * strata_weights_prop)
+  shift <- effect_grid
+  perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  for(i in 1:n_sims){
+    for(j in 1:length(shift)){
+      locations_1 <- strata(data = topsoil_rangeland, stratanames = "transect", size = n_strata_prop, method = "srswr")
+      locations_2 <- strata(data = topsoil_rangeland, stratanames = "transect", size = n_strata_prop, method = "srswr")
+      samples_1 <- getdata(topsoil_rangeland, locations_1) %>% select(TC, Stratum)
+      samples_2 <- getdata(topsoil_rangeland %>% mutate(TC = TC + shift[j]), locations_2) %>% select(TC, Stratum)
 
-
-#function to run a single simulation on the rangeland data
-run_rangeland_sim <- function(data_frame){
-  proportional_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata_prop, method = "srswr")
-  optimal_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata_opt, method = "srswr")
-  
-  random_sample <- sample(1:nrow(data_frame), size = n, replace = TRUE)
-  
-  prop_stratified_estimates <- get_mean_se_stratified(sample = getdata(data_frame, proportional_stratified_sample), N_strata = table(data_frame$transect))
-  opt_stratified_estimates <- get_mean_se_stratified(sample = getdata(data_frame, optimal_stratified_sample), N_strata = table(data_frame$transect))
-  
-  random_estimates <- get_mean_se(data_frame$TOC, random_sample)
-  #local_pivotal_estimates <- get_mean_se(population, local_pivotal_sample)
-  
-  cbind(random_estimates, prop_stratified_estimates, opt_stratified_estimates)
+      diff_mean <- mean(sample_1) - mean(sample_2)
+      normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
+      perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 500), alternative = "two-sided")
+    }
+  }
+  normal_power_shift <- colMeans(normal_p_values < .05)
+  perm_power_shift <- colMeans(perm_p_values < .05)
+  cbind("normal" = normal_power_shift, "permutation" = perm_power_shift)
 }
-#compute the estimand, i.e. the true mean in the rangeland topsoil data
-true_rangeland_mean <- mean(rangeland_data_topsoil$TOC)
 
-#run simulations, replicated 1000 times
-rangeland_sims <- replicate(n = 2000, run_rangeland_sim(data_frame = rangeland_data_topsoil))
 
-#compute properties of the samples
-#the empirical coverage of 95% normal theory confidence intervals (should be 95%)
-coverage_rangeland <- apply(rangeland_sims[1,,] - qnorm(p = .975) * rangeland_sims[2,,] <= true_rangeland_mean & true_rangeland_mean <= rangeland_sims[1,,] + qnorm(p = .975) * rangeland_sims[2,,], 1, mean)
-#the width of a confidence interval, basically 4 times the SE
-ci_width_rangeland <- apply(2 * qnorm(p = .975) * rangeland_sims[2,,], 1, mean)
-#the actual standard error over simulations
-se_rangeland <- apply(rangeland_sims, c(1,2), sd)[1,]
-#the average estimated standard error
-se_hat_rangeland <- apply(rangeland_sims, c(1,2), mean)[2,]
-#the mean squared error
-rmse_rangeland <- sqrt(apply((rangeland_sims - true_rangeland_mean)^2, c(1,2), mean)[1,])
-mad_rangeland <- apply(abs(rangeland_sims - true_rangeland_mean), c(1,2), median)[1,]
-#ratio of mse compared to uniform independent random sampling
-#rmse_rangeland <- rmse_rangeland / rmse_rangeland[2]
-#compile results
-rangeland_results_frame <- rbind(coverage_rangeland, ci_width_rangeland, rmse_rangeland, mad_rangeland) %>%
-  as_tibble() %>%
-  mutate(property = c("coverage", "ci width", "RMSE", "MAD")) %>%
-  select(property, random_estimates, prop_stratified_estimates, opt_stratified_estimates)
+
 
 
 
