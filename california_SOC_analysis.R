@@ -190,33 +190,44 @@ average_cropland_bd <- cropland_summary_bd %>%
   summarize(mean_bd = mean(mean_bd, na.rm = TRUE), sd_bd = sd(sd_bd, na.rm = TRUE), cv_bd = mean(cv_bd, na.rm = TRUE))
 
 
+#stock totals on rangeland 
+#first compute volumetric concentration (vc) at each sampled point
+#then compute rangeland stocks within depth
+rangeland_stocks <- rangeland_master %>% 
+  select(transect, depth, TC) %>%
+  mutate(TC = TC / 100) %>% #since TC is currently in percent
+  left_join(
+    rangeland_BD %>% 
+      group_by(transect, depth) %>% 
+      summarize(mean_BD = mean(bd, na.rm = TRUE))
+  ) %>%
+  mutate(stock = TC * mean_BD) %>%
+  mutate(length = as.numeric(recode(depth, a = "10", b = "20", c = "20", d = "25", e = "25"))) %>%
+  group_by(depth) %>%
+  summarize(mean_TC = mean(TC, na.rm = T), mean_stock_g_cm3 = mean(stock, na.rm = T), se_stock_g_cm3 = sd(stock, na.rm = T)/sqrt(n()), length = first(length)) %>%
+  mutate(mean_stock_Mg_ha = mean_stock_g_cm3 * length * 1e8 * 1e-6) %>% #1e8 cm2 in a hectare, 1e-6 metric tons in a gram
+  mutate(se_stock_Mg_ha = se_stock_g_cm3 * length * 1e8 * 1e-6)
+
+#whole profile stock on rangeland
+rangeland_wp_stock <- rangeland_stocks %>%
+  summarize(wp_stock_Mg_ha = sum(mean_stock_Mg_ha), wp_stock_se_Mg_ha = sum(se_stock_Mg_ha))
+
 
 ############## replicates and assay error ##############
 #compare variation due to sampling and variation due to assay
 #note that samples were specifically selected along a grid of carbon concentrations
 #this means that sampling heterogeneity is likely to be artificially inflated in the replicate data.
-replicates_long <- rangeland_solitoc_reps %>% 
-  bind_rows(cropland_solitoc_reps) %>%
-  bind_rows(rangeland_costech_reps) %>%
-  bind_rows(cropland_costech_reps)
-average_error_sd <- replicates_long %>% 
-  group_by(machine, sample_number, depth, site) %>%
-  summarize(sd_estimate = sd(TC, na.rm = T)) %>%
-  group_by(machine, depth) %>%
-  summarize(within_sd = mean(sd_estimate, na.rm = T), samples = n()) %>% 
-  pivot_wider(names_from = machine, values_from = within_sd)
-#ratio of costech assay sd to plot sd in range or cropland 
-#costech and solitoc are fairly similar, though solitoc is more precise
-#proportions of assay heterogeneity as proportions of field heterogeneity
-assay_field_proportions <- combined_master %>%
-  group_by(site, depth, land_use) %>%
-  summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T)) %>% 
-  group_by(depth, land_use) %>%
-  summarize(sd_TC = mean(sd_TC, na.rm = T)) %>%
-  left_join(average_error_sd, by = "depth") %>%
-  mutate(error_prop_solitoc = solitoc / sd_TC) %>%
-  mutate(error_prop_costech = costech / sd_TC) %>%
-  arrange(land_use, depth)
+# replicates_long <- rangeland_solitoc_reps %>% 
+#   bind_rows(cropland_solitoc_reps) %>%
+#   bind_rows(rangeland_costech_reps) %>%
+#   bind_rows(cropland_costech_reps)
+# average_error <- replicates_long %>% 
+#   group_by(machine, sample_number, site) %>%
+#   summarize(error_estimate = var(TC, na.rm = T) / (mean(TC,  na.rm = T)^2 - var(TC, na.rm = T)/n())) %>%
+#   group_by(machine) %>%
+#   summarize(within_error = mean(error_estimate, na.rm = T), samples = n()) %>% 
+#   pivot_wider(names_from = machine, values_from = within_error)
+
 
 
 #compute percent error on each replicated sample
@@ -255,6 +266,32 @@ median_sigma_delta <- assay_error_long %>%
   summarize(sigma_delta = median(sigma_delta_TC))
 
 
+#proportions of assay heterogeneity as proportions of field heterogeneity
+sample_size <- 30
+assay_field_proportions <- combined_master %>%
+  group_by(site, depth, land_use) %>%
+  summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T)) %>% 
+  group_by(depth, land_use) %>%
+  summarize(sd_TC = mean(sd_TC, na.rm = T), mean_TC = mean(mean_TC, na.rm = T)) %>%
+  mutate(SoliTOC = median_sigma_delta$sigma_delta[median_sigma_delta$machine == "solitoc"]) %>%
+  mutate(Costech = median_sigma_delta$sigma_delta[median_sigma_delta$machine == "costech"]) %>%
+  pivot_longer(cols = c(SoliTOC, Costech), names_to = "machine", values_to = "assay_error") %>%
+  mutate(variance_prop_nocompositing = (assay_error * mean_TC)^2 / (sd_TC^2 + assay_error^2 * mean_TC^2)) %>%
+  mutate(variance_prop_fullcompositing =  sample_size * (assay_error * mean_TC)^2 / (sd_TC^2 + sample_size * assay_error^2 * mean_TC^2)) %>%
+  pivot_longer(cols = c(variance_prop_nocompositing, variance_prop_fullcompositing), names_to = "compositing", names_prefix = "variance_prop_", values_to = "variance_proportion") %>%
+  mutate(compositing = ifelse(compositing == "nocompositing", "No Compositing", "Full Compositing")) %>%
+  mutate(compositing = factor(compositing, levels = c("No Compositing", "Full Compositing"))) %>%
+  filter(depth != "e")
+
+#variance proportions plot
+ggplot(assay_field_proportions, aes(x = depth, fill = land_use, y = variance_proportion)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  facet_grid(machine ~ compositing) +
+  ylim(0,1) +
+  guides(fill = guide_legend(title = "Land Type")) +
+  ylab("Approximate Proportion of Total Estimation Variance") +
+  xlab("Depth") +
+  theme(text = element_text(size = 16))
 
 #non-parametric permutation test for differences in measurement
 #nonparametric analysis of no difference in labs/machines:
@@ -631,8 +668,40 @@ ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Tes
   xlab("Effect size (additional % TC)") +
   theme(text = element_text(size = 16))
 
+
+
+########### two-sample inference (under development) #########
+#an example where the t-test fails to give valid inference under the null (the mean does not change)
+N <- 100
+#means are exactly 3 in both populations. Population 2 is highly skewed so that low values (which make means equal) are rarely sampled
+pop_1 <- rep(3, N) + rnorm(N, sd = .05)
+pop_1 <- pop_1 - mean(pop_1) + 3
+pop_2 <- c(rep(1, 5), rep(3, N-5)) + rnorm(N, sd = .05)
+pop_2 <- pop_2 - mean(pop_2) + 3
+
+par(mfrow = c(1,2))
+hist(pop_1, breaks = 5, xlim = c(0,4), xlab = "Population distribution at time 1", freq = FALSE, main = "")
+hist(pop_2, breaks = 50, xlim = c(0,4), xlab = "Population distribution at time 2", freq = FALSE, main = "")
+par(mfrow = c(1,1))
+
+run_two_sample_t_test <- function(n, pop_1, pop_2){
+  sample_1 <- sample(pop_1, size = n, replace = TRUE)
+  sample_2 <- sample(pop_2, size = n, replace = TRUE)
+  t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
+}
+
+n_grid <- 5:60
+rejection_rate <- rep(0, length(n_grid))
+for(i in 1:length(n_grid)){
+  p_values <- replicate(n = 1000, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
+  rejection_rate[i] <- mean(p_values < .05)
+}
+plot(y = rejection_rate, x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "Empirical risk under null", lwd = 2)
+abline(a = 0.05, b = 0, lty = 'dashed', col = 'red', lwd = 2)
+
 #Two-sample tests for stratified (by transect) rangeland plot
 #function to return estimated mean and standard error given a population, sampling index, and stratification information
+#IN DEVELOPMENT
 get_mean_se_stratified <- function(sample, N_strata){
   N <- sum(N_strata)
   strata_weights <- N_strata / N
@@ -655,7 +724,8 @@ strata_weights_prop <- N_strata / length(topsoil_rangeland$transect)
 run_stratified_twosample_sims <- function(sample_size, n_sims = 400){
   n_strata_prop <- round_strata_sizes(sample_size * strata_weights_prop)
   shift <- effect_grid
-  perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  perm_p_values_unstrat <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  perm_p_values_strat <- matrix(NA, nrow = n_sims, ncol = length(shift))
   normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
   for(i in 1:n_sims){
     for(j in 1:length(shift)){
@@ -671,15 +741,17 @@ run_stratified_twosample_sims <- function(sample_size, n_sims = 400){
       group_labels <- c(rep(1, nrow(samples_1)), rep(2, nrow(samples_2)))
       combined_TC <- c(samples_1$TC, sample_2$TC)
       combined_strata <- c(samples_1$transect, samples_2$transect)
-      perm_p_values[i,j] <- t2p(diff_mean, stratified_two_sample(group = group_labels, response = combined_TC, stratum = combined_strata, stat = "mean", reps = 300), alternative = "two-sided")
+      perm_p_values_unstrat[i,j] <-  t2p(diff_mean, two_sample(x = samples_1$TC, y = samples_2$TC, reps = 300), alternative = "two-sided")
+      perm_p_values_strat[i,j] <- t2p(diff_mean, stratified_two_sample(group = group_labels, response = combined_TC, stratum = combined_strata, stat = "mean", reps = 300), alternative = "two-sided")
     }
   }
   normal_power_shift <- colMeans(normal_p_values < .05)
-  perm_power_shift <- colMeans(perm_p_values < .05)
-  cbind("normal" = normal_power_shift, "permutation" = perm_power_shift)
+  perm_power_shift_unstrat <- colMeans(perm_p_values_unstrat < .05)
+  perm_power_shift_strat <- colMeans(perm_p_values_strat < .05)
+  cbind("normal" = normal_power_shift, "permutation_unstrat" = perm_power_shift_unstrat,  "permutation_strat" = perm_power_shift_strat)
 }
 
-stratified_power_30 <- run_stratified_twosample_sims(sample_size = 30)
+stratified_power_30 <- run_stratified_twosample_sims(sample_size = 30, n_sims = 10)
 
 
 
