@@ -276,22 +276,40 @@ assay_field_proportions <- combined_master %>%
   mutate(SoliTOC = median_sigma_delta$sigma_delta[median_sigma_delta$machine == "solitoc"]) %>%
   mutate(Costech = median_sigma_delta$sigma_delta[median_sigma_delta$machine == "costech"]) %>%
   pivot_longer(cols = c(SoliTOC, Costech), names_to = "machine", values_to = "assay_error") %>%
-  mutate(variance_prop_nocompositing = (assay_error * mean_TC)^2 / (sd_TC^2 + assay_error^2 * mean_TC^2)) %>%
-  mutate(variance_prop_fullcompositing =  sample_size * (assay_error * mean_TC)^2 / (sd_TC^2 + sample_size * assay_error^2 * mean_TC^2)) %>%
-  pivot_longer(cols = c(variance_prop_nocompositing, variance_prop_fullcompositing), names_to = "compositing", names_prefix = "variance_prop_", values_to = "variance_proportion") %>%
-  mutate(compositing = ifelse(compositing == "nocompositing", "No Compositing", "Full Compositing")) %>%
-  mutate(compositing = factor(compositing, levels = c("No Compositing", "Full Compositing"))) %>%
+  mutate(assay_contribution = (assay_error * mean_TC)^2) %>%
+  mutate(variance_prop_nocompositing = assay_contribution / (sd_TC^2 + assay_contribution)) %>%
+  mutate(variance_prop_fullcompositing =  sample_size * assay_contribution / (sd_TC^2 + sample_size * assay_contribution)) %>%
+  pivot_longer(cols = c(variance_prop_nocompositing, variance_prop_fullcompositing), names_to = "compositing", names_prefix = "variance_prop_", values_to = "assay_proportion") %>%
+  mutate(compositing = ifelse(compositing == "nocompositing", "No Compositing", "Full Compositing (n=30)")) %>%
+  mutate(compositing = factor(compositing, levels = c("No Compositing", "Full Compositing (n=30)"))) %>%
+  mutate(field_proportion = 1 - assay_proportion) %>%
+  pivot_longer(cols = c(assay_proportion,field_proportion), names_to = "source", values_to = "proportion") %>%
+  mutate(source = ifelse(source == "assay_proportion", "Assay Variability", "Spatial Heterogeneity")) %>%
+  mutate(land_use = factor(land_use, levels = c("Rangeland","Cropland"))) %>%
   filter(depth != "e")
 
 #variance proportions plot
-ggplot(assay_field_proportions, aes(x = depth, fill = land_use, y = variance_proportion)) +
-  geom_bar(position = "dodge", stat = "identity") +
-  facet_grid(machine ~ compositing) +
+ggplot(assay_field_proportions, aes(x = depth, fill = source, y = proportion)) +
+  geom_bar(position = "stack", stat = "identity") +
+  facet_grid(machine ~ compositing + land_use) +
   ylim(0,1) +
-  guides(fill = guide_legend(title = "Land Type")) +
-  ylab("Approximate Proportion of Total Estimation Variance") +
+  guides(fill = guide_legend(title = "Source of Variance")) +
+  ylab("Approximate Proportion of Estimation Variance") +
   xlab("Depth") +
   theme(text = element_text(size = 16))
+
+#total variance contributions plot (not proportions)
+variance_contributions <- assay_field_proportions %>%
+  filter(source == "Assay Variability") %>%
+  select(depth, land_use, sd_TC, compositing, assay_contribution, machine) %>%
+  mutate(var_TC = sd_TC^2) %>%
+  mutate(var_TC = ifelse(compositing == "Full Compositing (n=30)", var_TC/30, var_TC)) %>%
+  pivot_longer(cols = c("var_TC", "assay_contribution"), names_to = "source", values_to = "variance")
+ 
+ggplot(variance_contributions, aes(x = depth, y = variance, fill = source)) +
+  geom_bar(position = "stack", stat = "identity") +
+  facet_grid(machine ~ land_use + compositing)
+
 
 #non-parametric permutation test for differences in measurement
 #nonparametric analysis of no difference in labs/machines:
