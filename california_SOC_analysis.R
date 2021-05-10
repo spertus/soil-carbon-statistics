@@ -304,11 +304,16 @@ variance_contributions <- assay_field_proportions %>%
   select(depth, land_use, sd_TC, compositing, assay_contribution, machine) %>%
   mutate(var_TC = sd_TC^2) %>%
   mutate(var_TC = ifelse(compositing == "Full Compositing (n=30)", var_TC/30, var_TC)) %>%
-  pivot_longer(cols = c("var_TC", "assay_contribution"), names_to = "source", values_to = "variance")
+  pivot_longer(cols = c("var_TC", "assay_contribution"), names_to = "source", values_to = "variance") %>%
+  mutate(source = ifelse(source == "assay_contribution", "Assay Variability", "Field Heterogeneity"))
  
 ggplot(variance_contributions, aes(x = depth, y = variance, fill = source)) +
   geom_bar(position = "stack", stat = "identity") +
-  facet_grid(machine ~ land_use + compositing)
+  facet_grid(machine ~ compositing + land_use)  +
+  guides(fill = guide_legend(title = "Source of Variance")) +
+  ylab("Variance of one assayed sample") +
+  xlab("Depth") +
+  theme(text = element_text(size = 14))
 
 
 #non-parametric permutation test for differences in measurement
