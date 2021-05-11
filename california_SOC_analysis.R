@@ -304,11 +304,16 @@ variance_contributions <- assay_field_proportions %>%
   select(depth, land_use, sd_TC, compositing, assay_contribution, machine) %>%
   mutate(var_TC = sd_TC^2) %>%
   mutate(var_TC = ifelse(compositing == "Full Compositing (n=30)", var_TC/30, var_TC)) %>%
-  pivot_longer(cols = c("var_TC", "assay_contribution"), names_to = "source", values_to = "variance")
+  pivot_longer(cols = c("var_TC", "assay_contribution"), names_to = "source", values_to = "variance") %>%
+  mutate(source = ifelse(source == "assay_contribution", "Assay Variability", "Field Heterogeneity"))
  
 ggplot(variance_contributions, aes(x = depth, y = variance, fill = source)) +
   geom_bar(position = "stack", stat = "identity") +
-  facet_grid(machine ~ land_use + compositing)
+  facet_grid(machine ~ compositing + land_use)  +
+  guides(fill = guide_legend(title = "Source of Variance")) +
+  ylab("Variance of one assayed sample") +
+  xlab("Depth") +
+  theme(text = element_text(size = 14))
 
 
 #non-parametric permutation test for differences in measurement
@@ -691,15 +696,15 @@ ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Tes
 ########### two-sample inference (under development) #########
 #an example where the t-test fails to give valid inference under the null (the mean does not change)
 N <- 100
-#means are exactly 3 in both populations. Population 2 is highly skewed so that low values (which make means equal) are rarely sampled
-pop_1 <- rep(3, N) + rnorm(N, sd = .05)
+#means are exactly 3 in both populations. Population 1 is highly skewed so that high values (which make means equal) are rarely sampled
+pop_1 <- c(rep(3, N-5), rep(6, 5)) + rnorm(N, sd = .05)
 pop_1 <- pop_1 - mean(pop_1) + 3
-pop_2 <- c(rep(1, 5), rep(3, N-5)) + rnorm(N, sd = .05)
+pop_2 <- rep(3, N) + rnorm(N, sd = .05)
 pop_2 <- pop_2 - mean(pop_2) + 3
 
 par(mfrow = c(1,2))
-hist(pop_1, breaks = 5, xlim = c(0,4), xlab = "Population distribution at time 1", freq = FALSE, main = "")
-hist(pop_2, breaks = 50, xlim = c(0,4), xlab = "Population distribution at time 2", freq = FALSE, main = "")
+hist(pop_1, breaks = 50, xlim = c(2,6), xlab = "Population distribution at time 1", freq = FALSE, main = "")
+hist(pop_2, breaks = 5, xlim = c(2,6), xlab = "Population distribution at time 2", freq = FALSE, main = "")
 par(mfrow = c(1,1))
 
 run_two_sample_t_test <- function(n, pop_1, pop_2){
