@@ -366,6 +366,7 @@ reps_long_both <- reps_long_both %>%
   mutate(rejected = ifelse(identifier %in% levels(strata)[p_values < .05], 1, 0))
 
 #plot assay densities stratified by sample number
+#all samples that were not significantly different (TC and TOC)
 assay_density_plot_accepted <- ggplot(reps_long_both %>% filter(rejected == 0), aes(carbon, fill = machine)) +
   geom_density(alpha = .5) +
   facet_wrap(~ identifier, scales = "free_y") +
@@ -375,6 +376,7 @@ assay_density_plot_accepted <- ggplot(reps_long_both %>% filter(rejected == 0), 
   theme_bw() +
   scale_fill_discrete(name = "Machine") +
   theme(text = element_text(size = 16), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.title.y = element_blank())
+#only TOC that were rejected (since rejected TC were re-run for TOC)
 assay_density_plot_rejected <- ggplot(reps_long_both %>% filter(rejected == 1, carbon_type == "TOC"), aes(carbon, fill = machine)) +
   geom_density(alpha = .5) +
   facet_wrap(~ identifier, scales = "free_y") +
@@ -441,11 +443,13 @@ plot_variogram <- function(rangeland_depth = "a", rangeland_transect = "T", plot
 }
 
 
-variog_T <- plot_variogram(rangeland_depth = "a", rangeland_transect = "T", plot = FALSE)
-variog_Mx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Mx", plot = FALSE)
-variog_My <- plot_variogram(rangeland_depth = "a", rangeland_transect = "My", plot = FALSE)
-variog_Bx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Bx", plot = FALSE)
-variog_By <- plot_variogram(rangeland_depth = "a", rangeland_transect = "By", plot = FALSE)
+
+variog_T <- plot_variogram(rangeland_depth = "a", rangeland_transect = "T", plot = TRUE)
+variog_Mx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Mx", plot = TRUE)
+variog_My <- plot_variogram(rangeland_depth = "a", rangeland_transect = "My", plot = TRUE)
+variog_Bx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Bx", plot = TRUE)
+variog_By <- plot_variogram(rangeland_depth = "a", rangeland_transect = "By", plot = TRUE)
+
 
 distance <- variog_T$u
 avg_variogram <- colMeans(rbind(variog_T$v, variog_Mx$v, variog_My$v, variog_Bx$v, variog_By$v))
@@ -638,7 +642,52 @@ power_crop4 <- get_power_two_sample(beta = 1-0.8, mu_1 = crop4_mean, mu_2 = crop
 
 
 
-########### power of a permutation test to detect topsoil change #########
+
+
+
+
+########### two-sample inference  #########
+#an example where the t-test fails to give valid inference under the null (the mean does not change)
+N <- 100
+#means are exactly 3 in both populations. Population 1 is highly skewed so that high values (which make means equal) are rarely sampled
+pop_1 <- c(rep(3, N-5), rep(6, 5)) + rnorm(N, sd = .05)
+pop_1 <- pop_1 - mean(pop_1) + 3
+pop_2 <- rep(3, N) + rnorm(N, sd = .05)
+pop_2 <- pop_2 - mean(pop_2) + 3
+
+par(mfrow = c(1,2))
+hist(pop_1, breaks = 50, xlim = c(2,6), xlab = "Population distribution at time 1", freq = FALSE, main = "")
+hist(pop_2, breaks = 5, xlim = c(2,6), xlab = "Population distribution at time 2", freq = FALSE, main = "")
+par(mfrow = c(1,1))
+
+run_two_sample_t_test <- function(n, pop_1, pop_2){
+  sample_1 <- sample(pop_1, size = n, replace = TRUE)
+  sample_2 <- sample(pop_2, size = n, replace = TRUE)
+  t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
+}
+run_two_sample_hedged <- function(n, pop_1, pop_2){
+  upper_1 <- hedged_CI(pop_1/100, n = n, alpha = .05/2, theta = 0)*100
+  lower_2 <- hedged_CI(pop_2/100, n = n, alpha = .05/2, theta = 1)*100
+  reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
+  reject
+}
+
+
+n_grid <- 5:50
+t_test_rejection_rate <- rep(0, length(n_grid))
+hedged_rejection_rate <- rep(0, length(n_grid))
+for(i in 1:length(n_grid)){
+  t_test_p_values <- replicate(n = 200, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
+  hedged_reject <- replicate(n = 200, run_two_sample_hedged(n = n_grid[i], pop_1, pop_2))
+  t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
+  hedged_rejection_rate[i] <- mean(hedged_reject)
+}
+plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'darkorange3', lwd = 2)
+points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 2)
+abline(a = 0.05, b = 0, lty = 'dashed', col = 'red', lwd = 2)
+
+
+# power of permutation tests, t-tests, and martingales to detect topsoil change 
 topsoil_rangeland <- rangeland_master %>% 
   filter(depth == "a") %>%
   filter(!is.na(TC)) %>%
@@ -650,22 +699,22 @@ topsoil_TC_rangeland <- topsoil_rangeland %>% pull(TC)
 
 effect_grid = seq(0,2,by=.1)
 run_twosample_sims <- function(sample_size, n_sims = 400){
- shift <- effect_grid
- perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
- normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
- for(i in 1:n_sims){
-   for(j in 1:length(shift)){
-     
-     sample_1 <- sample(topsoil_TC_rangeland, size = sample_size, replace = TRUE)
-     sample_2 <- sample(topsoil_TC_rangeland + shift[j], size = sample_size, replace = TRUE)
-     diff_mean <- mean(sample_1) - mean(sample_2)
-     normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
-     perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 500), alternative = "two-sided")
-   }
- }
- normal_power_shift <- colMeans(normal_p_values < .05)
- perm_power_shift <- colMeans(perm_p_values < .05)
- cbind("normal" = normal_power_shift, "permutation" = perm_power_shift)
+  shift <- effect_grid
+  perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  for(i in 1:n_sims){
+    for(j in 1:length(shift)){
+      
+      sample_1 <- sample(topsoil_TC_rangeland, size = sample_size, replace = TRUE)
+      sample_2 <- sample(topsoil_TC_rangeland + shift[j], size = sample_size, replace = TRUE)
+      diff_mean <- mean(sample_1) - mean(sample_2)
+      normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
+      perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 500), alternative = "two-sided")
+    }
+  }
+  normal_power_shift <- colMeans(normal_p_values < .05)
+  perm_power_shift <- colMeans(perm_p_values < .05)
+  cbind("normal" = normal_power_shift, "permutation" = perm_power_shift)
 }
 
 #these take a while to run, we can save them as an object
@@ -691,36 +740,6 @@ ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Tes
   xlab("Effect size (additional % TC)") +
   theme(text = element_text(size = 16))
 
-
-
-########### two-sample inference (under development) #########
-#an example where the t-test fails to give valid inference under the null (the mean does not change)
-N <- 100
-#means are exactly 3 in both populations. Population 1 is highly skewed so that high values (which make means equal) are rarely sampled
-pop_1 <- c(rep(3, N-5), rep(6, 5)) + rnorm(N, sd = .05)
-pop_1 <- pop_1 - mean(pop_1) + 3
-pop_2 <- rep(3, N) + rnorm(N, sd = .05)
-pop_2 <- pop_2 - mean(pop_2) + 3
-
-par(mfrow = c(1,2))
-hist(pop_1, breaks = 50, xlim = c(2,6), xlab = "Population distribution at time 1", freq = FALSE, main = "")
-hist(pop_2, breaks = 5, xlim = c(2,6), xlab = "Population distribution at time 2", freq = FALSE, main = "")
-par(mfrow = c(1,1))
-
-run_two_sample_t_test <- function(n, pop_1, pop_2){
-  sample_1 <- sample(pop_1, size = n, replace = TRUE)
-  sample_2 <- sample(pop_2, size = n, replace = TRUE)
-  t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
-}
-
-n_grid <- 5:60
-rejection_rate <- rep(0, length(n_grid))
-for(i in 1:length(n_grid)){
-  p_values <- replicate(n = 1000, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
-  rejection_rate[i] <- mean(p_values < .05)
-}
-plot(y = rejection_rate, x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "Empirical risk under null", lwd = 2)
-abline(a = 0.05, b = 0, lty = 'dashed', col = 'red', lwd = 2)
 
 #Two-sample tests for stratified (by transect) rangeland plot
 #function to return estimated mean and standard error given a population, sampling index, and stratification information
