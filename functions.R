@@ -665,7 +665,7 @@ kmart_p_value_sequence <- function(population, prior_alpha = 1, prior_beta = 1){
 #last: return the entire sequence of p-values or just the last p-value?
 #outputs: 
 #a finite-sample, sequentially valid p-value for the hypothesis that the mean(population) == m
-hedged_pvalue <- function(population, mu_0 = 1/2, theta = 1, log = FALSE, shuffle = TRUE, last = FALSE){
+hedged_pvalue <- function(population, mu_0 = 1/2, theta = 0.5, log = FALSE, shuffle = TRUE, last = FALSE){
   if(shuffle){
     population <- shuffle(population)
   }
@@ -679,6 +679,12 @@ hedged_pvalue <- function(population, mu_0 = 1/2, theta = 1, log = FALSE, shuffl
   lagged_sigma_hat[1:2] <- 1/4
   lambda_sequence_plus <- pmin(sqrt(2 * log(2/alpha) / (log(1:N) * 1:N * lagged_sigma_hat)), .9 / mu_0)
   lambda_sequence_minus <- pmin(sqrt(2 * log(2/alpha) / (log(1:N) * 1:N * lagged_sigma_hat)), .9 / (1-mu_0))
+  #if theta==0 or theta==1 this is really a one-sided interval
+  if(theta == 0){
+    lambda_sequence_plus <- 0
+  } else if(theta == 1){
+    lambda_sequence_minus <- 0
+  }
   if(log){
     K_plus <- cumsum(log(1 + lambda_sequence_plus * (population - mu_0)))
     K_minus <- cumsum(log(1 - lambda_sequence_minus * (population - mu_0)))
@@ -703,25 +709,40 @@ hedged_pvalue <- function(population, mu_0 = 1/2, theta = 1, log = FALSE, shuffl
 #population: a vector of values representing the (true, fixed) population distribution 
 #n: the desired sample size
 #alpha: the desired confidence level
+#theta: the theta coefficient to use when constructing the confidence interval, weights how much emphasis to put on lower vs upper bound. theta == 0 yields only an upper bound, theta == 1 yields only a lower bound.
+#resample: draw a sample of size n from the population or just use the original values? Setting resample = FALSE basically treats the population as a sample and ignores n. Defaults to TRUE, because usually a population is given from which to gather draws.
 #outputs:
 #a length-2 vector of lower and upper confidence bounds (respectively)
-hedged_CI <- function(population, n, alpha = .05){
-  shuffled_pop <- sample(population, n, replace = TRUE)
-  interval_center <- optimize(function(x){hedged_pvalue(mu_0 = x, population = shuffled_pop, theta = 0.5, log = TRUE, shuffle = FALSE, last = TRUE)}, interval = c(0,1), maximum = TRUE)$maximum
-  min_p <- hedged_pvalue(mu_0 = 0, population = shuffled_pop, theta = 0.5, shuffle = FALSE, last = TRUE)
-  max_p <- hedged_pvalue(mu_0 = 1, population = shuffled_pop, theta = 0.5, shuffle = FALSE, last = TRUE)
-  if(min_p > .05){
-    LB <- 0
+hedged_CI <- function(population, n, alpha = .05, theta = 0.5, resample = TRUE){
+  if(resample){
+    shuffled_pop <- sample(population, n, replace = TRUE)
   } else{
-    LB <- uniroot(function(x){hedged_pvalue(mu_0 = x, population = shuffled_pop, theta = 0.5, shuffle = FALSE, last = TRUE) - alpha}, lower = 0, upper = interval_center)$root
+    shuffled_pop <- population
   }
-  
-  if(max_p > .05){
-    UB <- 1
-  } else{
-    UB <- uniroot(function(x){hedged_pvalue(mu_0 = x, population = shuffled_pop, theta = 0.5, shuffle = FALSE, last = TRUE) - alpha}, lower = interval_center, upper = 1)$root
+  #computation for one-sided intervals (theta %in% c(0,1))
+  #lower bound
+  if(theta == 1){
+    LB <- uniroot(function(x){hedged_pvalue(mu_0 = x, population = shuffled_pop, theta = theta, shuffle = FALSE, last = TRUE) - alpha}, lower = 0, upper = 1)$root
+    c("lower" = LB)
+  } else if(theta == 0){ #upper bound
+    UB <- uniroot(function(x){hedged_pvalue(mu_0 = x, population = shuffled_pop, theta = theta, shuffle = FALSE, last = TRUE) - alpha}, lower = 0, upper = 1)$root
+    c("upper" = UB)
+  } else{ #two-sided
+    interval_center <- optimize(function(x){hedged_pvalue(mu_0 = x, population = shuffled_pop, theta = theta, log = TRUE, shuffle = FALSE, last = TRUE)}, interval = c(0,1), maximum = TRUE)$maximum
+    min_p <- hedged_pvalue(mu_0 = 0, population = shuffled_pop, theta = theta, shuffle = FALSE, last = TRUE)
+    max_p <- hedged_pvalue(mu_0 = 1, population = shuffled_pop, theta = theta, shuffle = FALSE, last = TRUE)
+    if(min_p > .05){
+      LB <- 0
+    } else{
+      LB <- uniroot(function(x){hedged_pvalue(mu_0 = x, population = shuffled_pop, theta = theta, shuffle = FALSE, last = TRUE) - alpha}, lower = 0, upper = interval_center)$root
+    }
+    if(max_p > .05){
+      UB <- 1
+    } else{
+      UB <- uniroot(function(x){hedged_pvalue(mu_0 = x, population = shuffled_pop, theta = theta, shuffle = FALSE, last = TRUE) - alpha}, lower = interval_center, upper = 1)$root
+    }
+    c("lower" = LB, "upper" = UB) 
   }
-  c(LB, UB)
 }
 
 

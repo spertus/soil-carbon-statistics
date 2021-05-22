@@ -665,15 +665,15 @@ run_two_sample_t_test <- function(n, pop_1, pop_2){
   sample_2 <- sample(pop_2, size = n, replace = TRUE)
   t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
 }
-run_two_sample_hedged <- function(n, pop_1, pop_2){
-  upper_1 <- hedged_CI(pop_1/100, n = n, alpha = .05/2, theta = 0)*100
-  lower_2 <- hedged_CI(pop_2/100, n = n, alpha = .05/2, theta = 1)*100
+run_two_sample_hedged <- function(n, pop_1, pop_2, resample = TRUE){
+  upper_1 <- hedged_CI(pop_1/100, n = n, alpha = .05/2, theta = 0, resample = resample)*100
+  lower_2 <- hedged_CI(pop_2/100, n = n, alpha = .05/2, theta = 1, resample = resample)*100
   reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
   reject
 }
 
 
-n_grid <- 5:50
+n_grid <- 5:20
 t_test_rejection_rate <- rep(0, length(n_grid))
 hedged_rejection_rate <- rep(0, length(n_grid))
 for(i in 1:length(n_grid)){
@@ -697,31 +697,36 @@ topsoil_rangeland <- rangeland_master %>%
 topsoil_TC_rangeland <- topsoil_rangeland %>% pull(TC)
 
 
-effect_grid = seq(0,2,by=.1)
-run_twosample_sims <- function(sample_size, n_sims = 400){
+effect_grid = seq(0,4,by=.1)
+run_twosample_sims <- function(sample_size, n_sims = 200){
   shift <- effect_grid
   perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
   normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  #the hedged two sample test just returns whether or not the test rejects, not an actual p-value
+  hedged_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
   for(i in 1:n_sims){
     for(j in 1:length(shift)){
-      
       sample_1 <- sample(topsoil_TC_rangeland, size = sample_size, replace = TRUE)
       sample_2 <- sample(topsoil_TC_rangeland + shift[j], size = sample_size, replace = TRUE)
       diff_mean <- mean(sample_1) - mean(sample_2)
       normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
       perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 500), alternative = "two-sided")
+      hedged_rejections[i,j] <- run_two_sample_hedged(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
     }
   }
   normal_power_shift <- colMeans(normal_p_values < .05)
   perm_power_shift <- colMeans(perm_p_values < .05)
-  cbind("normal" = normal_power_shift, "permutation" = perm_power_shift)
+  hedged_power_shift <- colMeans(hedged_rejections)
+  cbind("normal" = normal_power_shift, "permutation" = perm_power_shift, "hedged" = hedged_power_shift)
 }
 
 #these take a while to run, we can save them as an object
-# power_5 <- run_twosample_sims(sample_size = 5)
+#power_5 <- run_twosample_sims(sample_size = 5)
 # power_10 <- run_twosample_sims(sample_size = 10)
 # power_30 <- run_twosample_sims(sample_size = 30)
-# power_90 <- run_twosample_sims(sample_size = 90)
+#power_90 <- run_twosample_sims(sample_size = 90)
+#power_250 <- run_twosample_sims(sample_size = 250)
+power_1000 <- run_twosample_sims(sample_size = 1000)
 # power_frame <- bind_rows(
 #   as.data.frame(power_5) %>% mutate(sample_size = 5, effect_size = effect_grid),
 #   as.data.frame(power_10) %>% mutate(sample_size = 10, effect_size = effect_grid),
@@ -731,6 +736,10 @@ run_twosample_sims <- function(sample_size, n_sims = 400){
 #   pivot_longer(cols = c("t test", "Permutation test"), names_to = "Test", values_to = "Power")
 # save(power_frame, file = "power_frame")
 load("power_frame")
+
+power_frame <- as.data.frame(power_250) %>% mutate(sample_size = 250, effect_size = effect_grid) %>%
+    rename("t test" = normal, "Permutation test" = permutation, "Hedged martingale" = hedged) %>%
+    pivot_longer(cols = c("t test", "Permutation test", "Hedged martingale"), names_to = "Test", values_to = "Power")
 
 ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Test)) +
   geom_line(size = 1.5) +
