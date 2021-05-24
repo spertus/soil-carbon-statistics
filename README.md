@@ -1,4 +1,4 @@
-# soil-carbon-simulations
+# soil-carbon-statistics
 
 This is a repository with code to run simulations and analyses to estimate soil organic carbon (SOC). 
 
