@@ -62,14 +62,26 @@ combined_master <- rangeland_master %>%
 ###################### TOC concentration and BD in space ######################
 
 #stacked TC histograms for rangeland data
-ggplot(rangeland_master, aes(TC)) +
-  geom_histogram(binwidth = 0.25) +
-  facet_grid(depth ~ transect) +
+ggplot(rangeland_master, aes(TC, fill = transect)) +
+  geom_histogram(binwidth = 0.25, position = "stack", alpha = 1) +
+  facet_grid(depth ~ .) +
   xlab("% Total Carbon (TC)") +
   ylab("Number of Samples") +
-  ylim(0,23) +
+  #ylim(0,23) +
   theme_bw() +
   theme(text = element_text(size = 16))
+
+
+#histogram with side by side bars for rangeland data
+ggplot(rangeland_master %>% mutate(TC = as_factor(round(TC*2)/2)) %>% filter(!is.na(TC)), aes(TC, fill = transect)) +
+  geom_bar(position = position_dodge(preserve = "single")) +
+  facet_grid(depth ~ .) +
+  xlab("% Total Carbon (TC)") +
+  ylab("Number of Samples") +
+  #ylim(0,23) +
+  theme_bw() +
+  theme(text = element_text(size = 16))
+
 
 #TOC histogram for rangeland
 ggplot(rangeland_master, aes(TOC)) +
@@ -91,6 +103,16 @@ ggplot(cropland_master, aes(TC)) +
   xlim(0,8) +
   ylim(0,23) +
   theme(text = element_text(size = 16))
+
+
+#cropland scatter plots by depth
+cropland_wide <- cropland_master %>%
+  filter(site != "CROP7") %>%
+  pivot_wider(names_from = "depth", values_from = "TC")
+pairs(~ a + b + c + d, data = cropland_wide)c
+#how well does cropland topsoil predict cropland deep soil?
+summary(lm(d ~ a*site, data = cropland_wide))
+
 
 #summary tables
 rangeland_summary <- rangeland_master %>% 
@@ -199,14 +221,16 @@ rangeland_stocks <- rangeland_master %>%
   left_join(
     rangeland_BD %>% 
       group_by(transect, depth) %>% 
-      summarize(mean_BD = mean(bd, na.rm = TRUE))
+      summarize(mean_BD = mean(bd, na.rm = TRUE), max_BD = max(bd, na.rm = TRUE), min_BD = min(bd, na.rm = TRUE))
   ) %>%
-  mutate(stock = TC * mean_BD) %>%
+  mutate(mean_stock = TC * mean_BD, max_stock = TC * max_BD, min_stock = TC * min_BD) %>%
   mutate(length = as.numeric(recode(depth, a = "10", b = "20", c = "20", d = "25", e = "25"))) %>%
   group_by(depth) %>%
-  summarize(mean_TC = mean(TC, na.rm = T), mean_stock_g_cm3 = mean(stock, na.rm = T), se_stock_g_cm3 = sd(stock, na.rm = T)/sqrt(n()), length = first(length)) %>%
+  summarize(mean_TC = mean(TC, na.rm = T), mean_stock_g_cm3 = mean(mean_stock, na.rm = T), se_stock_g_cm3 = sd(mean_stock, na.rm = T)/sqrt(n()), max_stock_g_cm3 = mean(max_stock, na.rm = T), min_stock_g_cm3 = mean(min_stock, na.rm = T), length = first(length)) %>%
   mutate(mean_stock_Mg_ha = mean_stock_g_cm3 * length * 1e8 * 1e-6) %>% #1e8 cm2 in a hectare, 1e-6 metric tons in a gram
-  mutate(se_stock_Mg_ha = se_stock_g_cm3 * length * 1e8 * 1e-6)
+  mutate(se_stock_Mg_ha = se_stock_g_cm3 * length * 1e8 * 1e-6) %>%
+  mutate(max_stock_Mg_ha = max_stock_g_cm3 * length * 1e8 * 1e-6) %>%
+  mutate(min_stock_Mg_ha = min_stock_g_cm3 * length * 1e8 * 1e-6) 
 
 #whole profile stock on rangeland
 rangeland_wp_stock <- rangeland_stocks %>%
@@ -737,7 +761,7 @@ power_1000 <- run_twosample_sims(sample_size = 1000)
 # save(power_frame, file = "power_frame")
 load("power_frame")
 
-power_frame <- as.data.frame(power_250) %>% mutate(sample_size = 250, effect_size = effect_grid) %>%
+power_frame <- as.data.frame(power_1000) %>% mutate(sample_size = 1000, effect_size = effect_grid) %>%
     rename("t test" = normal, "Permutation test" = permutation, "Hedged martingale" = hedged) %>%
     pivot_longer(cols = c("t test", "Permutation test", "Hedged martingale"), names_to = "Test", values_to = "Power")
 
