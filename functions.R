@@ -769,3 +769,25 @@ beta_binomial_ppm <- function(population, mu_0, prior_alpha, prior_beta){
 
 
 
+######### towards the Romano and Wolf bounds ######### 
+DKW_bounds <- function(x, alpha = .05, grid = seq(0,1,by=.01)){
+  sample_size <- length(x)
+  ecdf_x <- ecdf(x)
+  lower_bound <- pmax(0, ecdf_x(grid) - sqrt(log(2/alpha) / (2*sample_size)))
+  upper_bound <- pmin(1, ecdf_x(grid) + sqrt(log(2/alpha) / (2*sample_size)))
+  cbind("ecdf" = ecdf_x(grid), "lower" = lower_bound, "upper" = upper_bound)
+}
+
+anderson_CI <- function(sample, alpha = .05, resolution = .001){
+  ecdf_envelope <- DKW_bounds(x = sample, alpha = alpha, grid = seq(0,1,by=resolution))
+  anderson_LB <- sum((1 - ecdf_envelope[,'upper']) * resolution)
+  anderson_UB <- sum((1 - ecdf_envelope[,'lower']) * resolution)
+  c("lower" = anderson_LB, "upper" = anderson_UB)
+}
+
+
+
+
+
+
+
