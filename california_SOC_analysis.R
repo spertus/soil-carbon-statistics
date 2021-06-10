@@ -72,15 +72,17 @@ ggplot(rangeland_master, aes(TC, fill = transect)) +
   theme(text = element_text(size = 16))
 
 
-#histogram with side by side bars for rangeland data
-ggplot(rangeland_master %>% mutate(TC = as_factor(round(TC*2)/2)) %>% filter(!is.na(TC)), aes(TC, fill = transect)) +
-  geom_bar(position = position_dodge(preserve = "single")) +
+#violin plot for rangeland data
+ggplot(rangeland_master, aes(y = TC, x = transect, fill = transect, color = transect)) +
+  geom_violin() +
+  coord_flip() +
   facet_grid(depth ~ .) +
-  xlab("% Total Carbon (TC)") +
-  ylab("Number of Samples") +
-  #ylim(0,23) +
+  scale_fill_manual(values = c("firebrick","forestgreen","darkorchid4","darkorange3","steelblue")) +
+  scale_color_manual(values = c("firebrick","forestgreen","darkorchid4","darkorange3", "steelblue")) +
+  xlab("Transect") +
+  ylab("% Total Carbon (TC)") +
   theme_bw() +
-  theme(text = element_text(size = 16))
+  theme(text = element_text(size = 16), legend.position = "none")
 
 
 #TOC histogram for rangeland
@@ -103,6 +105,18 @@ ggplot(cropland_master, aes(TC)) +
   xlim(0,8) +
   ylim(0,23) +
   theme(text = element_text(size = 16))
+
+#violin plot for cropland data
+ggplot(cropland_master, aes(y = TC, x = site, fill = site, color = site)) +
+  geom_violin() +
+  coord_flip() +
+  facet_grid(depth ~ .) +
+  scale_fill_manual(values = c("hotpink","gold3","firebrick","forestgreen","darkorchid4","darkorange3","steelblue")) +
+  scale_color_manual(values = c("hotpink","gold3","firebrick","forestgreen","darkorchid4","darkorange3", "steelblue")) +
+  xlab("Transect") +
+  ylab("% Total Carbon (TC)") +
+  theme_bw() +
+  theme(text = element_text(size = 16), legend.position = "none")
 
 
 #cropland scatter plots by depth
@@ -277,12 +291,12 @@ assay_error_long <- assay_error %>%
 
 #compare average errors on rangeland samples
 ggplot(assay_error_long, aes(sigma_delta_TC*100, fill = machine)) +
-  geom_density(alpha = .5) +
+  geom_density(alpha = .75) +
   xlim(0,10) +
   xlab("Percent Error") +
   ylab("Density") +
   theme_bw() +
-  scale_fill_discrete(name = "Machine") +
+  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("Costech", "SoliTOC")) +
   theme(text = element_text(size = 16))
 
 median_sigma_delta <- assay_error_long %>%
@@ -304,8 +318,8 @@ assay_field_proportions <- combined_master %>%
   mutate(variance_prop_nocompositing = assay_contribution / (sd_TC^2 + assay_contribution)) %>%
   mutate(variance_prop_fullcompositing =  sample_size * assay_contribution / (sd_TC^2 + sample_size * assay_contribution)) %>%
   pivot_longer(cols = c(variance_prop_nocompositing, variance_prop_fullcompositing), names_to = "compositing", names_prefix = "variance_prop_", values_to = "assay_proportion") %>%
-  mutate(compositing = ifelse(compositing == "nocompositing", "No Compositing", "Full Compositing (n=30)")) %>%
-  mutate(compositing = factor(compositing, levels = c("No Compositing", "Full Compositing (n=30)"))) %>%
+  mutate(compositing = ifelse(compositing == "nocompositing", "No Compositing", "Full Compositing")) %>%
+  mutate(compositing = factor(compositing, levels = c("No Compositing", "Full Compositing"))) %>%
   mutate(field_proportion = 1 - assay_proportion) %>%
   pivot_longer(cols = c(assay_proportion,field_proportion), names_to = "source", values_to = "proportion") %>%
   mutate(source = ifelse(source == "assay_proportion", "Assay Variability", "Spatial Heterogeneity")) %>%
@@ -318,6 +332,7 @@ ggplot(assay_field_proportions, aes(x = depth, fill = source, y = proportion)) +
   facet_grid(machine ~ compositing + land_use) +
   ylim(0,1) +
   guides(fill = guide_legend(title = "Source of Variance")) +
+  scale_fill_manual(values = c("darkorange3","steelblue")) +
   ylab("Approximate Proportion of Estimation Variance") +
   xlab("Depth") +
   theme(text = element_text(size = 16))
@@ -619,7 +634,7 @@ rangeland_grid <- expand.grid(
   mu_0 = mu_0_rangeland, 
   sigma_p = sigma_p_rangeland, 
   sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc),
-  delta = seq(0,1.5,by=.01)
+  delta = seq(0,2,by=.01)
 )
 cropland_grid <- expand.grid(
   land_use = "Cropland",
@@ -627,7 +642,7 @@ cropland_grid <- expand.grid(
   mu_0 = mu_0_cropland, 
   sigma_p = sigma_p_cropland, 
   sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc),
-  delta = seq(0,1.5,by=.01)
+  delta = seq(0,2,by=.01)
 )
 
 
@@ -645,12 +660,14 @@ power_change_topsoil <- rangeland_grid %>%
   mutate(Compositing = ifelse(Compositing == "full_compositing", "Full", ifelse(Compositing == "no_compositing", "None", "Optimal"))) 
 
 ggplot(power_change_topsoil, aes(x = delta, y = power, color = Compositing)) +
-  geom_line(size = 1.5) +
+  geom_line(size = 1.2) +
   facet_grid(sample_size ~ land_use + Machine) +
   xlab("%TC Change") +
   ylab("Power of two-sample t-test") +
   scale_y_continuous(labels = scales::percent, limits = c(0,1), breaks = c(0,.25,.5,.75,1)) +
-  xlim(0,1.5) +
+  scale_x_continuous(labels = c("0", "0.5", "1.0", "1.5"), breaks = c(0,.5,1,1.5)) +
+  scale_color_manual(values = c("firebrick","darkorange3","steelblue")) +
+  coord_cartesian(xlim = c(0,1.5)) +
   theme_bw() +
   theme(text = element_text(size = 16))
 
@@ -690,14 +707,15 @@ run_two_sample_t_test <- function(n, pop_1, pop_2){
   t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
 }
 run_two_sample_hedged <- function(n, pop_1, pop_2, resample = TRUE){
-  upper_1 <- hedged_CI(pop_1/100, n = n, alpha = .05/2, theta = 0, resample = resample)*100
-  lower_2 <- hedged_CI(pop_2/100, n = n, alpha = .05/2, theta = 1, resample = resample)*100
+  #these are one sided Simes intervals, since draws are independent
+  upper_1 <- hedged_CI(pop_1/20, n = n, alpha = 1-sqrt(1-.05), theta = 0, resample = resample)*20
+  lower_2 <- hedged_CI(pop_2/20, n = n, alpha = 1-sqrt(1-.05), theta = 1, resample = resample)*20
   reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
   reject
 }
 
 
-n_grid <- 5:20
+n_grid <- seq(5,60, by = 2)
 t_test_rejection_rate <- rep(0, length(n_grid))
 hedged_rejection_rate <- rep(0, length(n_grid))
 for(i in 1:length(n_grid)){
@@ -706,8 +724,9 @@ for(i in 1:length(n_grid)){
   t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
   hedged_rejection_rate[i] <- mean(hedged_reject)
 }
-plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'darkorange3', lwd = 2)
+plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'darkorange3', lwd = 2, cex.axis = 1.1, cex.lab = 1.1)
 points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 2)
+legend(x = 45, y = 0.8, legend = c("t-test","Nonparametric"), lty = c("solid","solid"), col = c("darkorange3","steelblue"), lwd = 2, bty = "n")
 abline(a = 0.05, b = 0, lty = 'dashed', col = 'red', lwd = 2)
 
 
@@ -721,10 +740,10 @@ topsoil_rangeland <- rangeland_master %>%
 topsoil_TC_rangeland <- topsoil_rangeland %>% pull(TC)
 
 
-effect_grid = seq(0,4,by=.1)
-run_twosample_sims <- function(sample_size, n_sims = 200){
+effect_grid = seq(0,4,by=.2)
+run_twosample_sims <- function(sample_size, n_sims = 300){
   shift <- effect_grid
-  perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  #perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
   normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
   #the hedged two sample test just returns whether or not the test rejects, not an actual p-value
   hedged_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
@@ -734,99 +753,47 @@ run_twosample_sims <- function(sample_size, n_sims = 200){
       sample_2 <- sample(topsoil_TC_rangeland + shift[j], size = sample_size, replace = TRUE)
       diff_mean <- mean(sample_1) - mean(sample_2)
       normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
-      perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 500), alternative = "two-sided")
+      #perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 500), alternative = "two-sided")
       hedged_rejections[i,j] <- run_two_sample_hedged(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
     }
   }
   normal_power_shift <- colMeans(normal_p_values < .05)
-  perm_power_shift <- colMeans(perm_p_values < .05)
+  #perm_power_shift <- colMeans(perm_p_values < .05)
   hedged_power_shift <- colMeans(hedged_rejections)
-  cbind("normal" = normal_power_shift, "permutation" = perm_power_shift, "hedged" = hedged_power_shift)
+  cbind("normal" = normal_power_shift, "hedged" = hedged_power_shift)
 }
 
 #these take a while to run, we can save them as an object
-#power_5 <- run_twosample_sims(sample_size = 5)
+# power_5 <- run_twosample_sims(sample_size = 5)
 # power_10 <- run_twosample_sims(sample_size = 10)
 # power_30 <- run_twosample_sims(sample_size = 30)
-#power_90 <- run_twosample_sims(sample_size = 90)
-#power_250 <- run_twosample_sims(sample_size = 250)
-power_1000 <- run_twosample_sims(sample_size = 1000)
+# power_90 <- run_twosample_sims(sample_size = 90)
+# power_200 <- run_twosample_sims(sample_size = 200)
+#power_1000 <- run_twosample_sims(sample_size = 1000)
 # power_frame <- bind_rows(
-#   as.data.frame(power_5) %>% mutate(sample_size = 5, effect_size = effect_grid),
 #   as.data.frame(power_10) %>% mutate(sample_size = 10, effect_size = effect_grid),
 #   as.data.frame(power_30) %>% mutate(sample_size = 30, effect_size = effect_grid),
-#   as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid)) %>%
-#   rename("t test" = normal, "Permutation test" = permutation) %>%
-#   pivot_longer(cols = c("t test", "Permutation test"), names_to = "Test", values_to = "Power")
-# save(power_frame, file = "power_frame")
-load("power_frame")
+#   as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid),
+#   as.data.frame(power_200) %>% mutate(sample_size = 200, effect_size = effect_grid)) %>%
+#   rename("t test" = normal, "Nonparametric" = hedged) %>%
+#   pivot_longer(cols = c("t test", "Nonparametric"), names_to = "Test", values_to = "Power")
+#save(power_frame, file = "power_frame_nonparametric")
+load("power_frame_nonparametric")
 
-power_frame <- as.data.frame(power_1000) %>% mutate(sample_size = 1000, effect_size = effect_grid) %>%
-    rename("t test" = normal, "Permutation test" = permutation, "Hedged martingale" = hedged) %>%
-    pivot_longer(cols = c("t test", "Permutation test", "Hedged martingale"), names_to = "Test", values_to = "Power")
+#power_frame <- as.data.frame(power_10) %>% mutate(sample_size = 10, effect_size = effect_grid) %>%
+#    rename("t test" = normal, "Nonparametric test" = hedged) %>%
+#    pivot_longer(cols = c("t test", "Nonparametric test"), names_to = "Test", values_to = "Power")
 
 ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Test)) +
   geom_line(size = 1.5) +
   facet_wrap(~ sample_size) +
   theme_bw() +
+  scale_color_manual(values = c("steelblue","darkorange3")) +
   scale_y_continuous(labels = scales::percent) +
   xlab("Effect size (additional % TC)") +
   theme(text = element_text(size = 16))
 
 
-#Two-sample tests for stratified (by transect) rangeland plot
-#function to return estimated mean and standard error given a population, sampling index, and stratification information
-#IN DEVELOPMENT
-get_mean_se_stratified <- function(sample, N_strata){
-  N <- sum(N_strata)
-  strata_weights <- N_strata / N
-  n_strata <- as.numeric(table(sample$transect))
-  strata_means <- tapply(sample$TC, sample$transect, mean)
-  strata_vars <- tapply(sample$TC, sample$transect, var)
-  var_estimate <- N^(-2) * sum(N_strata^2 * strata_vars / n_strata)
-  c(sum(strata_weights * strata_means), sqrt(var_estimate))
-}
-
-round_strata_sizes <- function(n_strata){
-  rounded_n_strata <- floor(n_strata)
-  indices <- tail(order(n_strata-rounded_n_strata), round(sum(n_strata)) - sum(rounded_n_strata))
-  rounded_n_strata[indices] <- rounded_n_strata[indices] + 1
-  rounded_n_strata
-}
-N_strata <- as.numeric(table(topsoil_rangeland$transect))
-strata_weights_prop <- N_strata / length(topsoil_rangeland$transect)
-
-run_stratified_twosample_sims <- function(sample_size, n_sims = 400){
-  n_strata_prop <- round_strata_sizes(sample_size * strata_weights_prop)
-  shift <- effect_grid
-  perm_p_values_unstrat <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  perm_p_values_strat <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  for(i in 1:n_sims){
-    for(j in 1:length(shift)){
-      locations_1 <- strata(data = topsoil_rangeland, stratanames = "transect", size = n_strata_prop, method = "srswr")
-      locations_2 <- strata(data = topsoil_rangeland, stratanames = "transect", size = n_strata_prop, method = "srswr")
-      samples_1 <- getdata(topsoil_rangeland, locations_1) %>% select(TC, transect)
-      samples_2 <- getdata(topsoil_rangeland %>% mutate(TC = TC + shift[j]), locations_2) %>% select(TC, transect)
-      estimates_1 <- get_mean_se_stratified(sample = samples_1, N_strata = N_strata)
-      estimates_2 <- get_mean_se_stratified(sample = samples_2, N_strata = N_strata)
-      diff_mean <- estimates_1[1] - estimates_2[1]
-      pooled_se <- sqrt(estimates_1[2]^2 + estimates_2[2]^2)
-      normal_p_values[i,j] <- 2*pnorm(abs(diff_mean / pooled_se), lower.tail = FALSE)
-      group_labels <- c(rep(1, nrow(samples_1)), rep(2, nrow(samples_2)))
-      combined_TC <- c(samples_1$TC, sample_2$TC)
-      combined_strata <- c(samples_1$transect, samples_2$transect)
-      perm_p_values_unstrat[i,j] <-  t2p(diff_mean, two_sample(x = samples_1$TC, y = samples_2$TC, reps = 300), alternative = "two-sided")
-      perm_p_values_strat[i,j] <- t2p(diff_mean, stratified_two_sample(group = group_labels, response = combined_TC, stratum = combined_strata, stat = "mean", reps = 300), alternative = "two-sided")
-    }
-  }
-  normal_power_shift <- colMeans(normal_p_values < .05)
-  perm_power_shift_unstrat <- colMeans(perm_p_values_unstrat < .05)
-  perm_power_shift_strat <- colMeans(perm_p_values_strat < .05)
-  cbind("normal" = normal_power_shift, "permutation_unstrat" = perm_power_shift_unstrat,  "permutation_strat" = perm_power_shift_strat)
-}
-
-stratified_power_30 <- run_stratified_twosample_sims(sample_size = 30, n_sims = 10)
 
 
 
