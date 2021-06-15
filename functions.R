@@ -767,9 +767,44 @@ beta_binomial_ppm <- function(population, mu_0, prior_alpha, prior_beta){
   p_value
 }
 
+# function to calculate empirical Bernstein bound based on Maurer and Pontil 2009 https://arxiv.org/abs/0907.3740
+# inputs:
+  #population: a vector of independent samples from a population
+  #bound: one of upper, lower, or two-sided
+#outputs:
+  #either a vector of the upper or lower bound, or a length-2 vector of a two-sided bound
+empirical_bernstein_bound <- function(population, side = "upper"){
+  shuffled_pop <- shuffle(population)
+  N <- length(shuffled_pop)
+  alpha <- .05
+  sample_mean <- mean(shuffled_pop)
+  sample_variance <- var(shuffled_pop)
+  if(side == "upper"){
+    UB <- mean(shuffled_pop) - sqrt(sample_variance * log(2/alpha) / N) + 7 * log(2/alpha) / (3 * (N-1))
+    c("upper" = pmin(UB,1))
+  } else if(side == "lower"){
+    LB <- mean(shuffled_pop) - sqrt(sample_variance * log(2/alpha) / N) + 7 * log(2/alpha) / (3 * (N-1))
+    c("lower" = pmax(LB,0))
+  } else if(side == "two-sided"){
+    LB <- mean(shuffled_pop) - sqrt(sample_variance * log(4/alpha) / N) + 7 * log(4/alpha) / (3 * (N-1))
+    UB <- mean(shuffled_pop) - sqrt(sample_variance * log(4/alpha) / N) + 7 * log(4/alpha) / (3 * (N-1))
+    c("lower" = pmax(LB,0), "upper" = pmin(UB,1))
+  } else{
+    stop("side must be one of c(lower,upper,two-sided)!")
+  }
+}
+
+
 
 
 ######### towards the Romano and Wolf bounds ######### 
+#find a lower and upper bound on the ECDF
+#inputs:
+  #x: a vector of samples
+  #alpha: a desired size
+  #grid: a mesh on which to compute and return the bounds
+#outputs:
+  #a length(grid) by 3 matrix, with first column the ecdf, second column the lower DKW bound, and third column the upper DKW bound
 DKW_bounds <- function(x, alpha = .05, grid = seq(0,1,by=.01)){
   sample_size <- length(x)
   ecdf_x <- ecdf(x)
@@ -778,6 +813,7 @@ DKW_bounds <- function(x, alpha = .05, grid = seq(0,1,by=.01)){
   cbind("ecdf" = ecdf_x(grid), "lower" = lower_bound, "upper" = upper_bound)
 }
 
+#compute a (1-\alpha) confidence interval on the mean by Anderson's method of choosing the distribution with the lowest/highest mean in the (1-alpha) K-S band (in this case computed by the DKW bound)
 anderson_CI <- function(sample, alpha = .05, resolution = .001){
   ecdf_envelope <- DKW_bounds(x = sample, alpha = alpha, grid = seq(0,1,by=resolution))
   anderson_LB <- sum((1 - ecdf_envelope[,'upper']) * resolution)
@@ -785,7 +821,15 @@ anderson_CI <- function(sample, alpha = .05, resolution = .001){
   c("lower" = anderson_LB, "upper" = anderson_UB)
 }
 
-
+#Romano and Wolf (2000) I_{n,2} Bound
+romano_wolf_CI <- function(sample, alpha = .05, beta_n = NULL){
+  n <- length(sample)
+  if(is.null(beta_n)){
+    beta_n <- log(1 + 1/(1:n))
+  }
+  sample_mean <- mean(sample)
+  LB <- sample_mean - sqrt(n) * qnorm(1 - alpha/2 + beta_n[n])
+}
 
 
 
