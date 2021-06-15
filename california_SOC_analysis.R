@@ -713,18 +713,35 @@ run_two_sample_hedged <- function(n, pop_1, pop_2, resample = TRUE){
   reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
   reject
 }
+run_two_sample_eb <- function(n, pop_1, pop_2, resample){
+  if(resample){
+    sample_1 <- sample(pop_1, size = n, replace = TRUE)
+    sample_2 <- sample(pop_2, size = n, replace = TRUE)
+  } else{
+    sample_1 <- pop_1
+    sample_2 <- pop_2
+  }
+  upper_1 <- empirical_bernstein_bound(x = sample_1/20, alpha = 1-sqrt(1-.05), side = "upper")*20
+  lower_2 <- empirical_bernstein_bound(x = sample_2/20, alpha = 1-sqrt(1-.05), side = "lower")*20
+  reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
+  reject
+}
 
 
 n_grid <- seq(5,60, by = 2)
 t_test_rejection_rate <- rep(0, length(n_grid))
 hedged_rejection_rate <- rep(0, length(n_grid))
+eb_rejection_rate <- rep(0, length(n_grid))
 for(i in 1:length(n_grid)){
   t_test_p_values <- replicate(n = 200, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
   hedged_reject <- replicate(n = 200, run_two_sample_hedged(n = n_grid[i], pop_1, pop_2))
+  eb_reject <- replicate(n = 200, run_two_sample_eb(n = n_grid[i], pop_1, pop_2, resample = TRUE))
   t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
   hedged_rejection_rate[i] <- mean(hedged_reject)
+  eb_rejection_rate[i] <- mean(eb_reject)
 }
 plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'darkorange3', lwd = 2, cex.axis = 1.1, cex.lab = 1.1)
+points(y = eb_rejection_rate, x = n_grid, type = 'l', col = 'grey', lwd = 2)
 points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 2)
 legend(x = 45, y = 0.8, legend = c("t-test","Nonparametric"), lty = c("solid","solid"), col = c("darkorange3","steelblue"), lwd = 2, bty = "n")
 abline(a = 0.05, b = 0, lty = 'dashed', col = 'red', lwd = 2)
@@ -743,23 +760,23 @@ topsoil_TC_rangeland <- topsoil_rangeland %>% pull(TC)
 effect_grid = seq(0,4,by=.2)
 run_twosample_sims <- function(sample_size, n_sims = 300){
   shift <- effect_grid
-  #perm_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
   normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
   #the hedged two sample test just returns whether or not the test rejects, not an actual p-value
   hedged_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  #eb_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
   for(i in 1:n_sims){
     for(j in 1:length(shift)){
       sample_1 <- sample(topsoil_TC_rangeland, size = sample_size, replace = TRUE)
       sample_2 <- sample(topsoil_TC_rangeland + shift[j], size = sample_size, replace = TRUE)
       diff_mean <- mean(sample_1) - mean(sample_2)
       normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
-      #perm_p_values[i,j] <- t2p(diff_mean, two_sample(x = sample_1, y = sample_2, reps = 500), alternative = "two-sided")
       hedged_rejections[i,j] <- run_two_sample_hedged(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
+      #eb_rejections[i,j] <- run_two_sample_eb(pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
     }
   }
   normal_power_shift <- colMeans(normal_p_values < .05)
-  #perm_power_shift <- colMeans(perm_p_values < .05)
   hedged_power_shift <- colMeans(hedged_rejections)
+  #eb_power_shift <- colMeans(eb_rejections)
   cbind("normal" = normal_power_shift, "hedged" = hedged_power_shift)
 }
 
@@ -767,7 +784,7 @@ run_twosample_sims <- function(sample_size, n_sims = 300){
 # power_5 <- run_twosample_sims(sample_size = 5)
 # power_10 <- run_twosample_sims(sample_size = 10)
 # power_30 <- run_twosample_sims(sample_size = 30)
-# power_90 <- run_twosample_sims(sample_size = 90)
+#power_90 <- run_twosample_sims(sample_size = 90)
 # power_200 <- run_twosample_sims(sample_size = 200)
 #power_1000 <- run_twosample_sims(sample_size = 1000)
 # power_frame <- bind_rows(
@@ -780,9 +797,9 @@ run_twosample_sims <- function(sample_size, n_sims = 300){
 #save(power_frame, file = "power_frame_nonparametric")
 load("power_frame_nonparametric")
 
-#power_frame <- as.data.frame(power_10) %>% mutate(sample_size = 10, effect_size = effect_grid) %>%
-#    rename("t test" = normal, "Nonparametric test" = hedged) %>%
-#    pivot_longer(cols = c("t test", "Nonparametric test"), names_to = "Test", values_to = "Power")
+# power_frame <- as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid) %>%
+#     rename("t test" = normal, "Nonparametric test" = hedged) %>%
+#     pivot_longer(cols = c("t test", "Nonparametric test"), names_to = "Test", values_to = "Power")
 
 ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Test)) +
   geom_line(size = 1.5) +

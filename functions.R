@@ -769,25 +769,25 @@ beta_binomial_ppm <- function(population, mu_0, prior_alpha, prior_beta){
 
 # function to calculate empirical Bernstein bound based on Maurer and Pontil 2009 https://arxiv.org/abs/0907.3740
 # inputs:
-  #population: a vector of independent samples from a population
+  #x: a vector of independent samples from a population
+  #alpha: the desired level of the confidence interval
   #bound: one of upper, lower, or two-sided
 #outputs:
   #either a vector of the upper or lower bound, or a length-2 vector of a two-sided bound
-empirical_bernstein_bound <- function(population, side = "upper"){
-  shuffled_pop <- shuffle(population)
-  N <- length(shuffled_pop)
+empirical_bernstein_bound <- function(x, alpha = .05, side = "upper"){
+  N <- length(x)
   alpha <- .05
-  sample_mean <- mean(shuffled_pop)
-  sample_variance <- var(shuffled_pop)
+  sample_mean <- mean(x)
+  sample_variance <- var(x)
   if(side == "upper"){
-    UB <- mean(shuffled_pop) - sqrt(sample_variance * log(2/alpha) / N) + 7 * log(2/alpha) / (3 * (N-1))
+    UB <- mean(x) + sqrt(sample_variance * log(2/alpha) / N) + 7 * log(2/alpha) / (3 * (N-1))
     c("upper" = pmin(UB,1))
   } else if(side == "lower"){
-    LB <- mean(shuffled_pop) - sqrt(sample_variance * log(2/alpha) / N) + 7 * log(2/alpha) / (3 * (N-1))
+    LB <- mean(x) - sqrt(sample_variance * log(2/alpha) / N) - 7 * log(2/alpha) / (3 * (N-1))
     c("lower" = pmax(LB,0))
   } else if(side == "two-sided"){
-    LB <- mean(shuffled_pop) - sqrt(sample_variance * log(4/alpha) / N) + 7 * log(4/alpha) / (3 * (N-1))
-    UB <- mean(shuffled_pop) - sqrt(sample_variance * log(4/alpha) / N) + 7 * log(4/alpha) / (3 * (N-1))
+    LB <- mean(x) - sqrt(sample_variance * log(4/alpha) / N) - 7 * log(4/alpha) / (3 * (N-1))
+    UB <- mean(x) + sqrt(sample_variance * log(4/alpha) / N) + 7 * log(4/alpha) / (3 * (N-1))
     c("lower" = pmax(LB,0), "upper" = pmin(UB,1))
   } else{
     stop("side must be one of c(lower,upper,two-sided)!")
