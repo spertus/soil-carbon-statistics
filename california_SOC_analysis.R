@@ -706,42 +706,26 @@ run_two_sample_t_test <- function(n, pop_1, pop_2){
   sample_2 <- sample(pop_2, size = n, replace = TRUE)
   t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
 }
-run_two_sample_hedged <- function(n, pop_1, pop_2, resample = TRUE){
-  #these are one sided Simes intervals, since draws are independent
-  upper_1 <- hedged_CI(pop_1/20, n = n, alpha = 1-sqrt(1-.05), theta = 0, resample = resample)*20
-  lower_2 <- hedged_CI(pop_2/20, n = n, alpha = 1-sqrt(1-.05), theta = 1, resample = resample)*20
-  reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
-  reject
-}
-run_two_sample_eb <- function(n, pop_1, pop_2, resample){
-  if(resample){
-    sample_1 <- sample(pop_1, size = n, replace = TRUE)
-    sample_2 <- sample(pop_2, size = n, replace = TRUE)
-  } else{
-    sample_1 <- pop_1
-    sample_2 <- pop_2
-  }
-  upper_1 <- empirical_bernstein_bound(x = sample_1/20, alpha = 1-sqrt(1-.05), side = "upper")*20
-  lower_2 <- empirical_bernstein_bound(x = sample_2/20, alpha = 1-sqrt(1-.05), side = "lower")*20
-  reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
-  reject
-}
+
 
 
 n_grid <- seq(5,60, by = 2)
 t_test_rejection_rate <- rep(0, length(n_grid))
 hedged_rejection_rate <- rep(0, length(n_grid))
 eb_rejection_rate <- rep(0, length(n_grid))
+anderson_rejection_rate <- rep(0, length(n_grid))
 for(i in 1:length(n_grid)){
   t_test_p_values <- replicate(n = 200, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
-  hedged_reject <- replicate(n = 200, run_two_sample_hedged(n = n_grid[i], pop_1, pop_2))
-  eb_reject <- replicate(n = 200, run_two_sample_eb(n = n_grid[i], pop_1, pop_2, resample = TRUE))
+  hedged_reject <- replicate(n = 200, two_sample_hedged_test(n = n_grid[i], pop_1, pop_2))
+  #eb_reject <- replicate(n = 200, two_sample_eb_test(n = n_grid[i], pop_1, pop_2, resample = TRUE))
+  anderson_reject <- replicate(n = 200, two_sample_anderson_test(n = n_grid[i], pop_1, pop_2, resample = TRUE))
   t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
   hedged_rejection_rate[i] <- mean(hedged_reject)
-  eb_rejection_rate[i] <- mean(eb_reject)
+  anderson_rejection_rate[i] <- mean(anderson_reject)
+  #eb_rejection_rate[i] <- mean(eb_reject)
 }
 plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'darkorange3', lwd = 2, cex.axis = 1.1, cex.lab = 1.1)
-points(y = eb_rejection_rate, x = n_grid, type = 'l', col = 'grey', lwd = 2)
+points(y = anderson_rejection_rate, x = n_grid, type = 'l', col = 'grey', lwd = 2)
 points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 2)
 legend(x = 45, y = 0.8, legend = c("t-test","Nonparametric"), lty = c("solid","solid"), col = c("darkorange3","steelblue"), lwd = 2, bty = "n")
 abline(a = 0.05, b = 0, lty = 'dashed', col = 'red', lwd = 2)
@@ -763,6 +747,7 @@ run_twosample_sims <- function(sample_size, n_sims = 300){
   normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
   #the hedged two sample test just returns whether or not the test rejects, not an actual p-value
   hedged_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  anderson_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
   #eb_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
   for(i in 1:n_sims){
     for(j in 1:length(shift)){
@@ -770,14 +755,16 @@ run_twosample_sims <- function(sample_size, n_sims = 300){
       sample_2 <- sample(topsoil_TC_rangeland + shift[j], size = sample_size, replace = TRUE)
       diff_mean <- mean(sample_1) - mean(sample_2)
       normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
-      hedged_rejections[i,j] <- run_two_sample_hedged(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
-      #eb_rejections[i,j] <- run_two_sample_eb(pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
+      hedged_rejections[i,j] <- two_sample_hedged_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
+      anderson_rejections[i,j] <- two_sample_anderson_test(pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
+      #eb_rejections[i,j] <- two_sample_eb_test(pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
     }
   }
   normal_power_shift <- colMeans(normal_p_values < .05)
   hedged_power_shift <- colMeans(hedged_rejections)
+  anderson_power_shift <- colMeans(anderson_rejections)
   #eb_power_shift <- colMeans(eb_rejections)
-  cbind("normal" = normal_power_shift, "hedged" = hedged_power_shift)
+  cbind("normal" = normal_power_shift, "hedged" = hedged_power_shift, "anderson"= anderson_power_shift)
 }
 
 #these take a while to run, we can save them as an object
