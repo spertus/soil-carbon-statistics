@@ -814,11 +814,28 @@ DKW_bounds <- function(x, alpha = .05, grid = seq(0,1,by=.01)){
 }
 
 #compute a (1-\alpha) confidence interval on the mean by Anderson's method of choosing the distribution with the lowest/highest mean in the (1-alpha) K-S band (in this case computed by the DKW bound)
-anderson_CI <- function(sample, alpha = .05, resolution = .001){
-  ecdf_envelope <- DKW_bounds(x = sample, alpha = alpha, grid = seq(0,1,by=resolution))
-  anderson_LB <- sum((1 - ecdf_envelope[,'upper']) * resolution)
-  anderson_UB <- sum((1 - ecdf_envelope[,'lower']) * resolution)
-  c("lower" = anderson_LB, "upper" = anderson_UB)
+anderson_CI <- function(x, alpha = .05, side = "upper"){
+  n <- length(x)
+  if(side == "upper"){
+    u <- pmax(1:n/n - sqrt(log(1/alpha)/(2*n)), 0)
+    sorted_x <- c(sort(x, decreasing = FALSE), 1)
+    UB <- 1 - sum(u * diff(sorted_x))
+    c("upper" = pmin(UB,1))
+  } else if(side == "lower"){
+    u <- pmax(1:n/n - sqrt(log(1/alpha)/(2*n)), 0)
+    rev_sorted_x <- c(sort(x, decreasing = TRUE), 0)
+    LB <- sum(u * -diff(rev_sorted_x))
+    c("lower" = pmax(LB,0))
+  } else if(side == "two-sided"){
+    u <- pmax(1:n/n - sqrt(log(2/alpha)/(2*n)), 0)
+    sorted_x <- c(sort(x, decreasing = FALSE), 1)
+    rev_sorted_x <- c(sort(x, decreasing = TRUE), 0)
+    UB <- 1 - sum(u * diff(sorted_x))
+    LB <- sum(u * -diff(rev_sorted_x))
+    c("lower" = pmax(LB,0), "upper" = pmin(UB,1))
+  } else{
+    stop("side must be one of c(lower,upper,two-sided)!")
+  }
 }
 
 #Romano and Wolf (2000) I_{n,2} Bound
