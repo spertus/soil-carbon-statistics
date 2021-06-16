@@ -814,11 +814,34 @@ DKW_bounds <- function(x, alpha = .05, grid = seq(0,1,by=.01)){
 }
 
 #compute a (1-\alpha) confidence interval on the mean by Anderson's method of choosing the distribution with the lowest/highest mean in the (1-alpha) K-S band (in this case computed by the DKW bound)
-anderson_CI <- function(sample, alpha = .05, resolution = .001){
-  ecdf_envelope <- DKW_bounds(x = sample, alpha = alpha, grid = seq(0,1,by=resolution))
-  anderson_LB <- sum((1 - ecdf_envelope[,'upper']) * resolution)
-  anderson_UB <- sum((1 - ecdf_envelope[,'lower']) * resolution)
-  c("lower" = anderson_LB, "upper" = anderson_UB)
+#inputs:
+  #x: a vector of independent random samples from a population distribution on [0,1]
+  #alpha: the desired level of the confidence interval
+  #side: the sidedness of the bounds, one of "upper", "lower", or "two-sided"
+#outputs:
+  #an upper, lower, or two-sided confidence bound on the mean of the distribution from which x was drawn
+anderson_CI <- function(x, alpha = .05, side = "upper"){
+  n <- length(x)
+  if(side == "upper"){
+    u <- pmax(1:n/n - sqrt(log(1/alpha)/(2*n)), 0)
+    sorted_x <- c(sort(x, decreasing = FALSE), 1)
+    UB <- 1 - sum(u * diff(sorted_x))
+    c("upper" = pmin(UB,1))
+  } else if(side == "lower"){
+    u <- pmax(1:n/n - sqrt(log(1/alpha)/(2*n)), 0)
+    rev_sorted_x <- c(sort(x, decreasing = TRUE), 0)
+    LB <- sum(u * -diff(rev_sorted_x))
+    c("lower" = pmax(LB,0))
+  } else if(side == "two-sided"){
+    u <- pmax(1:n/n - sqrt(log(2/alpha)/(2*n)), 0)
+    sorted_x <- c(sort(x, decreasing = FALSE), 1)
+    rev_sorted_x <- c(sort(x, decreasing = TRUE), 0)
+    UB <- 1 - sum(u * diff(sorted_x))
+    LB <- sum(u * -diff(rev_sorted_x))
+    c("lower" = pmax(LB,0), "upper" = pmin(UB,1))
+  } else{
+    stop("side must be one of c(lower,upper,two-sided)!")
+  }
 }
 
 #Romano and Wolf (2000) I_{n,2} Bound
@@ -832,6 +855,44 @@ romano_wolf_CI <- function(sample, alpha = .05, beta_n = NULL){
 }
 
 
+
+two_sample_hedged_test <- function(n, pop_1, pop_2, resample = TRUE){
+  #these are one sided Simes intervals, since draws are independent
+  upper_1 <- hedged_CI(pop_1/20, n = n, alpha = 1-sqrt(1-.05), theta = 0, resample = resample)*20
+  lower_2 <- hedged_CI(pop_2/20, n = n, alpha = 1-sqrt(1-.05), theta = 1, resample = resample)*20
+  reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
+  reject
+}
+
+#assumes samples are bounded between 0 and 20%
+two_sample_eb_test <- function(n, pop_1, pop_2, resample){
+  if(resample){
+    sample_1 <- sample(pop_1, size = n, replace = TRUE)
+    sample_2 <- sample(pop_2, size = n, replace = TRUE)
+  } else{
+    sample_1 <- pop_1
+    sample_2 <- pop_2
+  }
+  upper_1 <- empirical_bernstein_bound(x = sample_1/20, alpha = 1-sqrt(1-.05), side = "upper")*20
+  lower_2 <- empirical_bernstein_bound(x = sample_2/20, alpha = 1-sqrt(1-.05), side = "lower")*20
+  reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
+  reject
+}
+
+#assumes samples are bounded between 0 and 20%
+two_sample_anderson_test <- function(n, pop_1, pop_2, resample){
+  if(resample){
+    sample_1 <- sample(pop_1, size = n, replace = TRUE)
+    sample_2 <- sample(pop_2, size = n, replace = TRUE)
+  } else{
+    sample_1 <- pop_1
+    sample_2 <- pop_2
+  }
+  upper_1 <- anderson_CI(x = sample_1/20, alpha = 1-sqrt(1-.05), side = "upper")*20
+  lower_2 <- anderson_CI(x = sample_2/20, alpha = 1-sqrt(1-.05), side = "lower")*20
+  reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
+  reject
+}
 
 
 
