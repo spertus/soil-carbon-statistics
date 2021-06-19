@@ -163,7 +163,37 @@ table_1 <- combined_master %>%
 
 
 
-#linear models
+#permutation ANOVAs 
+#need to drop missing TC observations and only use complete data
+rangeland_master_complete <- rangeland_master %>% 
+  filter(!is.na(TC)) %>%
+  mutate(transect_id = as.numeric(as.factor(transect))) %>%
+  mutate(depth_id = as.numeric(as.factor(depth)))
+cropland_master_complete <- cropland_master %>% 
+  filter(!is.na(TC)) %>%
+  mutate(site_id = as.numeric(as.factor(site))) %>%
+  mutate(depth_id = as.numeric(as.factor(depth)))
+
+#Rangeland permutation ANOVA results
+rangeland_transect_ANOVA <- t2p(
+  tst = sum(table(rangeland_master_complete$transect_id) * tapply(rangeland_master_complete$TC, rangeland_master_complete$transect_id, mean)^2),
+  distr = k_sample(x = rangeland_master_complete$TC, group = rangeland_master_complete$transect_id, stat = "oneway_anova", reps = 10000),
+  alternative = "two-sided")
+rangeland_depth_ANOVA <- t2p(
+  tst = sum(table(rangeland_master_complete$depth_id) * tapply(rangeland_master_complete$TC, rangeland_master_complete$depth_id, mean)^2),
+  distr = k_sample(x = rangeland_master_complete$TC, group = rangeland_master_complete$depth_id, stat = "oneway_anova", reps = 10000),
+  alternative = "two-sided")
+
+#Cropland permutation ANOVA results
+cropland_site_ANOVA <- t2p(
+  tst = sum(table(cropland_master_complete$site_id) * tapply(cropland_master_complete$TC, cropland_master_complete$site_id, mean)^2),
+  distr = k_sample(x = cropland_master_complete$TC, group = cropland_master_complete$site_id, stat = "oneway_anova", reps = 10000),
+  alternative = "two-sided")
+cropland_depth_ANOVA <- t2p(
+  tst = sum(table(cropland_master_complete$depth_id) * tapply(cropland_master_complete$TC, cropland_master_complete$depth_id, mean)^2),
+  distr = k_sample(x = cropland_master_complete$TC, group = cropland_master_complete$depth_id, stat = "oneway_anova", reps = 10000),
+  alternative = "two-sided")
+
 rangeland_model <- lm(TC ~ transect*depth, data = rangeland_master)
 cropland_model <- lm(TC ~ site*depth, data = cropland_master)
 anova(rangeland_model)
@@ -701,12 +731,6 @@ hist(pop_1, breaks = 50, xlim = c(2,6), xlab = "Population distribution at time 
 hist(pop_2, breaks = 5, xlim = c(2,6), xlab = "Population distribution at time 2", freq = FALSE, main = "")
 par(mfrow = c(1,1))
 
-run_two_sample_t_test <- function(n, pop_1, pop_2){
-  sample_1 <- sample(pop_1, size = n, replace = TRUE)
-  sample_2 <- sample(pop_2, size = n, replace = TRUE)
-  t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
-}
-
 
 
 n_grid <- seq(5,60, by = 2)
@@ -714,18 +738,21 @@ t_test_rejection_rate <- rep(0, length(n_grid))
 hedged_rejection_rate <- rep(0, length(n_grid))
 eb_rejection_rate <- rep(0, length(n_grid))
 anderson_rejection_rate <- rep(0, length(n_grid))
+LMT_rejection_rate <- rep(0, length(n_grid))
 for(i in 1:length(n_grid)){
   t_test_p_values <- replicate(n = 200, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
   hedged_reject <- replicate(n = 200, two_sample_hedged_test(n = n_grid[i], pop_1, pop_2))
   #eb_reject <- replicate(n = 200, two_sample_eb_test(n = n_grid[i], pop_1, pop_2, resample = TRUE))
-  anderson_reject <- replicate(n = 200, two_sample_anderson_test(n = n_grid[i], pop_1, pop_2, resample = TRUE))
+  #anderson_reject <- replicate(n = 200, two_sample_anderson_test(n = n_grid[i], pop_1, pop_2, resample = TRUE))
+  LMT_reject <- replicate(n = 200, two_sample_LMT_test(n = n_grid[i], pop_1, pop_2, resample = TRUE, B = 200))
   t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
   hedged_rejection_rate[i] <- mean(hedged_reject)
-  anderson_rejection_rate[i] <- mean(anderson_reject)
+  LMT_rejection_rate[i] <- mean(LMT_reject)
+  #anderson_rejection_rate[i] <- mean(anderson_reject)
   #eb_rejection_rate[i] <- mean(eb_reject)
 }
 plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'darkorange3', lwd = 2, cex.axis = 1.1, cex.lab = 1.1)
-points(y = anderson_rejection_rate, x = n_grid, type = 'l', col = 'grey', lwd = 2)
+points(y = LMT_rejection_rate, x = n_grid, type = 'l', col = 'grey', lwd = 2)
 points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 2)
 legend(x = 45, y = 0.8, legend = c("t-test","Nonparametric"), lty = c("solid","solid"), col = c("darkorange3","steelblue"), lwd = 2, bty = "n")
 abline(a = 0.05, b = 0, lty = 'dashed', col = 'red', lwd = 2)
