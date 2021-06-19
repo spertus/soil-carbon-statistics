@@ -751,11 +751,11 @@ for(i in 1:length(n_grid)){
   #anderson_rejection_rate[i] <- mean(anderson_reject)
   #eb_rejection_rate[i] <- mean(eb_reject)
 }
-plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'darkorange3', lwd = 2, cex.axis = 1.1, cex.lab = 1.1)
-points(y = LMT_rejection_rate, x = n_grid, type = 'l', col = 'grey', lwd = 2)
-points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 2)
-legend(x = 45, y = 0.8, legend = c("t-test","Nonparametric"), lty = c("solid","solid"), col = c("darkorange3","steelblue"), lwd = 2, bty = "n")
-abline(a = 0.05, b = 0, lty = 'dashed', col = 'red', lwd = 2)
+plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'forestgreen', lwd = 2, cex.axis = 1.1, cex.lab = 1.1)
+points(y = LMT_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 2)
+points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'darkorange3', lwd = 2, lty = "dashed")
+legend(x = 45, y = 0.8, legend = c("Hedged","LMT","t-test"), lty = c("dashed", "solid","solid"), col = c("darkorange3","steelblue","forestgreen"), lwd = 2, bty = "n")
+abline(a = 0.05, b = 0, lty = 'dashed', col = 'black', lwd = 2)
 
 
 # power of permutation tests, t-tests, and martingales to detect topsoil change 
@@ -774,7 +774,8 @@ run_twosample_sims <- function(sample_size, n_sims = 300){
   normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
   #the hedged two sample test just returns whether or not the test rejects, not an actual p-value
   hedged_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  anderson_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  LMT_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  #anderson_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
   #eb_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
   for(i in 1:n_sims){
     for(j in 1:length(shift)){
@@ -783,22 +784,24 @@ run_twosample_sims <- function(sample_size, n_sims = 300){
       diff_mean <- mean(sample_1) - mean(sample_2)
       normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
       hedged_rejections[i,j] <- two_sample_hedged_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
-      anderson_rejections[i,j] <- two_sample_anderson_test(pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
+      LMT_rejections[i,j] <- two_sample_LMT_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE, B = 200)
+      #anderson_rejections[i,j] <- two_sample_anderson_test(pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
       #eb_rejections[i,j] <- two_sample_eb_test(pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
     }
   }
   normal_power_shift <- colMeans(normal_p_values < .05)
   hedged_power_shift <- colMeans(hedged_rejections)
-  anderson_power_shift <- colMeans(anderson_rejections)
+  LMT_power_shift <- colMeans(LMT_rejections)
+  #anderson_power_shift <- colMeans(anderson_rejections)
   #eb_power_shift <- colMeans(eb_rejections)
-  cbind("normal" = normal_power_shift, "hedged" = hedged_power_shift, "anderson"= anderson_power_shift)
+  cbind("normal" = normal_power_shift, "hedged" = hedged_power_shift, "LMT"= LMT_power_shift)
 }
 
 #these take a while to run, we can save them as an object
 # power_5 <- run_twosample_sims(sample_size = 5)
 # power_10 <- run_twosample_sims(sample_size = 10)
 # power_30 <- run_twosample_sims(sample_size = 30)
-#power_90 <- run_twosample_sims(sample_size = 90)
+# power_90 <- run_twosample_sims(sample_size = 90)
 # power_200 <- run_twosample_sims(sample_size = 200)
 #power_1000 <- run_twosample_sims(sample_size = 1000)
 # power_frame <- bind_rows(
@@ -806,20 +809,20 @@ run_twosample_sims <- function(sample_size, n_sims = 300){
 #   as.data.frame(power_30) %>% mutate(sample_size = 30, effect_size = effect_grid),
 #   as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid),
 #   as.data.frame(power_200) %>% mutate(sample_size = 200, effect_size = effect_grid)) %>%
-#   rename("t test" = normal, "Nonparametric" = hedged) %>%
-#   pivot_longer(cols = c("t test", "Nonparametric"), names_to = "Test", values_to = "Power")
-#save(power_frame, file = "power_frame_nonparametric")
+#   rename("t test" = normal, "Hedged test" = hedged, "LMT test" = LMT) %>%
+#   pivot_longer(cols = c("t test", "Hedged test", "LMT test"), names_to = "Test", values_to = "Power")
+# save(power_frame, file = "power_frame_nonparametric")
 load("power_frame_nonparametric")
 
 # power_frame <- as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid) %>%
-#     rename("t test" = normal, "Nonparametric test" = hedged) %>%
-#     pivot_longer(cols = c("t test", "Nonparametric test"), names_to = "Test", values_to = "Power")
+#     rename("t test" = normal, "Hedged test" = hedged, "LMT test" = LMT) %>%
+#     pivot_longer(cols = c("t test", "Hedged test", "LMT test"), names_to = "Test", values_to = "Power")
 
 ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Test)) +
   geom_line(size = 1.5) +
   facet_wrap(~ sample_size) +
   theme_bw() +
-  scale_color_manual(values = c("steelblue","darkorange3")) +
+  scale_color_manual(values = c("darkorange3","steelblue","forestgreen")) +
   scale_y_continuous(labels = scales::percent) +
   xlab("Effect size (additional % TC)") +
   theme(text = element_text(size = 16))
