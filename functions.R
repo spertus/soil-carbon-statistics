@@ -844,7 +844,35 @@ anderson_CI <- function(x, alpha = .05, side = "upper"){
   }
 }
 
-#Romano and Wolf (2000) I_{n,2} Bound
+#Learned-Miller and Thomas bound https://arxiv.org/pdf/1905.06208.pdf
+#inputs:
+  #x: a vector of iid random samples
+  #alpha: a desired level for the confidence interval
+  #B: the number of Monte Carlo iterations to estimate the interval
+  #side: the side of the confidence interval, either "upper" or "lower"
+#outputs:
+  #an upper or lower confidence bound
+LMT_CI <- function(x, alpha = .05, B = 10000, side = "upper"){
+  n <- length(x)
+  if(side == "lower"){
+    x <- 1 - x
+  }
+  z <- sort(x, decreasing = FALSE)
+  ms <- rep(NA, B)
+  s <- c(diff(z), 1 - z[n])
+  for(i in 1:B){
+    u <- sort(runif(n), decreasing = FALSE)
+    ms[i] <- 1 - sum(u * s)
+  }
+  ms_alpha <- quantile(ms, 1 - alpha)
+  if(side == "lower"){
+    1 - ms_alpha
+  } else if(side == "upper"){
+    ms_alpha
+  }
+}
+
+#Romano and Wolf (2000) I_{n,2} Bound. UNDER DEVELOPMENT
 romano_wolf_CI <- function(sample, alpha = .05, beta_n = NULL){
   n <- length(sample)
   if(is.null(beta_n)){
@@ -855,6 +883,12 @@ romano_wolf_CI <- function(sample, alpha = .05, beta_n = NULL){
 }
 
 
+###### Two sample tests ########
+run_two_sample_t_test <- function(n, pop_1, pop_2){
+  sample_1 <- sample(pop_1, size = n, replace = TRUE)
+  sample_2 <- sample(pop_2, size = n, replace = TRUE)
+  t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
+}
 
 two_sample_hedged_test <- function(n, pop_1, pop_2, resample = TRUE){
   #these are one sided Simes intervals, since draws are independent
@@ -894,5 +928,18 @@ two_sample_anderson_test <- function(n, pop_1, pop_2, resample){
   reject
 }
 
+two_sample_LMT_test <- function(n, pop_1, pop_2, resample, B = 1000){
+  if(resample){
+    sample_1 <- sample(pop_1, size = n, replace = TRUE)
+    sample_2 <- sample(pop_2, size = n, replace = TRUE)
+  } else{
+    sample_1 <- pop_1
+    sample_2 <- pop_2
+  }
+  upper_1 <- LMT_CI(x = sample_1/20, alpha = 1-sqrt(1-.05), B = B, side = "upper")*20
+  lower_2 <- LMT_CI(x = sample_2/20, alpha = 1-sqrt(1-.05), B = B, side = "lower")*20
+  reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
+  reject
+}
 
 
