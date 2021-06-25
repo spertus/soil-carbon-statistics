@@ -62,9 +62,9 @@ combined_master <- rangeland_master %>%
 ###################### TOC concentration and BD in space ######################
 
 #stacked TC histograms for rangeland data
-ggplot(rangeland_master, aes(TC, fill = transect)) +
-  geom_histogram(binwidth = 0.25, position = "stack", alpha = 1) +
-  facet_grid(depth ~ .) +
+ggplot(rangeland_master, aes(TC)) +
+  geom_histogram(binwidth = 0.25, alpha = 1) +
+  facet_grid(depth ~ transect) +
   xlab("% Total Carbon (TC)") +
   ylab("Number of Samples") +
   #ylim(0,23) +
@@ -95,15 +95,15 @@ ggplot(rangeland_master, aes(TOC)) +
   theme(text = element_text(size = 16))
 
 
-#stacked histograms for cropland data
+#histograms for cropland data
 ggplot(cropland_master, aes(TC)) +
   geom_histogram(binwidth = 0.25) +
   facet_grid(depth ~ site) +
   xlab("% Total Carbon (TC)") +
   ylab("Number of Samples") +
   theme_bw() +
-  xlim(0,8) +
-  ylim(0,23) +
+  #xlim(0,8) +
+  #ylim(0,23) +
   theme(text = element_text(size = 16))
 
 #violin plot for cropland data
@@ -537,7 +537,7 @@ rangeland_data_topsoil <- rangeland_master %>%
   filter(!is.na(TC)) %>%
   arrange(transect)
 
-#the sample size for simulations
+#the sample size for survey simulations
 n <- 90
 #function to return the estimated mean and standard error given a population and sample index
 get_mean_se <- function(population, sample_index){
@@ -589,14 +589,15 @@ run_rangeland_sim <- function(data_frame){
 #compute the estimand, i.e. the true mean in the rangeland topsoil data
 true_rangeland_mean <- mean(rangeland_data_topsoil$TC)
 
-#run simulations, replicated 1000 times
+#run simulations, replicated 2000 times
 rangeland_sims <- replicate(n = 2000, run_rangeland_sim(data_frame = rangeland_data_topsoil))
 
 #compute properties of the samples
 #the empirical coverage of 95% normal theory confidence intervals (should be 95%)
-coverage_rangeland <- apply(rangeland_sims[1,,] - qnorm(p = .975) * rangeland_sims[2,,] <= true_rangeland_mean & true_rangeland_mean <= rangeland_sims[1,,] + qnorm(p = .975) * rangeland_sims[2,,], 1, mean)
+t_quantiles <- c(qt(p = .975, df = n - 1), qt(p = .975, df = n - length(N_strata)), qt(p = .975, df = n - length(N_strata)))
+coverage_rangeland <- apply(rangeland_sims[1,,] - t_quantiles * rangeland_sims[2,,] <= true_rangeland_mean & true_rangeland_mean <= rangeland_sims[1,,] + t_quantiles * rangeland_sims[2,,], 1, mean)
 #the width of a confidence interval, basically 4 times the SE
-ci_width_rangeland <- apply(2 * qnorm(p = .975) * rangeland_sims[2,,], 1, mean)
+ci_width_rangeland <- apply(2 * t_quantiles * rangeland_sims[2,,], 1, mean)
 #the actual standard error over simulations
 se_rangeland <- apply(rangeland_sims, c(1,2), sd)[1,]
 #the average estimated standard error
@@ -642,74 +643,64 @@ precision_combined <- combined_master %>%
   summarize(mu_site = mean(TC, na.rm = T), sigma_p_site = sd(TC, na.rm = T)) %>%
   group_by(depth, land_use) %>%
   summarize(mu = mean(mu_site, na.rm = T), sigma_p = mean(sigma_p_site, na.rm = T)) %>%
-  mutate(se_no_compositing = sqrt(get_variance(n = sample_size, k = sample_size, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech))) %>%
-  mutate(se_full_compositing = sqrt(get_variance(n = max_sample_size, k = 1, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech))) %>%
-  mutate(se_optimal_compositing = sqrt(get_minimum_error(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = max_budget)$optimum_variance)) %>%
-  mutate(composite_efficiency_ratio = se_optimal_compositing / se_no_compositing) %>%
-  mutate(optimal_composite_size_commercial = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 13.60)) %>%
-  mutate(optimal_composite_size_inhouse = get_optimal_composite_size(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, cost_c = 20, cost_P = 0, cost_A = 2.78)) %>%
+  mutate(se_no_compositing_costech = sqrt(get_variance(n = sample_size, k = sample_size, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech))) %>%
+  mutate(se_full_compositing_costech = sqrt(get_variance(n = max_sample_size, k = 1, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech))) %>%
+  mutate(se_optimal_compositing_costech = sqrt(get_minimum_error(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_costech, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = max_budget)$optimum_variance)) %>%
+  mutate(se_no_compositing_solitoc = sqrt(get_variance(n = sample_size, k = sample_size, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_solitoc))) %>%
+  mutate(se_full_compositing_solitoc = sqrt(get_variance(n = max_sample_size, k = 1, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_solitoc))) %>%
+  mutate(se_optimal_compositing_solitoc = sqrt(get_minimum_error(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta_solitoc, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = max_budget)$optimum_variance)) %>%
   arrange(land_use, depth)
 
+precision_combined_long <- precision_combined %>%
+  pivot_longer(cols = starts_with("se_"), names_to = "compositing", values_to = "std_error", names_prefix = "se_") %>%
+  separate(compositing, into = c("Compositing", "Instrument"), sep = "_compositing_") %>%
+  mutate(Instrument = ifelse(Instrument == "costech", "Costech", "SoliTOC")) %>%
+  mutate(Compositing = recode(Compositing, no = "None", full = "Full", optimal = "Optimal"))
 
-#power of two-sample t-test to detect a range of changes in rangeland topsoil
 
-mu_0_rangeland <- precision_combined %>% filter(depth == "a", land_use == "Rangeland") %>% pull(mu)
+
+
+#precision of sample mean in topsoil
+mu_rangeland <- precision_combined %>% filter(depth == "a", land_use == "Rangeland") %>% pull(mu)
 sigma_p_rangeland <- precision_combined %>% filter(depth == "a", land_use == "Rangeland") %>% pull(sigma_p)
-mu_0_cropland <- precision_combined %>% filter(depth == "a", land_use == "Cropland") %>% pull(mu)
+mu_cropland <- precision_combined %>% filter(depth == "a", land_use == "Cropland") %>% pull(mu)
 sigma_p_cropland <- precision_combined %>% filter(depth == "a", land_use == "Cropland") %>% pull(sigma_p)
 
 rangeland_grid <- expand.grid(
   land_use = "Rangeland",
-  sample_size = c(5,10,30,90),
-  mu_0 = mu_0_rangeland, 
+  sample_size = seq(1,110,by=1),
+  mu = mu_rangeland, 
   sigma_p = sigma_p_rangeland, 
-  sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc),
-  delta = seq(0,2,by=.01)
+  sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc)
 )
 cropland_grid <- expand.grid(
   land_use = "Cropland",
-  sample_size = c(5,10,30,90),
-  mu_0 = mu_0_cropland, 
+  sample_size = seq(1,110,by=1),
+  mu = mu_cropland, 
   sigma_p = sigma_p_cropland, 
-  sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc),
-  delta = seq(0,2,by=.01)
+  sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc)
 )
 
-
-power_change_topsoil <- rangeland_grid %>%
+precision_topsoil <- rangeland_grid %>%
   bind_rows(cropland_grid) %>%
   mutate(Machine = ifelse(sigma_delta == sigma_delta_costech, "Costech", "SoliTOC")) %>%
   mutate(budget = 20 * sample_size + 13.6 * sample_size) %>%
   mutate(max_sample_size = floor((budget - 13.6) / 20)) %>%
-  mutate(opt_n = get_minimum_error(sigma_p = sigma_p, mu = mu_0, sigma_delta = sigma_delta, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = budget)$n) %>%
-  mutate(opt_k = get_minimum_error(sigma_p = sigma_p, mu = mu_0, sigma_delta = sigma_delta, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = budget)$k) %>%
-  mutate(power_no_compositing = get_power_two_sample(n_1 = sample_size, k_1 = sample_size, n_2 = sample_size, k_2 = sample_size, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
-  mutate(power_full_compositing = get_power_two_sample(n_1 = max_sample_size, k_1 = 1, n_2 = max_sample_size, k_2 = 1, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
-  mutate(power_optimal_compositing = get_power_two_sample(n_1 = opt_n, k_1 = opt_k, n_2 = opt_n, k_2 = opt_k, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
-  pivot_longer(cols = starts_with("power_"), names_to = "Compositing", values_to = "power", names_prefix = "power_") %>%
-  mutate(Compositing = ifelse(Compositing == "full_compositing", "Full", ifelse(Compositing == "no_compositing", "None", "Optimal"))) 
+  mutate(se_no_compositing = sqrt(get_variance(n = sample_size, k = sample_size, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta))) %>%
+  mutate(se_full_compositing = sqrt(get_variance(n = max_sample_size, k = 1, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta))) %>%
+  mutate(se_optimal_compositing = sqrt(get_minimum_error(sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = budget)$optimum_variance)) %>%
+  pivot_longer(cols = starts_with("se_"), names_to = "Compositing", values_to = "std_error", names_prefix = "se_") %>%
+  mutate(Compositing = recode(Compositing, no_compositing = "None", full_compositing = "Full", optimal_compositing = "Optimal"))
 
-ggplot(power_change_topsoil, aes(x = delta, y = power, color = Compositing)) +
-  geom_line(size = 1.2) +
-  facet_grid(sample_size ~ land_use + Machine) +
-  xlab("%TC Change") +
-  ylab("Power of two-sample t-test") +
-  scale_y_continuous(labels = scales::percent, limits = c(0,1), breaks = c(0,.25,.5,.75,1)) +
-  scale_x_continuous(labels = c("0", "0.5", "1.0", "1.5"), breaks = c(0,.5,1,1.5)) +
-  scale_color_manual(values = c("firebrick","darkorange3","steelblue")) +
-  coord_cartesian(xlim = c(0,1.5)) +
+precision_plot <- ggplot(precision_topsoil, aes(x = sample_size, y = std_error, color = Compositing)) +
+  geom_line(size = 1.3) +
+  facet_grid(land_use ~ Machine) + 
   theme_bw() +
+  scale_color_manual(values = c("darkorange3", "forestgreen","steelblue")) +
+  xlab("Sample Size") +
+  ylab("Standard Error of Sample Mean") +
+  coord_cartesian(xlim = c(5,100), ylim = c(0,.4)) +
   theme(text = element_text(size = 16))
-
-#sample size needed to detect a 0.5% change in CROP4 topsoil topsoil
-crop4_stats <- combined_master %>% 
-  filter(site == "CROP4", depth == "a") %>%
-  summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T))
-
-crop4_mean <- crop4_stats$mean_TC
-crop4_sd <- crop4_stats$sd_TC
-
-power_crop4 <- get_power_two_sample(beta = 1-0.8, mu_1 = crop4_mean, mu_2 = crop4_mean + 0.5, sigma_p_1 = crop4_sd, sigma_p_2 = crop4_sd, alpha = 0.05, sigma_delta = sigma_delta_solitoc)
 
 
 
@@ -727,8 +718,8 @@ pop_2 <- rep(3, N) + rnorm(N, sd = .05)
 pop_2 <- pop_2 - mean(pop_2) + 3
 
 par(mfrow = c(1,2))
-hist(pop_1, breaks = 50, xlim = c(2,6), xlab = "Population distribution at time 1", freq = FALSE, main = "")
-hist(pop_2, breaks = 5, xlim = c(2,6), xlab = "Population distribution at time 2", freq = FALSE, main = "")
+hist(pop_1, breaks = 50, xlim = c(2,6), xlab = "%TC at time 1", freq = FALSE, main = "", cex.axis = 1.5, cex.lab = 1.5)
+hist(pop_2, breaks = 5, xlim = c(2,6), xlab = "%TC at time 2", freq = FALSE, main = "", cex.axis = 1.5, cex.lab = 1.5)
 par(mfrow = c(1,1))
 
 
@@ -741,20 +732,14 @@ anderson_rejection_rate <- rep(0, length(n_grid))
 LMT_rejection_rate <- rep(0, length(n_grid))
 for(i in 1:length(n_grid)){
   t_test_p_values <- replicate(n = 200, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
-  hedged_reject <- replicate(n = 200, two_sample_hedged_test(n = n_grid[i], pop_1, pop_2))
-  #eb_reject <- replicate(n = 200, two_sample_eb_test(n = n_grid[i], pop_1, pop_2, resample = TRUE))
-  #anderson_reject <- replicate(n = 200, two_sample_anderson_test(n = n_grid[i], pop_1, pop_2, resample = TRUE))
   LMT_reject <- replicate(n = 200, two_sample_LMT_test(n = n_grid[i], pop_1, pop_2, resample = TRUE, B = 200))
   t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
-  hedged_rejection_rate[i] <- mean(hedged_reject)
   LMT_rejection_rate[i] <- mean(LMT_reject)
-  #anderson_rejection_rate[i] <- mean(anderson_reject)
-  #eb_rejection_rate[i] <- mean(eb_reject)
 }
-plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'forestgreen', lwd = 2, cex.axis = 1.1, cex.lab = 1.1)
-points(y = LMT_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 2)
-points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'darkorange3', lwd = 2, lty = "dashed")
-legend(x = 45, y = 0.8, legend = c("Hedged","LMT","t-test"), lty = c("dashed", "solid","solid"), col = c("darkorange3","steelblue","forestgreen"), lwd = 2, bty = "n")
+plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'darkorange3', lwd = 4, cex.axis = 1.5, cex.lab = 1.5)
+points(y = LMT_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 4)
+#points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'darkorange3', lwd = 2, lty = "dashed")
+legend(x = 35, y = 0.8, legend = c("Nonparametric test","t-test"), lty = c( "solid","solid"), col = c("steelblue","darkorange3"), lwd = 4, bty = "n")
 abline(a = 0.05, b = 0, lty = 'dashed', col = 'black', lwd = 2)
 
 
@@ -818,11 +803,14 @@ load("power_frame_nonparametric")
 #     rename("t test" = normal, "Hedged test" = hedged, "LMT test" = LMT) %>%
 #     pivot_longer(cols = c("t test", "Hedged test", "LMT test"), names_to = "Test", values_to = "Power")
 
-ggplot(power_frame, aes(x = effect_size, y = Power, color = Test, linetype = Test)) +
+ggplot(power_frame %>% 
+         filter(Test != "Hedged test") %>% 
+         mutate(Test = ifelse(Test == "LMT test", "Nonparametric test", Test)), 
+       aes(x = effect_size, y = Power, color = Test, linetype = Test)) +
   geom_line(size = 1.5) +
   facet_wrap(~ sample_size) +
   theme_bw() +
-  scale_color_manual(values = c("darkorange3","steelblue","forestgreen")) +
+  scale_color_manual(values = c("darkorange3","steelblue")) +
   scale_y_continuous(labels = scales::percent) +
   xlab("Effect size (additional % TC)") +
   theme(text = element_text(size = 16))
