@@ -630,6 +630,25 @@ get_perm_p_value <- function(test_statistics, permutations){
 }
 
 
+#function to run an exact two-sample permutation test, for small sample sizes only where the permuation space is relatively small
+#input:
+  #x: a vector of samples from population 1
+  #y: a vector of samples from population 2
+#output:
+  #the exact permutation distribution (deterministically enumerated) of the difference-in-means 
+get_exact_permutation <- function(x, y){
+  if(length(x) + length(y) > 20){
+    stop("Too many permutations. Use a monte carlo method like permuter::two_sample()")
+  }
+  combined <- c(x,y)
+  index <- 1:length(combined)
+  reindex <- combn(index, m = length(x))
+  diff_means <- rep(NA, ncol(reindex))
+  for(i in 1:ncol(reindex)){
+    diff_means[i] <- mean(combined[reindex[,i]]) - mean(combined[-reindex[,i]])
+  }
+}
+
 
 shuffle <- function(x){sample(x, size = length(x), replace = FALSE)}
 #from appendix of https://arxiv.org/pdf/2008.08536.pdf 
