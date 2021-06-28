@@ -84,8 +84,9 @@ soil_means <- hr_data %>%
   mutate(subsurface_hardness = mean_impute(subsurface_hardness)) %>%
   ungroup() %>%
   mutate(soil_type = as_factor(soil_type)) 
+
 carbon_means <- carbon_data %>% 
-  group_by(site_name, treatment, upper_depth) %>%
+  group_by(site_name, soil_type, treatment, upper_depth) %>%
   summarize(C_stock = mean(C_Mg_ha, na.rm = TRUE), per_C = mean(per_C, na.rm = TRUE)) %>% 
   pivot_wider(names_from = upper_depth, values_from = c(C_stock, per_C)) %>%
   ungroup() %>%
@@ -101,6 +102,7 @@ carbon_means_long <- carbon_data %>%
   group_by(site_name, soil, treatment, upper_depth) %>%
   summarize(C_stock = mean(C_Mg_ha, na.rm = TRUE), per_C = mean(per_C, na.rm = TRUE)) %>%
   ungroup()
+
 plot_profile_carbon_change <- ggplot(carbon_means_long, aes(x = C_stock, y = site_name, color = treatment)) +
   geom_line(aes(group = site_name), color = "black") +
   geom_point(size = 3) +
@@ -121,7 +123,7 @@ carbon_pct_change_boxplot <- ggplot(data = carbon_means_long %>% mutate(Treatmen
   theme_bw() +
   theme(text = element_text(size = 16))
 
-#total carbon ANOVAs
+#total carbon ANOVAs for table
 total_var <- carbon_data %>%
   group_by(upper_depth) %>%
   summarize(total_var = var(C_Mg_ha, na.rm = TRUE)) 
@@ -141,7 +143,6 @@ soil_type_var <- carbon_data %>%
   group_by(upper_depth) %>%
   summarize(mean(within_soil_type_variance, na.rm = TRUE))
 
-anova(lm(per_C ~ treatment + as.factor(soil_type) + as_factor(site), data = carbon_data, subset = upper_depth == 0))
 
 #I've spot checked that this aligns with soil_means$profile_carbon, as it should
 wp_carbon_stocks <- carbon_means_long %>%
@@ -228,6 +229,35 @@ carbon_model <- lm(formula(paste("profile_carbon ~ ", paste(soil_health_vars[-c(
 #we might want to take out soil texture
 twoway_manova_model <- lm(topmeans_matrix ~ treatment * soil_type, data = topsoil_means)
 summary(manova(twoway_manova_model))
+
+
+#pairwise comparison of carbon across soil types stratified by row/hedgerow and combined
+#JAKE CHECK: running NPC to combine across rows and hedgerows without lockstep permutations 
+whole_profile_stock <- rowSums(carbon_matrix)
+land_use <- carbon_means$treatment
+soil_types <- carbon_means$soil_type
+comparison_matrix <- matrix(NA, nrow = 4, ncol = 4)
+colnames(comparison_matrix) <- c("Yolo", "Brentwood", "Capay", "Corning")
+for(i in 1:4){
+  if(i > 1){
+    for(j in 1:(i-1)){
+      #first compute permutation distribution for rows
+      row_data_0 <- whole_profile_stock[land_use == "R"][soil_types[land_use == "R"] == i]
+      row_data_1 <- whole_profile_stock[land_use == "R"][soil_types[land_use == "R"] == j]
+      diff_mean_rows <- mean(row_data_1) - mean(row_data_0) 
+      perm_dist_rows <- two_sample(x = row_data_0, y = row_data_1, reps = 10000)
+      #then for hedgerows
+      hedgerow_data_0 <- whole_profile_stock[land_use == "H"][soil_types[land_use == "H"] == i]
+      hedgerow_data_1 <- whole_profile_stock[land_use == "H"][soil_types[land_use == "H"] == j]
+      diff_mean_hedgerows <- mean(hedgerow_data_1) - mean(hedgerow_data_0) 
+      perm_dist_hedgerows <- two_sample(x = hedgerow_data_0, y = hedgerow_data_1, reps = 10000)
+      #combine by nonparametric combination of tests
+      #combined_p_value <- npc(statistics = c(diff_mean_rows, diff_mean_hedgerows), distr = cbind(perm_dist_rows, perm_dist_hedgerows), combine = "fisher", alternatives = "two-sided")
+      combined_p_value <- t2p(tst = diff_mean_hedgerows, distr = perm_dist_hedgerows, alternative = "two-sided")
+      comparison_matrix[i,j] <- combined_p_value
+    }
+  }
+}
 
 
 
