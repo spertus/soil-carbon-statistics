@@ -598,6 +598,25 @@ lockstep_one_sample <- function(delta_matrix, reps = 1000){
   permutation_means
 }
 
+#lockstep two sample test: return permutation distribution of difference in means (mean x - mean y) for each column of x and y
+#inputs:
+  #x_matrix: a matrix with units in rows and variables in columns for group 1
+  #y_matrix: the same for group 2, need ncol(x_matrix) == ncol(y_matrix)
+  #reps: the number of draws to take from the null distribution
+#outputs:
+  #a matrix of difference-in-means draws from null distribution of dimension reps by ncol(x_matrix)
+lockstep_two_sample <- function(x_matrix, y_matrix, reps = 1000){
+  diff_means <- matrix(NA, nrow = reps, ncol = ncol(x_matrix))
+  combined_matrix <- rbind(x_matrix, y_matrix)
+  n <- nrow(combined_matrix)
+  n_x <- nrow(x_matrix)
+  for(b in 1:reps){
+    permutation <- sample(1:n, size = n_x, replace = FALSE)
+    diff_means[b,] <- colMeans(combined_matrix[permutation,]) - colMeans(combined_matrix[-permutation,])
+  }
+  diff_means
+}
+
 
 #lockstep ANOVA
 #inputs:
@@ -647,7 +666,9 @@ get_exact_permutation <- function(x, y){
   for(i in 1:ncol(reindex)){
     diff_means[i] <- mean(combined[reindex[,i]]) - mean(combined[-reindex[,i]])
   }
+  diff_means
 }
+
 
 
 shuffle <- function(x){sample(x, size = length(x), replace = FALSE)}
