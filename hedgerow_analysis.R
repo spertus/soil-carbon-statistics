@@ -241,19 +241,14 @@ colnames(comparison_matrix) <- c("Yolo", "Brentwood", "Capay", "Corning")
 for(i in 1:4){
   if(i > 1){
     for(j in 1:(i-1)){
-      #first compute permutation distribution for rows
       row_data_0 <- whole_profile_stock[land_use == "R"][soil_types[land_use == "R"] == i]
       row_data_1 <- whole_profile_stock[land_use == "R"][soil_types[land_use == "R"] == j]
       diff_mean_rows <- mean(row_data_1) - mean(row_data_0) 
-      perm_dist_rows <- two_sample(x = row_data_0, y = row_data_1, reps = 10000)
-      #then for hedgerows
       hedgerow_data_0 <- whole_profile_stock[land_use == "H"][soil_types[land_use == "H"] == i]
       hedgerow_data_1 <- whole_profile_stock[land_use == "H"][soil_types[land_use == "H"] == j]
       diff_mean_hedgerows <- mean(hedgerow_data_1) - mean(hedgerow_data_0) 
-      perm_dist_hedgerows <- two_sample(x = hedgerow_data_0, y = hedgerow_data_1, reps = 10000)
-      #combine by nonparametric combination of tests
-      #combined_p_value <- npc(statistics = c(diff_mean_rows, diff_mean_hedgerows), distr = cbind(perm_dist_rows, perm_dist_hedgerows), combine = "fisher", alternatives = "two-sided")
-      combined_p_value <- t2p(tst = diff_mean_hedgerows, distr = perm_dist_hedgerows, alternative = "two-sided")
+      perm_dist <- lockstep_two_sample(x_matrix = cbind(row_data_0, hedgerow_data_0), y_matrix = cbind(row_data_1, hedgerow_data_1), reps = 10000)
+      combined_p_value <- npc(statistics = c(diff_mean_rows, diff_mean_hedgerows), distr = perm_dist, combine = "fisher", alternatives = "two-sided")
       comparison_matrix[i,j] <- combined_p_value
     }
   }
