@@ -222,38 +222,43 @@ corrplot(top_corr_matrix, method = "square")
 corrplot(sub_corr_matrix, method = "square")
 corrplot(total_corr_matrix, method = "square")
 
-#whole profile carbon model
-carbon_model <- lm(formula(paste("profile_carbon ~ ", paste(soil_health_vars[-c(3)], collapse = "+"))), data = topsoil_means)
-
-#2-way
-#we might want to take out soil texture
-twoway_manova_model <- lm(topmeans_matrix ~ treatment * soil_type, data = topsoil_means)
-summary(manova(twoway_manova_model))
 
 
 #pairwise comparison of carbon across soil types stratified by row/hedgerow and combined
 #JAKE CHECK: running NPC to combine across rows and hedgerows without lockstep permutations 
 whole_profile_stock <- rowSums(carbon_matrix)
-land_use <- carbon_means$treatment
-soil_types <- carbon_means$soil_type
-comparison_matrix <- matrix(NA, nrow = 4, ncol = 4)
-colnames(comparison_matrix) <- c("Yolo", "Brentwood", "Capay", "Corning")
-for(i in 1:4){
-  if(i > 1){
-    for(j in 1:(i-1)){
-      row_data_0 <- whole_profile_stock[land_use == "R"][soil_types[land_use == "R"] == i]
-      row_data_1 <- whole_profile_stock[land_use == "R"][soil_types[land_use == "R"] == j]
-      diff_mean_rows <- mean(row_data_1) - mean(row_data_0) 
-      hedgerow_data_0 <- whole_profile_stock[land_use == "H"][soil_types[land_use == "H"] == i]
-      hedgerow_data_1 <- whole_profile_stock[land_use == "H"][soil_types[land_use == "H"] == j]
-      diff_mean_hedgerows <- mean(hedgerow_data_1) - mean(hedgerow_data_0) 
-      perm_dist <- lockstep_two_sample(x_matrix = cbind(row_data_0, hedgerow_data_0), y_matrix = cbind(row_data_1, hedgerow_data_1), reps = 10000)
-      combined_p_value <- npc(statistics = c(diff_mean_rows, diff_mean_hedgerows), distr = perm_dist, combine = "fisher", alternatives = "two-sided")
-      comparison_matrix[i,j] <- combined_p_value
+
+#helper function to run a pairwise comparison of the hypothesis that variable x does not differ between soil types for both rows and hedgerows
+run_pairwise_comparison <- function(x){
+  comparison_matrix <- matrix(NA, nrow = 4, ncol = 4)
+  colnames(comparison_matrix) <- c("Yolo", "Brentwood", "Capay", "Corning")
+  land_use <- carbon_means$treatment
+  soil_types <- carbon_means$soil_type
+  for(i in 1:4){
+    if(i > 1){
+      for(j in 1:(i-1)){
+        row_data_0 <- x[land_use == "R"][soil_types[land_use == "R"] == i]
+        row_data_1 <- x[land_use == "R"][soil_types[land_use == "R"] == j]
+        diff_mean_rows <- mean(row_data_1) - mean(row_data_0) 
+        hedgerow_data_0 <- x[land_use == "H"][soil_types[land_use == "H"] == i]
+        hedgerow_data_1 <- x[land_use == "H"][soil_types[land_use == "H"] == j]
+        diff_mean_hedgerows <- mean(hedgerow_data_1) - mean(hedgerow_data_0) 
+        perm_dist <- lockstep_two_sample(x_matrix = cbind(row_data_0, hedgerow_data_0), y_matrix = cbind(row_data_1, hedgerow_data_1), reps = 10000)
+        combined_p_value <- npc(statistics = c(diff_mean_rows, diff_mean_hedgerows), distr = perm_dist, combine = "fisher", alternatives = "two-sided")
+        comparison_matrix[i,j] <- combined_p_value
+      }
     }
   }
+  comparison_matrix
 }
 
+pairwise_carbon_wp <- run_pairwise_comparison(whole_profile_stock)
+pairwise_MBC_top <- run_pairwise_comparison(topmeans_matrix[,'MBC'])
+pairwise_MBN_top <- run_pairwise_comparison(topmeans_matrix[,'MBN'])
+pairwise_POXc_top <- run_pairwise_comparison(topmeans_matrix[,'POXc'])
+pairwise_cellulase_top <-  run_pairwise_comparison(topmeans_matrix[,'cell'])
+pairwise_macroagg_top <-  run_pairwise_comparison(topmeans_matrix[,'macroagg'])
+pairwise_microagg_top <-  run_pairwise_comparison(topmeans_matrix[,'microagg'])
 
 
 #non-parametric paired one-way manova
