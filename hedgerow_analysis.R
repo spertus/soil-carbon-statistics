@@ -260,6 +260,17 @@ pairwise_cellulase_top <-  run_pairwise_comparison(topmeans_matrix[,'cell'])
 pairwise_macroagg_top <-  run_pairwise_comparison(topmeans_matrix[,'macroagg'])
 pairwise_microagg_top <-  run_pairwise_comparison(topmeans_matrix[,'microagg'])
 
+#6 * 7 = 42 hypotheses are tested here
+#correct for false discovery rate control by Benjamini-Hochberg procedure
+#this assumes p-values are independent, which may not be true
+all_p_values <- as.numeric(cbind(pairwise_carbon_wp, pairwise_MBC_top, pairwise_MBN_top, pairwise_POXc_top, pairwise_cellulase_top, pairwise_macroagg_top, pairwise_microagg_top))
+all_p_values <- all_p_values[!is.na(all_p_values)]
+m <- length(all_p_values)
+threshold <- 1:m / m * 0.05
+ordered_p <- sort(all_p_values)
+cutoff <- max(ordered_p[ordered_p <= threshold])
+
+
 
 #non-parametric paired one-way manova
 #topsoil differences
