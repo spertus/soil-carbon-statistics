@@ -119,13 +119,6 @@ ggplot(cropland_master, aes(y = TC, x = site, fill = site, color = site)) +
   theme(text = element_text(size = 16), legend.position = "none")
 
 
-#cropland scatter plots by depth
-cropland_wide <- cropland_master %>%
-  filter(site != "CROP7") %>%
-  pivot_wider(names_from = "depth", values_from = "TC")
-pairs(~ a + b + c + d, data = cropland_wide)c
-#how well does cropland topsoil predict cropland deep soil?
-summary(lm(d ~ a*site, data = cropland_wide))
 
 
 #summary tables
@@ -321,10 +314,10 @@ assay_error_long <- assay_error %>%
 
 #compare average errors on rangeland samples
 ggplot(assay_error_long, aes(sigma_delta_TC*100, fill = machine)) +
-  geom_density(alpha = .75) +
-  xlim(0,10) +
+  #geom_density(alpha = .75) +
+  geom_histogram(binwidth = 1, alpha = .75, position = "stack") +
   xlab("Percent Error") +
-  ylab("Density") +
+  ylab("Number of Samples") +
   theme_bw() +
   scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("Costech", "SoliTOC")) +
   theme(text = element_text(size = 16))
@@ -743,76 +736,85 @@ legend(x = 35, y = 0.8, legend = c("Nonparametric test","t-test"), lty = c( "sol
 abline(a = 0.05, b = 0, lty = 'dashed', col = 'black', lwd = 2)
 
 
-# power of permutation tests, t-tests, and martingales to detect topsoil change 
-topsoil_rangeland <- rangeland_master %>% 
-  filter(depth == "a") %>%
-  filter(!is.na(TC)) %>%
-  arrange(transect) %>%
-  select(transect, TC)
-
-topsoil_TC_rangeland <- topsoil_rangeland %>% pull(TC)
-
-
-effect_grid = seq(0,4,by=.2)
-run_twosample_sims <- function(sample_size, n_sims = 300){
-  shift <- effect_grid
+# power of t-test and nonparametric to detect topsoil change 
+effect_grid = seq(0,1.25,by=.05)
+run_twosample_sims <- function(x, sample_size, n_sims = 300){
+  mu <- mean(x)
+  shift <- effect_grid * mu
   normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  #the hedged two sample test just returns whether or not the test rejects, not an actual p-value
-  hedged_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  #hedged_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
   LMT_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
   #anderson_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
   #eb_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
   for(i in 1:n_sims){
     for(j in 1:length(shift)){
-      sample_1 <- sample(topsoil_TC_rangeland, size = sample_size, replace = TRUE)
-      sample_2 <- sample(topsoil_TC_rangeland + shift[j], size = sample_size, replace = TRUE)
+      sample_1 <- sample(x, size = sample_size, replace = TRUE)
+      sample_2 <- sample(x + shift[j], size = sample_size, replace = TRUE)
       diff_mean <- mean(sample_1) - mean(sample_2)
       normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
-      hedged_rejections[i,j] <- two_sample_hedged_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
+      #hedged_rejections[i,j] <- two_sample_hedged_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
       LMT_rejections[i,j] <- two_sample_LMT_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE, B = 200)
-      #anderson_rejections[i,j] <- two_sample_anderson_test(pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
-      #eb_rejections[i,j] <- two_sample_eb_test(pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
+
     }
   }
   normal_power_shift <- colMeans(normal_p_values < .05)
-  hedged_power_shift <- colMeans(hedged_rejections)
+  #hedged_power_shift <- colMeans(hedged_rejections)
   LMT_power_shift <- colMeans(LMT_rejections)
   #anderson_power_shift <- colMeans(anderson_rejections)
   #eb_power_shift <- colMeans(eb_rejections)
-  cbind("normal" = normal_power_shift, "hedged" = hedged_power_shift, "LMT"= LMT_power_shift)
+  cbind("normal" = normal_power_shift, "LMT"= LMT_power_shift)
 }
 
+#run tests on topsoil from rangeland and cropland
+topsoil_rangeland <- rangeland_master %>% 
+  filter(depth == "a") %>%
+  filter(!is.na(TC)) %>%
+  arrange(transect) %>%
+  select(transect, TC)
+#cropland site 7 has the second most samples (20) and the lowest heterogeneity
+topsoil_cropland <- cropland_master %>% 
+  filter(depth == "a") %>%
+  filter(site == "CROP5") %>%
+  filter(!is.na(TC)) 
+
+topsoil_TC_rangeland <- topsoil_rangeland %>% pull(TC)
+topsoil_TC_cropland <- topsoil_cropland %>% pull(TC)
+
 #these take a while to run, we can save them as an object
-# power_5 <- run_twosample_sims(sample_size = 5)
-# power_10 <- run_twosample_sims(sample_size = 10)
-# power_30 <- run_twosample_sims(sample_size = 30)
-# power_90 <- run_twosample_sims(sample_size = 90)
-# power_200 <- run_twosample_sims(sample_size = 200)
-#power_1000 <- run_twosample_sims(sample_size = 1000)
-# power_frame <- bind_rows(
-#   as.data.frame(power_10) %>% mutate(sample_size = 10, effect_size = effect_grid),
-#   as.data.frame(power_30) %>% mutate(sample_size = 30, effect_size = effect_grid),
-#   as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid),
-#   as.data.frame(power_200) %>% mutate(sample_size = 200, effect_size = effect_grid)) %>%
-#   rename("t test" = normal, "Hedged test" = hedged, "LMT test" = LMT) %>%
-#   pivot_longer(cols = c("t test", "Hedged test", "LMT test"), names_to = "Test", values_to = "Power")
+power_10_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 10)
+power_30_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 30)
+power_90_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 90)
+power_200_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 200)
+power_10_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 10)
+power_30_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 30)
+power_90_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 90)
+power_200_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 200)
+power_frame <- bind_rows(
+  as.data.frame(power_10_rangeland) %>% mutate(sample_size = 10, relative_effect_size = effect_grid, land_use = "Rangeland"),
+  as.data.frame(power_30_rangeland) %>% mutate(sample_size = 30, relative_effect_size = effect_grid, land_use = "Rangeland"),
+  as.data.frame(power_90_rangeland) %>% mutate(sample_size = 90, relative_effect_size = effect_grid, land_use = "Rangeland"),
+  as.data.frame(power_200_rangeland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Rangeland"),
+  as.data.frame(power_10_cropland) %>% mutate(sample_size = 10, relative_effect_size = effect_grid, land_use = "Cropland"),
+  as.data.frame(power_30_cropland) %>% mutate(sample_size = 30, relative_effect_size = effect_grid, land_use = "Cropland"),
+  as.data.frame(power_90_cropland) %>% mutate(sample_size = 90, relative_effect_size = effect_grid, land_use = "Cropland"),
+  as.data.frame(power_200_cropland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Cropland")) %>%
+  rename("t test" = normal, "LMT test" = LMT) %>%
+  pivot_longer(cols = c("t test", "LMT test"), names_to = "Test", values_to = "Power")
 # save(power_frame, file = "power_frame_nonparametric")
 load("power_frame_nonparametric")
 
-# power_frame <- as.data.frame(power_90) %>% mutate(sample_size = 90, effect_size = effect_grid) %>%
-#     rename("t test" = normal, "Hedged test" = hedged, "LMT test" = LMT) %>%
-#     pivot_longer(cols = c("t test", "Hedged test", "LMT test"), names_to = "Test", values_to = "Power")
 
 ggplot(power_frame %>% 
          filter(Test != "Hedged test") %>% 
          mutate(Test = ifelse(Test == "LMT test", "Nonparametric test", Test)), 
-       aes(x = effect_size, y = Power, color = Test, linetype = Test)) +
+       aes(x = relative_effect_size, y = Power, color = Test, linetype = Test)) +
   geom_line(size = 1.5) +
-  facet_wrap(~ sample_size) +
+  facet_grid(sample_size ~ land_use) +
   theme_bw() +
   scale_color_manual(values = c("darkorange3","steelblue")) +
   scale_y_continuous(labels = scales::percent) +
-  xlab("Effect size (additional % TC)") +
+  scale_x_continuous(labels = scales::percent) +
+  xlab("Relative effect size (additional percent TC%)") +
   theme(text = element_text(size = 16))
 
 
