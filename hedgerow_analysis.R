@@ -225,7 +225,6 @@ corrplot(total_corr_matrix, method = "square")
 
 
 #pairwise comparison of carbon across soil types stratified by row/hedgerow and combined
-#JAKE CHECK: running NPC to combine across rows and hedgerows without lockstep permutations 
 whole_profile_stock <- rowSums(carbon_matrix)
 
 #helper function to run a pairwise comparison of the hypothesis that variable x does not differ between soil types for both rows and hedgerows
@@ -243,7 +242,7 @@ run_pairwise_comparison <- function(x){
         hedgerow_data_0 <- x[land_use == "H"][soil_types[land_use == "H"] == i]
         hedgerow_data_1 <- x[land_use == "H"][soil_types[land_use == "H"] == j]
         diff_mean_hedgerows <- mean(hedgerow_data_1) - mean(hedgerow_data_0) 
-        perm_dist <- lockstep_two_sample(x_matrix = cbind(row_data_0, hedgerow_data_0), y_matrix = cbind(row_data_1, hedgerow_data_1), reps = 10000)
+        perm_dist <- lockstep_two_sample(x_matrix = cbind(row_data_0, hedgerow_data_0), y_matrix = cbind(row_data_1, hedgerow_data_1), exact = TRUE)
         combined_p_value <- npc(statistics = c(diff_mean_rows, diff_mean_hedgerows), distr = perm_dist, combine = "fisher", alternatives = "two-sided")
         comparison_matrix[i,j] <- combined_p_value
       }

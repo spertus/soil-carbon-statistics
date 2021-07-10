@@ -605,14 +605,26 @@ lockstep_one_sample <- function(delta_matrix, reps = 1000){
   #reps: the number of draws to take from the null distribution
 #outputs:
   #a matrix of difference-in-means draws from null distribution of dimension reps by ncol(x_matrix)
-lockstep_two_sample <- function(x_matrix, y_matrix, reps = 1000){
-  diff_means <- matrix(NA, nrow = reps, ncol = ncol(x_matrix))
+lockstep_two_sample <- function(x_matrix, y_matrix, reps = 1000, exact = FALSE){
   combined_matrix <- rbind(x_matrix, y_matrix)
   n <- nrow(combined_matrix)
   n_x <- nrow(x_matrix)
-  for(b in 1:reps){
-    permutation <- sample(1:n, size = n_x, replace = FALSE)
-    diff_means[b,] <- colMeans(combined_matrix[permutation,]) - colMeans(combined_matrix[-permutation,])
+  if(exact){
+    if(nrow(combined_matrix) > 20){
+      stop("Too many permutations. Use a conditional monte carlo (exact = FALSE)")
+    }
+    index <- 1:n
+    permutation <- combn(index, m = n_x)
+    diff_means <- matrix(NA, nrow = ncol(permutation), ncol = ncol(x_matrix))
+    for(b in 1:ncol(permutation)){
+      diff_means[b,] <- colMeans(combined_matrix[permutation[,b],]) - colMeans(combined_matrix[-permutation[,b],])
+    }
+  } else {
+    diff_means <- matrix(NA, nrow = reps, ncol = ncol(x_matrix))
+    for(b in 1:reps){
+      permutation <- sample(1:n, size = n_x, replace = FALSE)
+      diff_means[b,] <- colMeans(combined_matrix[permutation,]) - colMeans(combined_matrix[-permutation,])
+    }
   }
   diff_means
 }
@@ -639,14 +651,83 @@ lockstep_ANOVA <- function(delta_matrix, group, reps = 1000){
 
 #get two-sided pvalues for a vector of test statistics and matrix of permutations
 #inputs:
-#test_statistics: a length V vector of "original" test statistics, usually computed on unpermuted data 
-#permutations: a matrix of test statistics computed from permuted data
+#test_statistics: a length V vector of "original" test statistics, or a scalar 
+#permutations: a matrix of test statistics computed from permuted data, or a vector
 #output:
-#a length V vector of conservative permutation p-values
-get_perm_p_value <- function(test_statistics, permutations){
-  B <- nrow(permutations)
-  pmin((1/2 + colSums(t(t(abs(permutations)) > test_statistics))) / (B + 1), 1)
+#a length V vector of permutation p-values. Is exact if permutations are exact.
+get_perm_p_value <- function(test_statistics, permutations, alternative = "two-sided"){
+  if(is.matrix(permutations)){
+    B <- nrow(permutations)
+    if(alternative == "two-sided"){
+      pmin(2 * (colSums(t(t(abs(permutations)) >= test_statistics))) / B, 1)
+    } else if(alternative == "greater"){
+      pmin((colSums(t(t(permutations) <= test_statistics))) / B, 1)
+    } else if(alternative == "less"){
+      pmin((colSums(t(t(permutations) >= test_statistics))) / B, 1)
+    }
+  } else {
+    B <- length(permutations)
+    if(alternative == "two-sided"){
+      pmin(2 * sum(abs(permutations) >= test_statistics) / B, 1)
+    } else if(alternative == "greater"){
+      pmin(sum(permutations <= test_statistics) / B, 1)
+    } else if(alternative == "less"){
+      pmin(sum(permutation >= test_statistics) / B, 1)
+    }
+  }
 }
+
+#this is a very straightforward modification of the npc function from the permuter package to use a slightly different way to compute the p-values that ensures conservativeness.
+#same as npc but uses get_perm_p_value() instead of t2p()
+npc <- function (statistics, distr, combine = "fisher", alternatives = "greater") 
+{
+  if (length(statistics) < 2) {
+    stop("Nothing to combine!")
+  }
+  if (length(statistics) != ncol(distr)) {
+    stop("Different number of statistics and null distributions")
+  }
+  if (length(alternatives) != length(statistics)) {
+    if (length(alternatives) == 1) {
+      alternatives <- rep(alternatives, length(statistics))
+    }
+    else {
+      stop("Bad alternatives")
+    }
+  }
+  pvalues <- sapply(1:ncol(distr), function(j) {
+    get_perm_p_value(statistics[j], distr[, j], alternatives[j])
+  })
+  null_pvalues <- sapply(1:ncol(distr), function(j) {
+    pvalue_distr(distr[, j], alternatives[j])
+  })
+  if (is.function(combine)) {
+    combn_func <- combine
+  }
+  else {
+    funcs <- list(fisher, liptak, tippett)
+    names(funcs) <- c("fisher", "liptak", "tippett")
+    if (!(combine %in% names(funcs))) {
+      stop(paste(combine, " is not a valid combining function."))
+    }
+    combn_func <- funcs[[combine]]
+    if (combine == "liptak") {
+      too_small <- which(null_pvalues == 0)
+      too_large <- which(null_pvalues == 1)
+      null_pvalues[too_small] <- null_pvalues[too_small] + 
+        1e-04
+      null_pvalues[too_large] <- null_pvalues[too_large] - 
+        1e-04
+    }
+  }
+  obs_combined_pvalue <- combn_func(pvalues)
+  if (is.infinite(obs_combined_pvalue)) {
+    return(0)
+  }
+  combined_pvalues <- apply(null_pvalues, 1, combn_func)
+  return(mean(combined_pvalues >= obs_combined_pvalue))
+}
+
 
 
 #function to run an exact two-sample permutation test, for small sample sizes only where the permuation space is relatively small
@@ -738,9 +819,9 @@ hedged_pvalue <- function(population, mu_0 = 1/2, theta = 0.5, log = FALSE, shuf
   }
   
   if(last){
-    p_value[length(p_value)]
+    min(1, p_value[length(p_value)])
   } else{
-    p_value
+    pmin(1, p_value)
   }
 }
 
