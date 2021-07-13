@@ -517,95 +517,6 @@ distance <- variog_T$u
 avg_variogram <- colMeans(rbind(variog_T$v, variog_Mx$v, variog_My$v, variog_Bx$v, variog_By$v))
 
 
-############## stratified versus SRS for one-sample problem ###########
-#we will empirically investigate the advantages of stratified sampling in these settings
-#the idea is similar to a bootstrap. 
-#take the samples as a population and then simulate taking subsamples
-
-#first we analyze stratified sampling at a small scale by using the rangeland samples
-#the strata are defined by transects, which roughly correspond to different locations on the ranch
-rangeland_data_topsoil <- rangeland_master %>% 
-  filter(depth == "a") %>%
-  select(transect, sample_number, TC) %>%
-  filter(!is.na(TC)) %>%
-  arrange(transect)
-
-#the sample size for survey simulations
-n <- 90
-#function to return the estimated mean and standard error given a population and sample index
-get_mean_se <- function(population, sample_index){
-  c(mean(population[sample_index]), sd(population[sample_index])/sqrt(length(sample_index)))
-}
-#function to return estimated mean and standard error given a population, sampling index, and stratification information
-get_mean_se_stratified <- function(sample, N_strata){
-  N <- sum(N_strata)
-  strata_weights <- N_strata / N
-  n_strata <- as.numeric(table(sample$transect))
-  strata_means <- tapply(sample$TC, sample$transect, mean)
-  strata_vars <- tapply(sample$TC, sample$transect, var)
-  var_estimate <- N^(-2) * sum(N_strata^2 * strata_vars / n_strata)
-  c(sum(strata_weights * strata_means), sqrt(var_estimate))
-}
-
-N_strata <- as.numeric(table(rangeland_data_topsoil$transect))
-#helper function to make integer sample sizes with the sum preserved
-round_strata_sizes <- function(n_strata){
-  rounded_n_strata <- floor(n_strata)
-  indices <- tail(order(n_strata-rounded_n_strata), round(sum(n_strata)) - sum(rounded_n_strata))
-  rounded_n_strata[indices] <- rounded_n_strata[indices] + 1
-  rounded_n_strata
-}
-
-#proportional allocation to strata
-strata_weights_prop <- N_strata / length(rangeland_data_topsoil$transect)
-n_strata_prop <- round_strata_sizes(n * strata_weights_prop)
-sigma_strata <- tapply(rangeland_data_topsoil$TC, rangeland_data_topsoil$transect, sd)
-strata_weights_opt <- N_strata * sigma_strata / sum(N_strata * sigma_strata) 
-n_strata_opt <- round_strata_sizes(n * strata_weights_opt)
-
-
-#function to run a single simulation on the rangeland data
-run_rangeland_sim <- function(data_frame){
-  proportional_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata_prop, method = "srswr")
-  optimal_stratified_sample <- strata(data = data_frame, stratanames = "transect", size = n_strata_opt, method = "srswr")
-  
-  random_sample <- sample(1:nrow(data_frame), size = n, replace = TRUE)
-  
-  prop_stratified_estimates <- get_mean_se_stratified(sample = getdata(data_frame, proportional_stratified_sample), N_strata = table(data_frame$transect))
-  opt_stratified_estimates <- get_mean_se_stratified(sample = getdata(data_frame, optimal_stratified_sample), N_strata = table(data_frame$transect))
-  
-  random_estimates <- get_mean_se(data_frame$TC, random_sample)
-  #local_pivotal_estimates <- get_mean_se(population, local_pivotal_sample)
-  
-  cbind(random_estimates, prop_stratified_estimates, opt_stratified_estimates)
-}
-#compute the estimand, i.e. the true mean in the rangeland topsoil data
-true_rangeland_mean <- mean(rangeland_data_topsoil$TC)
-
-#run simulations, replicated 2000 times
-rangeland_sims <- replicate(n = 2000, run_rangeland_sim(data_frame = rangeland_data_topsoil))
-
-#compute properties of the samples
-#the empirical coverage of 95% normal theory confidence intervals (should be 95%)
-t_quantiles <- c(qt(p = .975, df = n - 1), qt(p = .975, df = n - length(N_strata)), qt(p = .975, df = n - length(N_strata)))
-coverage_rangeland <- apply(rangeland_sims[1,,] - t_quantiles * rangeland_sims[2,,] <= true_rangeland_mean & true_rangeland_mean <= rangeland_sims[1,,] + t_quantiles * rangeland_sims[2,,], 1, mean)
-#the width of a confidence interval, basically 4 times the SE
-ci_width_rangeland <- apply(2 * t_quantiles * rangeland_sims[2,,], 1, mean)
-#the actual standard error over simulations
-se_rangeland <- apply(rangeland_sims, c(1,2), sd)[1,]
-#the average estimated standard error
-se_hat_rangeland <- apply(rangeland_sims, c(1,2), mean)[2,]
-#the mean squared error
-rmse_rangeland <- sqrt(apply((rangeland_sims - true_rangeland_mean)^2, c(1,2), mean)[1,])
-mad_rangeland <- apply(abs(rangeland_sims - true_rangeland_mean), c(1,2), median)[1,]
-#ratio of mse compared to uniform independent random sampling
-#rmse_rangeland <- rmse_rangeland / rmse_rangeland[2]
-#compile results
-rangeland_results_frame <- rbind(coverage_rangeland, ci_width_rangeland, rmse_rangeland, mad_rangeland) %>%
-  as_tibble() %>%
-  mutate(property = c("coverage", "ci width", "RMSE", "MAD")) %>%
-  select(property, random_estimates, prop_stratified_estimates, opt_stratified_estimates)
-
 
 
 
@@ -736,36 +647,8 @@ legend(x = 35, y = 0.8, legend = c("Nonparametric test","t-test"), lty = c( "sol
 abline(a = 0.05, b = 0, lty = 'dashed', col = 'black', lwd = 2)
 
 
-# power of t-test and nonparametric to detect topsoil change 
-effect_grid = seq(0,1.25,by=.05)
-run_twosample_sims <- function(x, sample_size, n_sims = 300){
-  mu <- mean(x)
-  shift <- effect_grid * mu
-  normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  #hedged_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  LMT_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  #anderson_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  #eb_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  for(i in 1:n_sims){
-    for(j in 1:length(shift)){
-      sample_1 <- sample(x, size = sample_size, replace = TRUE)
-      sample_2 <- sample(x + shift[j], size = sample_size, replace = TRUE)
-      diff_mean <- mean(sample_1) - mean(sample_2)
-      normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
-      #hedged_rejections[i,j] <- two_sample_hedged_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
-      LMT_rejections[i,j] <- two_sample_LMT_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE, B = 200)
-
-    }
-  }
-  normal_power_shift <- colMeans(normal_p_values < .05)
-  #hedged_power_shift <- colMeans(hedged_rejections)
-  LMT_power_shift <- colMeans(LMT_rejections)
-  #anderson_power_shift <- colMeans(anderson_rejections)
-  #eb_power_shift <- colMeans(eb_rejections)
-  cbind("normal" = normal_power_shift, "LMT"= LMT_power_shift)
-}
-
-#run tests on topsoil from rangeland and cropland
+# power of t-test (unstratified and stratified) or nonparametric (unstratified) to detect topsoil change 
+# run tests on topsoil from rangeland and cropland
 topsoil_rangeland <- rangeland_master %>% 
   filter(depth == "a") %>%
   filter(!is.na(TC)) %>%
@@ -780,11 +663,67 @@ topsoil_cropland <- cropland_master %>%
 topsoil_TC_rangeland <- topsoil_rangeland %>% pull(TC)
 topsoil_TC_cropland <- topsoil_cropland %>% pull(TC)
 
+# set up stratification parameters
+strata <- topsoil_rangeland$transect
+N_strata <- as.numeric(table(topsoil_rangeland$transect))
+strata_weights_prop <- N_strata / length(strata)
+sigma_strata <- tapply(topsoil_TC_rangeland, strata, sd)
+strata_weights_opt <- N_strata * sigma_strata / sum(N_strata * sigma_strata) 
+
+effect_grid = seq(0,0.8,by=.025)
+run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE){
+  mu <- mean(x)
+  shift <- effect_grid * mu
+  if(stratified){
+    #dataframe format needed to work with sampling package
+    K <- length(unique(strata))
+    pop_1 <- data.frame(TC = x, strata = strata)
+    #n_strata_opt <- round_strata_sizes(sample_size * strata_weights_opt)
+    n_strata_prop <- round_strata_sizes(sample_size * strata_weights_prop)
+    stratified_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  }
+  normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  LMT_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  
+  for(i in 1:n_sims){
+    for(j in 1:length(shift)){
+      sample_1 <- sample(x, size = sample_size, replace = TRUE)
+      sample_2 <- sample(x + shift[j], size = sample_size, replace = TRUE)
+      diff_mean <- mean(sample_1) - mean(sample_2)
+      normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
+      #hedged_rejections[i,j] <- two_sample_hedged_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
+      LMT_rejections[i,j] <- two_sample_LMT_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE, B = 200)
+      if(stratified){
+        pop_2 <- data.frame(TC = x + shift[j], strata = strata)
+        strat_sample_1 <- strata(data = pop_1, stratanames = "strata", size = n_strata_prop, method = "srswr")
+        strat_sample_2 <- strata(data = pop_2, stratanames = "strata", size = n_strata_prop, method = "srswr")
+        stratified_estimate_1 <- get_mean_se_stratified(sample = getdata(pop_1, strat_sample_1), N_strata = table(pop_1$strata))
+        stratified_estimate_2 <- get_mean_se_stratified(sample = getdata(pop_2, strat_sample_2), N_strata = table(pop_2$strata))
+        difference_estimate <- stratified_estimate_2[1] - stratified_estimate_1[1]
+        combined_se <- sqrt(stratified_estimate_1[2]^2 + stratified_estimate_2[2]^2)
+        stratified_p_values[i,j] <- 1 - pt(q = difference_estimate / combined_se, df = 2 * (sample_size - K))
+      }
+    }
+  }
+  normal_power_shift <- colMeans(normal_p_values < .05)
+  #hedged_power_shift <- colMeans(hedged_rejections)
+  LMT_power_shift <- colMeans(LMT_rejections)
+  #anderson_power_shift <- colMeans(anderson_rejections)
+  #eb_power_shift <- colMeans(eb_rejections)
+  if(stratified){
+    stratified_power_shift <- colMeans(stratified_p_values < 0.05)
+    cbind("normal" = normal_power_shift, "stratified" = stratified_power_shift, "LMT"= LMT_power_shift)
+  } else {
+    cbind("normal" = normal_power_shift, "LMT"= LMT_power_shift)
+  }
+}
+
+
 #these take a while to run, we can save them as an object
-power_10_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 10)
-power_30_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 30)
-power_90_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 90)
-power_200_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 200)
+power_10_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 10, stratified = TRUE)
+power_30_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 30, stratified = TRUE)
+power_90_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 90, stratified = TRUE)
+power_200_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 200, stratified = TRUE)
 power_10_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 10)
 power_30_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 30)
 power_90_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 90)

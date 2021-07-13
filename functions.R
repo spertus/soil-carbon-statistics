@@ -1064,3 +1064,31 @@ two_sample_LMT_test <- function(n, pop_1, pop_2, resample, B = 1000){
 }
 
 
+
+#stratification helper function to make vector an integer vector with the sum preserved
+#input: 
+  #n_strata: the number of samples to take from each stratum, which could be non-integer, but sums to overall sample size
+#output:
+  #a rounded vector with the sum equal to the sum of the original vector
+round_strata_sizes <- function(n_strata){
+  rounded_n_strata <- floor(n_strata)
+  indices <- tail(order(n_strata-rounded_n_strata), round(sum(n_strata)) - sum(rounded_n_strata))
+  rounded_n_strata[indices] <- rounded_n_strata[indices] + 1
+  rounded_n_strata
+}
+
+#function to get mean and standard error estimate from a stratified sample used alongside 'sampling' package
+#input: 
+  #sample: a dataframe of stratified samples as output by sampling::strata()
+#output:
+  #length 2 vector with the estimate of the population mean and the estimated standard error of that estimate
+get_mean_se_stratified <- function(sample, N_strata){
+  N <- sum(N_strata)
+  strata_weights <- N_strata / N
+  n_strata <- as.numeric(table(sample$strata))
+  strata_means <- tapply(sample$TC, sample$strata, mean)
+  strata_vars <- tapply(sample$TC, sample$strata, var)
+  var_estimate <- N^(-2) * sum(N_strata^2 * strata_vars / n_strata)
+  c(sum(strata_weights * strata_means), sqrt(var_estimate))
+}
+
