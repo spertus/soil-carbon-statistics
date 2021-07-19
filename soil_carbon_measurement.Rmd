@@ -176,3 +176,59 @@ simulation_results_skewed <- replicate(n = 200, run_simulation_skewed(true_sampl
 plot(y = rowMeans(simulation_results_skewed), x = samples, pch = 20, cex = 1.5, xlab = "True value of s", ylab = "Expected value of sequentially thresholded duplicates", main = "Skewed Measurement Error")
 abline(0,1)
 ```
+
+
+
+
+# Effect of imprecise weighing on SOC measurements
+
+Most elemental analyzers specify that aliquots to be assayed should be weighed out to 6 decimal places, that is .000001 grams or .001 milligrams. During combustion, the mass of CO2 released is measured to some precision by the elemental analyzer. The amount of carbon on a gram per gram basis, is then determined by dividing this amount by the exact mass of the soil. The carbon concentration can then be converted into percent, gram per kilogram, etc. 
+
+The measurement error is thus a function of the machine's precision in measuring CO2 released, and the precision of the balance used to weigh the aliquot. If a 5 decimal point balance is used instead of a 6 decimal point balance, then the measurement error of the weighing is increased by a factor of 10. Does this have an appreciable effect on the overall precision of the analysis?
+
+Let $M_i$ be the measured mass in the $i$th run of a sample and $C_i$ be the mass of carbon released during combustion, both in milligrams. The measured concentration of carbon is $S_i = C_i / M_i$. We assume that measurements are unbiased (which can be assured through callibration on standards) such that $\mathbb{E}[S_i] = \mu_S$, where $\mu_S$ is the true concentration in the sample. The variance of $S_i$ is
+
+$$\mathbb{V}[S_i] = \mathbb{V}[C_i / M_i] = \mathbb{V}\bigg [C_i \frac{1}{M_i} \bigg ] = \mathbb{V}[C_i] \mathbb{E}[M_i^{-1}]^2 + \mathbb{V}[M_i^{-1}] \mathbb{E}[C_i]^2 + \mathbb{V}[C_i]\mathbb{V}[M_i^{-1}].$$
+$M_i$ is bounded away from 0 so this should be well-defined, but is still difficult to analyze without further assumptions. On the other hand, it is straightforward to simulate the distribution of $S_i$ assuming distributions for $C_i$ and $M_i$. 
+
+#### Normal error
+
+For example, suppose $C_i \sim \mathcal{N}(\mu_C, \sigma_C^2)$ and $M_i \sim \mathcal{N}(\mu_M, \sigma_M)^2$, independently, with $\mu_C$ the true mass of carbon and $\mu_M$ the true mass of the aliquot so $\mu_S = \mu_C / \mu_M$. [Diaz-Frances and Rubio, 2012](https://link.springer.com/article/10.1007/s00362-012-0429-2) derive a normal approximation to the distribution of $S_i = C_i / M_i$, with approximate variance:
+$$\sigma_S^2 = \mu_s^2 \bigg( \frac{\sigma_C^2}{\mu_C^2} + \frac{\sigma_M^2}{\mu_M^2} \bigg)$$
+
+The effect of imprecision in weighing is to increase $\sigma_M$, and the effect on $\sigma_S^2$ in turn depends on how much sample is weighed ($\mu_M^2$). Ultimately, if the machine measurement is highly imprecise then the first term inside the parentheses $\sigma_C^2 / \mu_C^2$ will dominate. Here is a function to simulate from the distribution of $S_i$:
+
+```{r}
+#inputs: 
+  #n: the number of samples to draw of S_i
+  #mu_M: the average weighed mass of the aliquot (true mass, assuming unbiased weighing)
+  #var_M: the imprecision of the balance used. 
+  #mu_C: the average carbon mass measured by the machine (true mass, assuming unbiased measurement)
+  #var_C: the error variance of the machine
+run_sim <- function(n, mu_M, var_M, mu_C, var_C){
+  C <- rnorm(n, mean = mu_C, sd = sqrt(var_C))
+  M <- rnorm(n, mean = mu_M, sd = sqrt(var_M))
+  S <- C/M
+  S
+}
+
+#an example where carbon concentration is 10% (.1 gram/gram), with measurement error .001 grams. 1 gram is weighed at a resolution of .00001 (5 decimal places) or .000001 (6 decimal places). 
+#sigma_M = .000005 puts 95% of the mass measurements within .00001 grams of the true mass.
+#sigma_C = .0005 puts 95% of the carbon mass measurements made by the machine within .001 grams of the true carbon mass. 
+sims_5_places <- run_sim(n = 1e6, mu_M = 1, var_M = .000005^2, mu_C = .1, var_C = .0005^2)
+sims_6_places <- run_sim(n = 1e6, mu_M = 1, var_M = .0000005^2, mu_C = .1, var_C = .0005^2)
+#resulting overall measurement error (in sd)
+sd(sims_5_places)
+sd(sims_6_places)
+#ratio of errors. How much is the error inflated by less precision in weighing?
+sd(sims_5_places) / sd(sims_6_places) 
+```
+
+The simulated measurement error is about .0005 grams, so 95% of measurements are in about 0.001 gram/gram or .1 percent of the true concentration. 0.0005 grams is essentially just the error of the machine, so in this case the effect of more imprecise weighing is completely negligible. This also tracks with the analytical approximation:
+
+$$0.1^2 \bigg( \frac{0.0005^2}{0.1^2} + \frac{0.00005^2}{1^2} \bigg) \bigg / 0.1^2 \bigg( \frac{0.0005^2}{0.1^2} + \frac{0.000005^2}{1^2} \bigg)$$
+```{r}
+(.0005^2 / .01 + .00005^2) / (.0005^2 / .01 + 0.000005^2)
+```
+
+The LHS inside the parentheses, which corresponds to the machine precision, dominates the variability of assay. Of course, other inputs for the true weight of the sample, the true concentration of the sample, or the precision of the machine will change the cost of using a 5 decimal over a 6 decimal point balance. These costs could be explored for a range of other choices of the parameters.
