@@ -201,22 +201,22 @@ The effect of imprecision in weighing is to increase $\sigma_M$, and the effect 
 ```{r}
 #inputs: 
   #n: the number of samples to draw of S_i
-  #mu_M: the average weighed mass of the aliquot (true mass, assuming unbiased weighing)
-  #var_M: the imprecision of the balance used. 
+  #range_M: a length-2 vector with upper and lower bounds of the measurement error, the imprecision of the balance used
   #mu_C: the average carbon mass measured by the machine (true mass, assuming unbiased measurement)
   #var_C: the error variance of the machine
-run_sim <- function(n, mu_M, var_M, mu_C, var_C){
+run_sim <- function(n, range_M, mu_C, var_C){
   C <- rnorm(n, mean = mu_C, sd = sqrt(var_C))
-  M <- rnorm(n, mean = mu_M, sd = sqrt(var_M))
+  M <- runif(n, min = range_M[1], max = range_M[2])
+  #M <- rnorm(n, mean = mu_M, sd = sqrt(var_M))
   S <- C/M
   S
 }
 
 #an example where carbon concentration is 1% (.01 gram/gram), with measurement error .1% (absolute on the concentration scale). mu_M = 10 milligrams are weighed at a resolution of .00001 (5 decimal places) or .000001 (6 decimal places) grams. The total mass of carbon released is thus mu_C = .0001 grams = .1 milligrams.  
-#sigma_M = .000005 puts 95% of the mass measurements within .00001 grams of the true mass.
-#For sigma_C, most measurements need to be within .000098 and .00012 in order for concenrations to be within 2 * .1% of the true concentration of .0001. Thus sigma_C = .00001.
-sims_5_places <- run_sim(n = 1e6, mu_M = .01, var_M = .000005^2, mu_C = .0001, var_C = .00001^2)
-sims_6_places <- run_sim(n = 1e6, mu_M = .01, var_M = .0000005^2, mu_C = .0001, var_C = .00001^2)
+#the measurement is made to 10 mgs, but rounded at the 5th or 6th decimal place
+#For sigma_C, most measurements to have an SD on the % scale of .1 the error for a 1% sample needs to be sigma_C = .00001.
+sims_5_places <- run_sim(n = 1e6, range_M = c(.009995, .010005), mu_C = .0001, var_C = .00001^2)
+sims_6_places <- run_sim(n = 1e6, range_M =  c(.0099995, .0100005), mu_C = .0001, var_C = .00001^2)
 #resulting overall measurement error (in sd)
 sd(sims_5_places)
 sd(sims_6_places)
