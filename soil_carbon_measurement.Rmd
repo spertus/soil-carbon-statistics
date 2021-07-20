@@ -194,7 +194,7 @@ $M_i$ is bounded away from 0 so this should be well-defined, but is still diffic
 #### Normal error
 
 For example, suppose $C_i \sim \mathcal{N}(\mu_C, \sigma_C^2)$ and $M_i \sim \mathcal{N}(\mu_M, \sigma_M)^2$, independently, with $\mu_C$ the true mass of carbon and $\mu_M$ the true mass of the aliquot so $\mu_S = \mu_C / \mu_M$. [Diaz-Frances and Rubio, 2012](https://link.springer.com/article/10.1007/s00362-012-0429-2) derive a normal approximation to the distribution of $S_i = C_i / M_i$, with approximate variance:
-$$\sigma_S^2 = \mu_s^2 \bigg( \frac{\sigma_C^2}{\mu_C^2} + \frac{\sigma_M^2}{\mu_M^2} \bigg)$$
+$$\sigma_S^2 = \mu_S^2 \bigg( \frac{\sigma_C^2}{\mu_C^2} + \frac{\sigma_M^2}{\mu_M^2} \bigg)$$
 
 The effect of imprecision in weighing is to increase $\sigma_M$, and the effect on $\sigma_S^2$ in turn depends on how much sample is weighed ($\mu_M^2$). Ultimately, if the machine measurement is highly imprecise then the first term inside the parentheses $\sigma_C^2 / \mu_C^2$ will dominate. Here is a function to simulate from the distribution of $S_i$:
 
@@ -212,11 +212,11 @@ run_sim <- function(n, mu_M, var_M, mu_C, var_C){
   S
 }
 
-#an example where carbon concentration is 10% (.1 gram/gram), with measurement error .001 grams. 1 gram is weighed at a resolution of .00001 (5 decimal places) or .000001 (6 decimal places). 
+#an example where carbon concentration is 1% (.01 gram/gram), with measurement error .1% (absolute on the concentration scale). mu_M = 10 milligrams are weighed at a resolution of .00001 (5 decimal places) or .000001 (6 decimal places) grams. The total mass of carbon released is thus mu_C = .0001 grams = .1 milligrams.  
 #sigma_M = .000005 puts 95% of the mass measurements within .00001 grams of the true mass.
-#sigma_C = .0005 puts 95% of the carbon mass measurements made by the machine within .001 grams of the true carbon mass. 
-sims_5_places <- run_sim(n = 1e6, mu_M = 1, var_M = .000005^2, mu_C = .1, var_C = .0005^2)
-sims_6_places <- run_sim(n = 1e6, mu_M = 1, var_M = .0000005^2, mu_C = .1, var_C = .0005^2)
+#For sigma_C, most measurements need to be within .000098 and .00012 in order for concenrations to be within 2 * .1% of the true concentration of .0001. Thus sigma_C = .00001.
+sims_5_places <- run_sim(n = 1e6, mu_M = .01, var_M = .000005^2, mu_C = .0001, var_C = .00001^2)
+sims_6_places <- run_sim(n = 1e6, mu_M = .01, var_M = .0000005^2, mu_C = .0001, var_C = .00001^2)
 #resulting overall measurement error (in sd)
 sd(sims_5_places)
 sd(sims_6_places)
@@ -224,11 +224,13 @@ sd(sims_6_places)
 sd(sims_5_places) / sd(sims_6_places) 
 ```
 
-The simulated measurement error is about .0005 grams, so 95% of measurements are in about 0.001 gram/gram or .1 percent of the true concentration. 0.0005 grams is essentially just the error of the machine, so in this case the effect of more imprecise weighing is completely negligible. This also tracks with the analytical approximation:
+The simulated measurement error is about .001 grams, so 95% of measurements are in about 0.002 gram/gram or .2 percent of the true concentration. This aligns with the standard deviation of .1 percent for SoliTOC given by Elementar. 0.001 grams is essentially just the error of the machine, so in this case the effect of more imprecise weighing is completely negligible. This also tracks with the analytical approximation:
 
-$$0.1^2 \bigg( \frac{0.0005^2}{0.1^2} + \frac{0.00005^2}{1^2} \bigg) \bigg / 0.1^2 \bigg( \frac{0.0005^2}{0.1^2} + \frac{0.000005^2}{1^2} \bigg)$$
+$$0.01^2 \bigg( \frac{0.00001^2}{0.0001^2} + \frac{0.00005^2}{.01^2} \bigg) \bigg / 0.01^2 \bigg( \frac{0.00001^2}{0.0001^2} + \frac{0.000005^2}{.01^2} \bigg)$$
 ```{r}
-(.0005^2 / .01 + .00005^2) / (.0005^2 / .01 + 0.000005^2)
+(.00001^2 / .0001^2 + .00005^2/.01^2) / (.00001^2 / .0001^2 + 0.000005^2/.01^2)
 ```
 
-The LHS inside the parentheses, which corresponds to the machine precision, dominates the variability of assay. Of course, other inputs for the true weight of the sample, the true concentration of the sample, or the precision of the machine will change the cost of using a 5 decimal over a 6 decimal point balance. These costs could be explored for a range of other choices of the parameters.
+If the error of measurement with the instrument is always .1% (as indicated by Elementar) then $\sigma_C / \mu_S = .001$ (here the true concentration is 1%, so $\sigma_C = .001 * .01 = .00001$. If it is 2% so $\mu_S = .02$, $\sigma_C = .00002$ and so on). The contribution from instrumental error is always pegged to the true concentration, which isn't effected by the amount of sample weighed out. But this quantity, $\mu_M$, does effect the contribution from weighing error, so at very small aliquot masses the weighing error can dominate the overall measurement error $\sigma_S$. The simulations above seem to indicate that this doesn't happen down to 10mg and 1% concentration, which in practice is likely a worst case scenario for weighing. 
+
+
