@@ -37,7 +37,7 @@ mean_impute <- function(column){
 #texture and pH should not differ between treatments but should differ between soil types
 #GWC should not predict changes in soil health, microbial biomass should be controlled for GWC. Note that we do not see a significant difference in GWC between H and R
 #these are names of the variables that are soil health indicators:
-soil_health_vars <- c("per_C", "per_N", "profile_carbon", "POXc", "EOC", "MBC", "MBN", "glucam", "glucos", "cell", "BD")
+soil_health_vars <- c("per_C", "per_N", "profile_carbon", "POXc", "EOC", "EON", "MBC", "MBN", "glucam", "glucos", "cell", "BD")
 
 
 #the site FBF is missing all biological information, so delete it for now.
@@ -62,6 +62,7 @@ soil_means <- hr_data %>%
     POXc = mean(POXc),
     GWC = mean(GWC),
     EOC = mean(EOC),
+    EON = mean(EON),
     MBC = mean(MBC), 
     MBN = mean(MBN),
     profile_carbon = mean(profile_carbon),
@@ -282,6 +283,7 @@ topsoil_means_differences <- topsoil_means %>%
     diff_BD = BD_H - BD_R,
     diff_POXc = POXc_H - POXc_R,
     diff_EOC = EOC_H - EOC_R,
+    diff_EON = EON_H - EON_R,
     diff_MBC = MBC_H - MBC_R,
     diff_MBN = MBN_H - MBN_R,
     diff_glucam = glucam_H - glucam_R,
@@ -304,6 +306,7 @@ subsoil_means_differences <- subsoil_means %>%
     diff_BD = BD_H - BD_R,
     diff_POXc = POXc_H - POXc_R,
     diff_EOC = EOC_H - EOC_R,
+    diff_EON = EON_H - EON_R,
     diff_MBC = MBC_H - MBC_R,
     diff_MBN = MBN_H - MBN_R,
     diff_glucam = glucam_H - glucam_R,
@@ -335,7 +338,8 @@ colnames(diff_matrix_sub) <- paste("sub_", gsub("diff_", "", colnames(diff_matri
 diff_matrix_carbon <- carbon_means_differences %>%
   as.matrix()
 
-diff_matrix <- cbind(diff_matrix_top, diff_matrix_sub, diff_matrix_carbon)
+#carbon stock is not included in this analysis
+diff_matrix <- cbind(diff_matrix_top, diff_matrix_sub)
 
 diff_means <- apply(diff_matrix, 2, mean)
 original_ANOVAs <- apply(diff_matrix, 2, get_ANOVA, block = soil_type)
