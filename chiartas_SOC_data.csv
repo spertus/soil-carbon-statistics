@@ -1,0 +1,378 @@
+﻿Site Name,Soil Type,Transect Name,Sample Location,Top_Depth,Bottom_Depth,Weight (mg),N_response,C_response,N_wt,C_wt,per_N,per_C,C_N ratio,,,
+Avenue 33,Counterfeit Clay Loam,MC,1,0,15,25.364,195.107,4756.217,0.059,0.869,0.231,3.428,14.9,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,1,15,45,28.718,140.485,2426.495,0.035,0.429,0.121,1.494,12.3,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,1,45,70,32.504,132.637,2197.905,0.031,0.386,0.097,1.187,12.3,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,1,70,95,32.894,130.722,1901.66,0.031,0.330,0.093,1.003,10.8,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,2,0,15,34.862,215.878,5177.41,0.068,0.949,0.194,2.722,14.1,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,2,15,45,33.132,132.568,2578.653,0.031,0.458,0.095,1.382,14.6,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,2,45,70,29.99,130.152,2138.943,0.030,0.375,0.101,1.250,12.3,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,2,70,95,31.398,127.636,1705.165,0.029,0.293,0.093,0.933,10.0,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,3,0,15,30.624,226.374,5463.481,0.072,1.003,0.235,3.276,13.9,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,3,15,45,29.834,131.392,1989.317,0.031,0.347,0.104,1.161,11.2,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,3,45,70,28.082,115.325,1433.406,0.024,0.241,0.085,0.860,10.1,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,3,70,95,31.176,115.783,1175.126,0.024,0.193,0.077,0.618,8.0,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,4,0,15,28.7,209.48,4936.889,0.065,0.904,0.226,3.149,14.0,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,4,15,45,26.65,132.37,2117.764,0.031,0.371,0.118,1.391,11.8,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,4,45,70,24.286,109.09,1257.713,0.021,0.208,0.087,0.857,9.8,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,4,70,95,36.202,122.067,1276.743,0.027,0.212,0.074,0.585,7.9,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,5,0,15,31.308,208.671,5284.591,0.064,0.969,0.206,3.096,15.1,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,5,15,45,23.438,127.466,2023.035,0.029,0.353,0.125,1.506,12.1,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,5,45,70,30.24,122.913,1736.573,0.027,0.299,0.090,0.988,11.0,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,MC,5,70,95,28.67,107.138,1226.417,0.020,0.202,0.071,0.706,9.9,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,1,0,15,32.738,181.433,3675.687,0.053,0.665,0.161,2.032,12.6,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,1,15,45,28.502,124.619,1716.981,0.028,0.295,0.098,1.035,10.5,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,1,45,70,44.446,102.653,767.501,0.018,0.116,0.042,0.260,6.3,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,1,70,95,46.146,83.694,363.199,0.010,0.039,0.022,0.085,3.8,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,2,0,15,29.098,192.101,4093.027,0.057,0.744,0.197,2.557,13.0,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,2,15,45,30.682,128.149,1760.675,0.029,0.303,0.096,0.988,10.3,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,2,45,70,30.034,111.938,1181.83,0.022,0.194,0.075,0.646,8.6,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,2,70,95,49.128,89.098,345.772,0.013,0.036,0.026,0.073,2.9,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,3,0,15,27.742,163.649,3155.415,0.045,0.567,0.162,2.044,12.6,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,3,15,45,30.702,143.026,2404.237,0.036,0.425,0.117,1.384,11.8,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,3,45,70,27.254,110.751,1372.813,0.022,0.230,0.081,0.844,10.5,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,3,70,95,47.412,86.007,250.201,0.011,0.018,0.024,0.038,1.6,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,4,0,15,29.488,215.69,4979.077,0.067,0.912,0.229,3.091,13.5,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,4,15,45,31.434,128.292,1742.181,0.030,0.300,0.094,0.954,10.1,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,4,45,70,39.908,113.17,1097.041,0.023,0.178,0.058,0.446,7.7,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,4,70,95,41.5,87.895,282.716,0.012,0.024,0.029,0.058,2.0,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,5,0,15,21.002,143.978,2334.549,0.036,0.412,0.173,1.961,11.3,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,5,15,45,25.678,120.283,1562.487,0.026,0.266,0.102,1.035,10.2,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,5,45,70,23.752,105.17,1002.025,0.020,0.160,0.082,0.673,8.2,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OB,5,70,95,41.124,103.182,726.401,0.019,0.108,0.045,0.262,5.8,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,1,0,15,24.531,111.818,2495.862,0.022,0.442,0.091,1.803,19.7,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,1,15,45,34.368,146.19,2034.73,0.037,0.355,0.109,1.033,9.5,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,1,45,70,39.084,169.427,1386.48,0.047,0.233,0.121,0.595,4.9,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,1,70,95,30.076,157.391,931.781,0.042,0.147,0.140,0.487,3.5,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,2,0,15,25.026,182.207,2692.541,0.053,0.479,0.211,1.916,9.1,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,2,15,45,27.01,115.822,2017.677,0.024,0.352,0.089,1.303,14.6,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,2,45,70,37.003,176.54,1742.187,0.050,0.300,0.136,0.810,5.9,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,2,70,95,34.191,85.597,526.084,0.011,0.070,0.032,0.205,6.3,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,3,0,15,28.396,173.137,2967.515,0.049,0.531,0.173,1.871,10.8,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,3,15,45,29.774,170.382,2632.596,0.048,0.468,0.161,1.572,9.8,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,3,45,70,26.761,132.041,1082.262,0.031,0.175,0.117,0.654,5.6,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,3,70,95,36.116,133.137,1267.442,0.032,0.210,0.088,0.582,6.6,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,4,0,15,24.384,133.742,2031.245,0.032,0.354,0.131,1.454,11.1,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,4,15,45,24.734,109.968,1222.01,0.022,0.201,0.087,0.815,9.3,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,4,45,70,37.806,105.767,819.73,0.020,0.125,0.052,0.332,6.3,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,4,70,95,51.948,98.346,514.437,0.017,0.068,0.032,0.130,4.1,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,5,0,15,26.182,162.889,3323.396,0.045,0.599,0.170,2.287,13.4,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,5,15,45,27.92,119.011,1832.904,0.026,0.317,0.091,1.135,12.4,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,5,45,70,28.668,99.181,981.221,0.017,0.156,0.059,0.544,9.2,,Los Angeles,DFS
+Avenue 33,Counterfeit Clay Loam,OC,5,70,95,33.388,114.094,1010.291,0.023,0.161,0.070,0.484,6.9,,Los Angeles,DFS
+Duvarita,Arnold Loamy Sand,D,1,0,15,79.87,143.257,2289.899,0.036,0.403,0.045,0.505,11.2,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,1,15,30,78.204,111.478,1455.425,0.022,0.246,0.028,0.314,11.0,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,1,30,60,90.004,99.036,1084.178,0.017,0.175,0.019,0.195,10.4,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,1,60,100,81.306,88.444,714.766,0.012,0.106,0.015,0.130,8.6,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,2,0,15,91.506,159.656,2836.233,0.043,0.507,0.047,0.554,11.7,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,2,15,30,81.438,117.634,1836.978,0.025,0.318,0.031,0.390,12.7,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,2,30,60,75.172,93.245,835.857,0.014,0.128,0.019,0.171,8.9,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,2,60,100,77.112,90.699,791.489,0.013,0.120,0.017,0.156,9.1,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,3,0,15,83.528,200.466,3756.927,0.061,0.681,0.073,0.815,11.2,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,3,15,30,79.826,122.455,1707.126,0.027,0.293,0.034,0.367,10.8,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,3,30,60,84.666,100.043,997.833,0.017,0.159,0.020,0.188,9.2,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,3,60,100,79.41,88.372,1251.836,0.012,0.207,0.015,0.261,16.9,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,4,0,15,85.832,159.276,2954.712,0.043,0.529,0.050,0.616,12.3,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,4,15,30,90.578,127.308,1981.446,0.029,0.345,0.032,0.381,11.8,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,4,30,60,85.4,100.627,1145.239,0.018,0.187,0.021,0.219,10.6,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,4,60,100,84.248,80.525,549.11,0.009,0.074,0.011,0.088,8.4,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,5,0,15,79.936,194.635,3739.971,0.058,0.677,0.073,0.847,11.6,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,5,15,30,92.46,121.351,1738.435,0.027,0.299,0.029,0.323,11.3,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,5,30,60,76.93,105.52,1313.429,0.020,0.219,0.026,0.284,11.1,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,D,5,60,100,83.698,106.165,1338.431,0.020,0.223,0.024,0.267,11.2,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,1,0,15,28.356,122.129,1548.933,0.027,0.263,0.095,0.928,9.8,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,1,15,30,25.532,112.905,1412.213,0.023,0.221,0.090,0.864,9.6,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,1,30,60,32.386,99.202,1105.6,0.017,0.168,0.052,0.519,9.9,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,1,60,100,29.88,113.313,834.993,0.023,0.122,0.077,0.407,5.3,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,2,0,15,32.81,112.87,1953.577,0.023,0.314,0.070,0.956,13.7,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,2,15,30,30.468,120.657,1710.516,0.026,0.272,0.086,0.892,10.4,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,2,30,60,27.558,99.54,1220.083,0.017,0.188,0.062,0.681,11.0,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,2,60,100,30.536,120.478,935.34,0.026,0.139,0.086,0.455,5.3,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,3,0,15,29.224,130.105,2170.952,0.030,0.351,0.104,1.201,11.6,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,3,15,30,29.238,120.617,1519.932,0.026,0.239,0.090,0.818,9.1,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,3,30,60,35.658,114.453,1618.726,0.024,0.256,0.066,0.718,10.9,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,3,60,100,31.364,107.095,879.236,0.020,0.129,0.065,0.412,6.3,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,4,0,15,28.36,128.002,1948.043,0.029,0.313,0.104,1.102,10.6,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,4,15,30,32.398,124.205,1831.958,0.028,0.293,0.086,0.904,10.5,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,4,30,60,32.544,117.273,1433.442,0.025,0.224,0.076,0.689,9.1,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,4,60,100,36.076,127.841,1292.582,0.029,0.200,0.081,0.555,6.8,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,5,0,15,28.866,111.002,1873.825,0.022,0.300,0.076,1.039,13.6,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,5,15,30,28.02,113.286,1198.155,0.023,0.197,0.082,0.703,8.5,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,5,30,60,26.682,100.066,903.382,0.017,0.141,0.065,0.529,8.2,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,Elder,5,60,100,32.026,100.618,745.938,0.018,0.111,0.055,0.348,6.3,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,1,0,15,42.952,128.321,1882.78,0.030,0.326,0.069,0.760,11.0,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,1,15,30,42.22,99.777,1374.859,0.017,0.230,0.041,0.546,13.4,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,1,30,60,45.558,98.852,1131.556,0.017,0.184,0.037,0.405,11.0,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,1,60,100,47.204,84.578,559.333,0.011,0.076,0.022,0.161,7.2,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,2,0,15,41.478,126.267,1983.918,0.029,0.345,0.069,0.833,12.0,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,2,15,30,45.116,103.589,1192.115,0.019,0.196,0.042,0.434,10.4,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,2,30,60,46.686,89.579,709.534,0.013,0.105,0.027,0.224,8.2,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,2,60,100,44.496,78.6,371.023,0.008,0.041,0.018,0.091,5.1,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,3,0,15,55.204,166.831,2881.672,0.046,0.515,0.084,0.933,11.1,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,3,15,30,41.128,120.411,1665.475,0.026,0.285,0.064,0.694,10.9,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,3,30,60,45.43,93.053,800.991,0.014,0.122,0.031,0.268,8.5,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,"34.665618, -120.410510",3,60,100,46.342,82.031,441.719,0.010,0.054,0.021,0.117,5.7,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,4,0,15,30.628,104.07,1164.211,0.019,0.191,0.062,0.622,10.0,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,4,15,30,36.258,89.352,695.258,0.013,0.102,0.035,0.281,8.0,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,4,30,60,46.582,86.908,552.865,0.012,0.075,0.025,0.161,6.5,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,4,60,100,50.664,86.545,539.455,0.011,0.072,0.023,0.143,6.3,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,5,0,15,45.108,127.515,1662.892,0.029,0.264,0.065,0.585,9.0,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,5,15,30,48.868,123.973,1675.76,0.028,0.266,0.057,0.544,9.6,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,5,30,60,46.834,89.417,623.825,0.013,0.085,0.027,0.182,6.7,,Lompoc,Vineyard
+Duvarita,Arnold Loamy Sand,C+W,5,60,100,43.018,81.937,379.104,0.009,0.043,0.022,0.101,4.6,,Lompoc,Vineyard
+Malibu Orchards,Malibu Loam,TH,1,0,15,27.68,277.903,7488.76,0.094,1.386,0.341,5.007,14.7,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,1,15,40,32.006,168.298,4211.752,0.047,0.767,0.147,2.395,16.3,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,1,40,70,46.712,233.944,6620.893,0.075,1.222,0.161,2.616,16.2,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,2,0,15,27.442,196.967,4900.356,0.059,0.897,0.216,3.268,15.1,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,2,15,40,46.634,276.576,7083.651,0.094,1.309,0.201,2.808,14.0,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,2,40,70,38.31,198.254,5173.834,0.060,0.948,0.156,2.476,15.8,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,3,0,15,57.872,320.479,8657.819,0.113,1.607,0.195,2.777,14.2,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,3,15,40,58.718,261.732,7159.648,0.087,1.324,0.149,2.254,15.1,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,3,40,70,31.578,228.66,3262.97,0.073,0.587,0.231,1.860,8.0,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,4,0,15,36.772,346.893,8553.867,0.124,1.587,0.338,4.317,12.8,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,4,15,40,43.734,303.596,6822.552,0.106,1.260,0.241,2.881,11.9,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,4,40,70,39.848,239.829,3698.43,0.078,0.670,0.195,1.680,8.6,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,5,0,15,36.493,374.861,9587.157,0.136,1.783,0.374,4.885,13.1,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,5,15,40,35.041,297.032,5394.963,0.103,0.990,0.293,2.826,9.6,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,TH,5,40,70,26.41,189.481,3444.697,0.056,0.622,0.212,2.354,11.1,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,1,0,15,39.292,295.852,8370.622,0.102,1.553,0.260,3.952,15.2,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,1,15,40,38.886,185.568,4782.001,0.054,0.874,0.140,2.249,16.1,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,1,40,70,40.502,226.86,6593.732,0.072,1.217,0.178,3.004,16.8,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,2,0,15,40.654,267.667,6890.744,0.090,1.273,0.221,3.131,14.1,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,2,15,40,38.916,204.694,5136.843,0.063,0.941,0.161,2.419,15.0,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,2,40,70,36.582,180.044,4585.43,0.052,0.837,0.142,2.289,16.1,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,3,0,15,38.6,227.671,5673.559,0.073,1.043,0.188,2.702,14.4,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,3,15,40,39.114,218.204,5741.376,0.069,1.056,0.175,2.699,15.4,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,3,40,70,40.57,198.562,4957.679,0.060,0.908,0.148,2.237,15.1,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,4,0,15,27.686,290.923,5955.822,0.100,1.096,0.361,3.960,11.0,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,4,15,40,34.09,252.806,4124.602,0.084,0.750,0.245,2.200,9.0,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,4,40,70,28.288,199.988,2658.267,0.061,0.473,0.214,1.672,7.8,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,5,0,15,25.462,259.317,5066.341,0.086,0.928,0.339,3.645,10.7,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,5,15,40,25.612,248.347,2786.682,0.082,0.497,0.319,1.941,6.1,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,B,5,40,70,27.29,721.339,1765.492,0.287,0.304,1.050,1.115,1.1,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,1,0,15,36.28,410.955,11629.323,0.152,2.169,0.419,5.977,14.3,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,1,15,40,39.544,350.566,9950.792,0.126,1.851,0.318,4.682,14.7,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,1,40,70,37.616,304.338,7801.133,0.106,1.445,0.281,3.841,13.6,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,2,0,15,40.298,474.334,14119.505,0.180,2.639,0.446,6.549,14.7,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,2,15,40,38.16,322.071,10149.038,0.114,1.889,0.298,4.950,16.6,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,2,40,70,38.138,184.189,3946.085,0.054,0.716,0.141,1.878,13.3,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,3,0,15,38.792,432.365,11063.638,0.161,2.062,0.416,5.315,12.8,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,3,15,40,40.042,321.919,8148.905,0.113,1.511,0.283,3.773,13.3,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,3,40,70,37.106,215.471,3156.397,0.067,0.567,0.181,1.528,8.4,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,4,0,15,37.734,330.008,8999.847,0.117,1.672,0.310,4.430,14.3,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,4,15,40,39.496,312.289,8485.848,0.109,1.574,0.277,3.986,14.4,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,4,40,70,37.216,278.607,7748.967,0.095,1.435,0.254,3.856,15.2,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,5,0,15,37.878,372.042,9660.126,0.135,1.796,0.357,4.743,13.3,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,5,15,40,35.042,295.719,6866.217,0.102,1.268,0.291,3.619,12.4,,Malibu,Orchard
+Malibu Orchards,Malibu Loam,UB,5,40,70,38.186,291.113,6264.284,0.100,1.155,0.262,3.023,11.5,,Malibu,Orchard
+WFF,Sorrento Sandy Loam,9B,1,0,15,24.598,174.057,3154.868,0.049,0.567,0.201,2.304,11.5,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,1,15,35,28.034,114.793,1437.528,0.024,0.242,0.085,0.864,10.2,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,1,35,65,24.858,109.818,1265.254,0.022,0.210,0.087,0.843,9.7,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,1,65,100,32.278,110.724,1066.296,0.022,0.172,0.068,0.533,7.8,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,2,0,15,24.908,194.682,4025.5,0.058,0.731,0.234,2.936,12.5,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,2,15,35,27.534,126.715,1888.554,0.029,0.327,0.105,1.189,11.3,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,2,35,65,24.344,113.088,1471.782,0.023,0.249,0.094,1.022,10.8,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,2,65,100,37.816,127.109,1489.578,0.029,0.252,0.077,0.667,8.7,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,3,0,15,24.962,167.269,2870.772,0.046,0.513,0.186,2.056,11.0,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,3,15,35,31.204,129.446,1850.548,0.030,0.320,0.096,1.026,10.7,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,3,35,65,24.332,107.68,1265.815,0.021,0.210,0.085,0.862,10.2,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,3,65,100,25.992,103.493,940.029,0.019,0.148,0.072,0.570,7.9,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,4,0,15,25.636,197.615,3979.847,0.060,0.723,0.233,2.819,12.1,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,4,15,35,26.254,121.861,1749.045,0.027,0.301,0.102,1.147,11.2,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,4,35,65,30.196,119.629,1527.192,0.026,0.259,0.085,0.858,10.0,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,4,65,100,38.848,122.847,1286.996,0.027,0.214,0.070,0.550,7.9,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,5,0,15,28.576,238.764,5208.896,0.077,0.955,0.271,3.342,12.3,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,5,15,35,29.37,127.662,1885.26,0.029,0.327,0.100,1.113,11.2,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,5,35,65,32.13,124.306,1632.386,0.028,0.279,0.087,0.868,10.0,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,9B,5,65,100,44.512,134.555,1580.242,0.032,0.269,0.073,0.605,8.3,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,1,0,15,30.214,202.672,4140.962,0.062,0.753,0.205,2.493,12.2,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,1,15,35,29.404,135.536,2183.05,0.033,0.383,0.111,1.303,11.7,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,1,35,65,29.774,124.72,1754.292,0.028,0.302,0.094,1.015,10.8,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,1,65,100,25.538,111.258,1205.552,0.022,0.198,0.087,0.777,8.9,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,2,0,15,28.664,198.536,3977.911,0.060,0.722,0.209,2.520,12.0,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,2,15,35,27.722,128.299,1998.265,0.030,0.348,0.107,1.256,11.8,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,2,35,65,26.83,117.182,1676.25,0.025,0.287,0.092,1.071,11.6,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,2,65,100,25.292,106.026,1179.116,0.020,0.193,0.079,0.765,9.7,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,3,0,15,23.072,121.398,1783.196,0.027,0.308,0.115,1.333,11.6,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,3,15,35,25.176,116.779,1670.181,0.025,0.286,0.098,1.137,11.6,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,3,35,65,27.096,112.715,1419.113,0.023,0.239,0.084,0.881,10.5,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,3,65,100,31.698,107.834,1038.346,0.021,0.167,0.065,0.526,8.1,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,4,0,15,26.832,182.314,3488.904,0.053,0.630,0.197,2.348,11.9,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,4,15,35,29.916,138.012,2328.617,0.034,0.411,0.113,1.373,12.2,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,4,35,65,28.18,112.124,1437.003,0.023,0.242,0.080,0.859,10.7,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,4,65,100,50.926,133.189,1489.3,0.032,0.252,0.062,0.495,8.0,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,5,0,15,28.06,181.152,3493.042,0.052,0.631,0.187,2.248,12.0,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,5,15,35,26.5,117.038,1654.298,0.025,0.283,0.093,1.069,11.5,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,5,35,65,32.612,118.946,1545.094,0.026,0.263,0.078,0.805,10.3,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12B,5,65,100,37.39,112.825,1123.892,0.023,0.183,0.061,0.489,8.0,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,1,0,15,27.898,214.58,4446.09,0.067,0.811,0.240,2.907,12.1,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,1,15,35,32.602,126.538,1835.869,0.029,0.318,0.088,0.974,11.0,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,1,35,65,26.826,104.323,1166.944,0.019,0.191,0.071,0.712,10.0,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,1,65,100,32.176,103.359,817.216,0.019,0.125,0.058,0.388,6.7,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,2,0,15,32.558,194.871,4425.008,0.058,0.738,0.179,2.266,12.6,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,2,15,35,32.906,165.388,3097.508,0.046,0.510,0.139,1.550,11.2,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,2,35,65,30.632,133.208,1804.881,0.032,0.288,0.103,0.940,9.1,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,2,65,100,28.138,104.828,968.92,0.019,0.145,0.069,0.514,7.5,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,3,0,15,34.414,200.026,4511.178,0.061,0.753,0.176,2.187,12.4,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,3,15,35,30.182,119.96,1840.338,0.026,0.294,0.086,0.975,11.3,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,3,35,65,26.938,104.388,1160.959,0.019,0.178,0.071,0.659,9.2,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,3,65,100,29.652,96.009,777.217,0.016,0.112,0.052,0.377,7.2,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,4,0,15,31,176.893,3481.898,0.051,0.576,0.163,1.858,11.4,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,4,15,35,31.93,128.979,1993.539,0.030,0.320,0.094,1.004,10.7,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,4,35,65,28.482,124.682,1800.636,0.028,0.287,0.098,1.009,10.3,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,4,65,100,32.176,137.246,1322.353,0.033,0.205,0.104,0.638,6.1,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,5,0,15,32.636,182.587,3743.832,0.053,0.621,0.163,1.903,11.7,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,5,15,35,31.662,130.722,2188.678,0.031,0.354,0.097,1.118,11.6,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,5,35,65,28.518,118.792,1503.355,0.025,0.236,0.089,0.829,9.3,,Gaviota,Cropland
+WFF,Sorrento Sandy Loam,12R,5,65,100,25.912,109.642,903.767,0.021,0.133,0.083,0.515,6.2,,Gaviota,Cropland
+Fat Uncle,Lokern Clay,AC,1,0,15,30.07,195.884,3989.8,0.059,0.663,0.196,2.205,11.3,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,2,15,30,37.388,244.057,5283.994,0.080,0.885,0.213,2.368,11.1,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,3,30,60,27.396,231.812,4413.432,0.074,0.736,0.272,2.686,9.9,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,4,60,100,33.61,222.539,4759.308,0.070,0.795,0.209,2.366,11.3,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,5,0,15,30.764,193.268,4421.145,0.058,0.737,0.188,2.396,12.8,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,1,15,30,27.96,181.92,3602.972,0.053,0.597,0.189,2.134,11.3,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,2,30,60,34.744,226.441,4338.856,0.072,0.723,0.208,2.081,10.0,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,3,60,100,25.164,176.937,3138.132,0.051,0.517,0.201,2.054,10.2,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,4,0,15,23.91,190.913,2876.512,0.057,0.472,0.237,1.974,8.3,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,5,15,30,27.372,176.377,3108.793,0.050,0.512,0.184,1.870,10.2,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,1,30,60,26.4,410.614,2580.164,0.152,0.421,0.575,1.595,2.8,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,2,60,100,28.912,546.648,3976.179,0.211,0.661,0.729,2.286,3.1,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,3,0,15,29.542,127.378,3279.141,0.029,0.541,0.099,1.832,18.6,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,4,15,30,30.51,345.711,3841.62,0.124,0.638,0.406,2.090,5.2,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,5,30,60,24.868,151.318,2305.366,0.040,0.374,0.159,1.504,9.5,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,1,60,100,33.504,258.514,2265.512,0.086,0.367,0.257,1.096,4.3,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,2,0,15,35.057,181.066,2054.514,0.052,0.331,0.150,0.944,6.3,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,3,15,30,33.944,247.858,1855.512,0.081,0.297,0.240,0.874,3.6,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,4,30,60,24.462,185.471,2245.241,0.054,0.364,0.222,1.487,6.7,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 1,5,60,100,32.144,128.352,1831.08,0.030,0.293,0.092,0.910,9.9,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,1,0,15,25.126,246.93,4576.37,0.081,0.764,0.322,3.040,9.4,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,2,15,30,28.298,277.956,5568.455,0.094,0.934,0.334,3.301,9.9,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,3,30,60,33.462,238.703,4796.737,0.077,0.802,0.231,2.396,10.4,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,4,60,100,33.68,306.667,5325.439,0.107,0.892,0.317,2.650,8.4,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,5,0,15,29.026,221.965,3822.365,0.070,0.634,0.242,2.186,9.0,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,1,15,30,27.334,228.783,4573.188,0.073,0.763,0.267,2.793,10.4,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,2,30,60,29.486,161.275,2598.908,0.044,0.424,0.149,1.439,9.7,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,3,60,100,29.452,185.821,4165.222,0.054,0.693,0.185,2.354,12.7,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,4,0,15,29.468,2691.587,4140.006,NA,0.689,NA,2.338,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,5,15,30,37.132,3200.922,3385.373,NA,0.559,NA,1.507,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,1,30,60,23.764,3129.619,2833.201,NA,0.465,NA,1.955,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,2,60,100,27.762,3590.318,2595.952,NA,0.424,NA,1.527,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,3,0,15,27.132,3571.805,3257.381,NA,0.537,NA,1.981,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,4,15,30,24.768,763.326,3071.844,NA,0.506,NA,2.041,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,5,30,60,24.722,332.754,2342.215,NA,0.380,NA,1.538,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,1,60,100,25.288,2994.237,2320.168,NA,0.377,NA,1.489,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,2,0,15,20.537,3320.083,2154.11,NA,0.348,NA,1.695,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,3,15,30,27.223,3042.591,2034.69,NA,0.328,NA,1.203,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,4,30,60,28.338,3086.903,2327.58,NA,0.378,NA,1.333,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 2,5,60,100,25.591,2757.235,2273.035,NA,0.368,NA,1.440,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,1,0,15,29.186,3242.103,4870.754,NA,0.814,NA,2.790,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,2,15,30,27.138,3146.017,6281.433,NA,1.057,NA,3.893,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,3,30,60,29.38,2857.304,7126.532,NA,1.202,NA,4.090,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,4,60,100,28.442,3132.338,5160.481,NA,0.864,NA,3.038,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,5,0,15,30.094,3058.699,4917.954,NA,0.822,NA,2.733,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,1,15,30,28.262,2561.803,4670.062,NA,0.780,NA,2.760,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,2,30,60,26.386,2307.361,3491.482,NA,0.578,NA,2.189,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,3,60,100,30.924,2708.783,3839.972,NA,0.637,NA,2.061,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,4,0,15,25.354,2213.142,2958.221,NA,0.486,NA,1.917,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,5,15,30,29.108,2319.221,3072.024,NA,0.506,NA,1.737,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,1,30,60,25.392,2002.292,1967.713,NA,0.316,NA,1.245,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,2,60,100,26.506,2010.146,1753.575,NA,0.279,NA,1.054,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,3,0,15,29.174,1323.687,1387.167,NA,0.216,NA,0.742,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,4,15,30,35.592,3024.928,2825.256,NA,0.463,NA,1.302,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,5,30,60,25.706,3399.433,2862.667,NA,0.470,NA,1.827,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,1,60,100,30.017,2318.248,1718.726,NA,0.273,NA,0.910,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,2,0,15,33.509,2951.544,2661.888,NA,0.435,NA,1.299,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,3,15,30,26.522,2050.94,1644.062,NA,0.260,NA,0.982,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,4,30,60,27.18,2285.53,2263.292,NA,0.367,NA,1.349,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,AC 3,5,60,100,30.379,2058.342,2888.88,NA,0.474,NA,1.561,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,1,0,15,26.804,1991.493,7947.777,NA,1.343,NA,5.009,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,2,15,30,32.696,3396.855,5086.197,NA,0.851,NA,2.604,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,3,30,60,25.546,2986.917,6102.746,NA,1.026,NA,4.016,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,4,60,100,30.08,2763.871,4404.412,NA,0.734,NA,2.441,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,5,0,15,28.868,3329.661,3735.617,NA,0.620,NA,2.146,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,1,15,30,32.43,2827.225,4723.452,NA,0.789,NA,2.433,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,2,30,60,31.408,2987.786,3656.043,NA,0.606,NA,1.929,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,3,60,100,30.422,2727.571,4493.644,NA,0.750,NA,2.464,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,4,0,15,30.314,2304.643,3314.503,NA,0.547,NA,1.805,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,5,15,30,27.858,2247.344,4456.792,NA,0.743,NA,2.668,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,1,30,60,28.83,2350.776,3018.234,NA,0.496,NA,1.722,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,2,60,100,28.726,2286.7,3202.81,NA,0.528,NA,1.838,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,3,0,15,34.188,2139.711,2950.398,NA,0.485,NA,1.418,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,4,15,30,30.602,1611.464,3080.991,NA,0.507,NA,1.657,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,5,30,60,34.622,2012.552,2569.289,NA,0.419,NA,1.211,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,1,60,100,32.855,2523.361,2606.915,NA,0.426,NA,1.296,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,2,0,15,33.946,2165.201,1752.24,NA,0.279,NA,0.822,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,3,15,30,29.425,2002.569,1955.437,NA,0.314,NA,1.067,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,4,30,60,30.247,2246.116,2381.209,NA,0.387,NA,1.280,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C1,5,60,100,30.424,1473.09,2454.165,NA,0.400,NA,1.313,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,1,0,15,24.508,1385.094,3868.226,NA,0.642,NA,2.621,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,2,15,30,28.128,1931.592,4152.348,NA,0.691,NA,2.457,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,3,30,60,33.478,2044.211,5503.224,NA,0.923,NA,2.757,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,4,60,100,28.356,1602.512,4065.726,NA,0.676,NA,2.385,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,5,0,15,32.432,1978.09,4361.414,NA,0.727,NA,2.241,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,1,15,30,39.478,829.779,4801.106,NA,0.802,NA,2.033,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,2,30,60,29.802,906.684,3994.606,NA,0.664,NA,2.228,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,3,60,100,33.146,1257.914,4264.733,NA,0.710,NA,2.143,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,4,0,15,27.918,529.141,3940.333,NA,0.655,NA,2.345,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,5,15,30,30.386,790.173,4196.733,NA,0.699,NA,2.299,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,1,30,60,27.85,470.811,3014.684,NA,0.496,NA,1.780,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,2,60,100,33.238,1255.044,3936.645,NA,0.654,NA,1.968,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,3,0,15,33.45,817.054,3096.32,NA,0.510,NA,1.524,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,4,15,30,32.934,167.621,3717.916,NA,0.616,NA,1.872,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,5,30,60,28.612,665.555,3060.364,NA,0.504,NA,1.760,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,1,60,100,31.442,825.444,1638.875,NA,0.260,NA,0.826,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,2,0,15,35.114,694.575,2109.113,NA,0.340,NA,0.969,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,3,15,30,31.825,2840.376,2234.683,NA,0.362,NA,1.137,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,4,30,60,24.621,412.94,1666.134,NA,0.264,NA,1.073,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C2,5,60,100,26.92,348.622,2061.622,NA,0.332,NA,1.234,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,1,0,15,27.63,568.251,4120.397,NA,0.686,NA,2.481,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,2,15,30,33.412,789.833,4741.258,NA,0.792,NA,2.371,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,3,30,60,27.006,1011.468,3434.786,NA,0.568,NA,2.103,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,4,60,100,31.094,1425.529,3688.503,NA,0.611,NA,2.058,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,5,0,15,29.714,1177.333,4562.582,NA,0.761,NA,2.297,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,1,15,30,33.148,1329.32,3483.722,NA,0.576,NA,1.853,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,2,30,60,33.34,1019.443,3136.326,NA,0.517,NA,1.550,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,3,60,100,31.266,1341.141,2328.231,NA,0.378,NA,1.209,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,4,0,15,29.656,519.705,2296.022,NA,0.372,NA,1.256,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,5,15,30,32.168,151.691,2741.35,NA,0.449,NA,1.395,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,1,30,60,29.11,185.64,3330.836,NA,0.550,NA,1.890,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,2,60,100,27.934,156.46,2454.16,NA,0.400,NA,1.430,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,3,0,15,32.288,152.867,2445.454,NA,0.398,NA,1.233,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,4,15,30,35.474,155.166,2551.313,NA,0.416,NA,1.173,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,5,30,60,34.622,141.474,2445.643,NA,0.398,NA,1.150,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,1,60,100,35.476,243.536,2985.686,NA,0.491,NA,1.383,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,2,0,15,30.274,120.517,2157.235,NA,0.349,NA,1.151,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,3,15,30,28.881,260.842,2258.505,NA,0.366,NA,1.267,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,4,30,60,23.049,180.262,2481.19,NA,0.404,NA,1.754,NA,,Buttonwillow,Cropland
+Fat Uncle,Lokern Clay,C3,5,60,100,33.948,267.658,3112.473,NA,0.513,NA,1.510,NA,,Buttonwillow,Cropland
+,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+Zuma,Elder Sandy Loam,FRONT,1,0,30,,,,,,0.15,1.23,8.40,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,1,30,70,,,,,,0.12,0.94,7.93,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,1,70,100,,,,,,0.05,0.53,9.92,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,2,0,30,,,,,,0.10,0.83,8.70,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,2,30,70,,,,,,0.07,0.63,9.40,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,2,70,100,,,,,,0.03,0.32,11.09,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,3,0,30,,,,,,0.11,0.88,7.85,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,3,30,70,,,,,,0.14,1.09,7.63,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,3,70,100,,,,,,0.07,0.76,11.08,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,4,0,30,,,,,,0.06,0.56,10.02,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,4,30,70,,,,,,0.04,0.42,11.00,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,4,70,100,,,,,,0.03,0.36,11.86,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,5,0,30,,,,,,0.09,0.82,9.04,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,5,30,70,,,,,,0.07,0.65,8.83,,Malibu,DFS
+Zuma,Elder Sandy Loam,FRONT,5,70,100,,,,,,0.05,0.56,10.61,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,1,0,30,,,,,,0.13,1.04,7.91,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,1,30,70,,,,,,0.06,0.58,9.12,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,1,70,100,,,,,,0.06,0.48,8.60,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,2,0,30,,,,,,0.12,1.08,9.23,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,2,30,70,,,,,,0.08,0.83,9.99,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,2,70,100,,,,,,0.08,0.86,11.14,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,3,0,30,,,,,,0.07,0.59,8.42,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,3,30,70,,,,,,0.09,0.78,8.79,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,3,70,100,,,,,,0.10,0.89,8.79,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,4,0,30,,,,,,0.10,1,9.79,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,4,30,70,,,,,,0.06,0.55,8.47,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,4,70,100,,,,,,0.01,0.19,14.21,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,5,0,30,,,,,,0.10,1.02,9.81,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,5,30,70,,,,,,0.12,0.8,6.68,,Malibu,DFS
+Zuma,Elder Sandy Loam,TOP,5,70,100,,,,,,0.03,0.33,11.39,,Malibu,DFS
