@@ -10,6 +10,8 @@ library(RColorBrewer)
 set.seed(1337)
 source("functions.R")
 
+
+############# Load data ##############
 #this has only topsoil data, but includes physical indicators of soil health
 #Site FBF is missing all biological data, we drop it.
 hr_data <- read_csv("../Data/HR_Soil_Health_Updated.csv") %>%
@@ -33,7 +35,7 @@ mean_impute <- function(column){
   column
 }
 
-
+################# Data handling ##############
 #texture and pH should not differ between treatments but should differ between soil types
 #GWC should not predict changes in soil health, microbial biomass should be controlled for GWC. Note that we do not see a significant difference in GWC between H and R
 #these are names of the variables that are soil health indicators:
@@ -124,6 +126,8 @@ carbon_pct_change_boxplot <- ggplot(data = carbon_means_long %>% mutate(Treatmen
   theme_bw() +
   theme(text = element_text(size = 16))
 
+
+########### analysis of variance ###########
 #total carbon ANOVAs for table
 total_var <- carbon_data %>%
   group_by(upper_depth) %>%
@@ -145,6 +149,8 @@ soil_type_var <- carbon_data %>%
   summarize(mean(within_soil_type_variance, na.rm = TRUE))
 
 
+
+########## Carbon analysis #########
 #I've spot checked that this aligns with soil_means$profile_carbon, as it should
 wp_carbon_stocks <- carbon_means_long %>%
   group_by(site_name, treatment, soil) %>%
@@ -164,7 +170,7 @@ carbon_stock_change_boxplot <- ggplot(data = wp_carbon_stocks %>% mutate(Treatme
   theme(text = element_text(size = 16))
   
 
-
+############ PCA and correlation analysis ##########
 #PCAs of topsoil and subsoil data
 topsoil_matrix <- topsoil_data %>%
   select(all_of(soil_health_vars), macroagg, microagg, infiltration_dry, infiltration_wet, surface_hardness, GWC, pH, sand, clay) %>%
@@ -197,7 +203,7 @@ arrows(x0 = 0, y0 = 0, x1 = sub_pca$rotation[,1]*10, y1 = sub_pca$rotation[,2]*1
 text(x = sub_pca$rotation[,1]*12, y = sub_pca$rotation[,2]*11, labels = pca_labels, lwd = 1.5)
 
 
-#parametric manovas based on Gaussian assumptions
+
 #create matrix of soil health variables from means within plots
 topmeans_matrix <- topsoil_means %>%
   select(all_of(c(soil_health_vars)), macroagg, microagg, infiltration_dry, infiltration_wet, surface_hardness, -profile_carbon) %>%
@@ -224,7 +230,7 @@ corrplot(sub_corr_matrix, method = "square")
 corrplot(total_corr_matrix, method = "square")
 
 
-
+############ Pairwise comparison of soil types to each other on a few variables ########
 #pairwise comparison of carbon across soil types stratified by row/hedgerow and combined
 whole_profile_stock <- rowSums(carbon_matrix)
 
@@ -252,26 +258,16 @@ run_pairwise_comparison <- function(x){
   comparison_matrix
 }
 
-pairwise_carbon_wp <- run_pairwise_comparison(whole_profile_stock)
-pairwise_MBC_top <- run_pairwise_comparison(topmeans_matrix[,'MBC'])
-pairwise_MBN_top <- run_pairwise_comparison(topmeans_matrix[,'MBN'])
-pairwise_POXc_top <- run_pairwise_comparison(topmeans_matrix[,'POXc'])
-pairwise_cellulase_top <-  run_pairwise_comparison(topmeans_matrix[,'cell'])
-pairwise_macroagg_top <-  run_pairwise_comparison(topmeans_matrix[,'macroagg'])
-pairwise_microagg_top <-  run_pairwise_comparison(topmeans_matrix[,'microagg'])
-
-#6 * 7 = 42 hypotheses are tested here
-#correct for false discovery rate control by Benjamini-Hochberg procedure
-#this assumes p-values are independent, which may not be true
-all_p_values <- as.numeric(cbind(pairwise_carbon_wp, pairwise_MBC_top, pairwise_MBN_top, pairwise_POXc_top, pairwise_cellulase_top, pairwise_macroagg_top, pairwise_microagg_top))
-all_p_values <- all_p_values[!is.na(all_p_values)]
-m <- length(all_p_values)
-threshold <- 1:m / m * 0.05
-ordered_p <- sort(all_p_values)
-cutoff <- max(ordered_p[ordered_p <= threshold])
+# pairwise_carbon_wp <- run_pairwise_comparison(whole_profile_stock)
+# pairwise_MBC_top <- run_pairwise_comparison(topmeans_matrix[,'MBC'])
+# pairwise_MBN_top <- run_pairwise_comparison(topmeans_matrix[,'MBN'])
+# pairwise_POXc_top <- run_pairwise_comparison(topmeans_matrix[,'POXc'])
+# pairwise_cellulase_top <-  run_pairwise_comparison(topmeans_matrix[,'cell'])
+# pairwise_macroagg_top <-  run_pairwise_comparison(topmeans_matrix[,'macroagg'])
+# pairwise_microagg_top <-  run_pairwise_comparison(topmeans_matrix[,'microagg'])
 
 
-
+############# MANOVAs for management, soil type, and interaction ###########
 #non-parametric paired one-way manova
 #topsoil differences
 topsoil_means_differences <- topsoil_means %>%
@@ -298,8 +294,8 @@ topsoil_means_differences <- topsoil_means %>%
   select(site_name, soil_type, starts_with("diff_"))
 #subsoil differences
 subsoil_means_differences <- subsoil_means %>%
-  select(site_name, soil_type, treatment, all_of(soil_health_vars)) %>%
-  pivot_wider(names_from = treatment, values_from = all_of(soil_health_vars)) %>%
+  select(site_name, soil_type, treatment, all_of(soil_health_vars), subsurface_hardness) %>%
+  pivot_wider(names_from = treatment, values_from = all_of(c(soil_health_vars, "subsurface_hardness"))) %>%
   mutate(
     diff_per_N = per_N_H - per_N_R,
     diff_per_C = per_C_H - per_C_R,
@@ -311,7 +307,8 @@ subsoil_means_differences <- subsoil_means %>%
     diff_MBN = MBN_H - MBN_R,
     diff_glucam = glucam_H - glucam_R,
     diff_glucos = glucos_H - glucos_R,
-    diff_cell = cell_H - cell_R) %>%
+    diff_cell = cell_H - cell_R,
+    diff_subsurface_hardness = subsurface_hardness_H - subsurface_hardness_R) %>%
   arrange(site_name) %>%
   select(starts_with("diff_"))
 #carbon differences
@@ -338,30 +335,47 @@ colnames(diff_matrix_sub) <- paste("sub_", gsub("diff_", "", colnames(diff_matri
 diff_matrix_carbon <- carbon_means_differences %>%
   as.matrix()
 
+
+
 #carbon stock is not included in this analysis
+#differences are used for management and interaction analysis
 diff_matrix <- cbind(diff_matrix_top, diff_matrix_sub)
+#original means are used for soil types
+mean_matrix <- cbind(topmeans_matrix, submeans_matrix)
+colnames(mean_matrix) <- c(paste("top", colnames(topmeans_matrix), sep = "_"), paste("sub", colnames(submeans_matrix), sep = "_"))
 
-diff_means <- apply(diff_matrix, 2, mean)
-original_ANOVAs <- apply(diff_matrix, 2, get_ANOVA, block = soil_type)
+#compute original test statistics
+original_diff_means <- apply(diff_matrix, 2, mean)
+original_soil_type_ANOVAs <- apply(mean_matrix, 2, get_ANOVA, group = topsoil_means$soil_type)
+original_interaction_ANOVAs <- apply(diff_matrix, 2, get_ANOVA, group = soil_type)
 
-paired_perm_dist <- lockstep_one_sample(diff_matrix, reps = 10000)
+
+#simulate from permutation distributions
+paired_perm_dist <- lockstep_one_sample(diff_matrix, reps = 1e5)
+soil_type_perm_dist <- lockstep_ANOVA(mean_matrix, group = topsoil_means$soil_type, reps = 10000)
 interaction_perm_dist <- lockstep_ANOVA(diff_matrix, group = soil_type, reps = 1000)
-paired_p_values <- rep(1, length(diff_means))
-interaction_p_values <- rep(1, length(diff_means))
+
+#compute p-values from original test statistics and simulated permutation distributions
+paired_p_values <- rep(1, length(original_diff_means))
+soil_type_p_values <- rep(1, length(original_diff_means))
+interaction_p_values <- rep(1, length(original_diff_means))
 for(i in 1:length(paired_p_values)){
-  paired_p_values[i] <- t2p(diff_means[i], paired_perm_dist[,i], alternative = "two-sided")
-  interaction_p_values[i] <- t2p(original_ANOVAs[i], interaction_perm_dist[,i], alternative = "two-sided")
+  paired_p_values[i] <- t2p(original_diff_means[i], paired_perm_dist[,i], alternative = "two-sided")
+  soil_type_p_values[i] <- t2p(original_soil_type_ANOVAs[i], soil_type_perm_dist[,i], alternative = "greater")
+  interaction_p_values[i] <- t2p(original_interaction_ANOVAs[i], interaction_perm_dist[,i], alternative = "greater")
 }
+
 #p-value for the intersection null, that there is no effect on any SH variable
 #nonparametric one-way MANOVA
-combined_paired_p_value <- npc(diff_means, distr = paired_perm_dist, combine = "fisher", alternative = "two-sided")
-combined_interaction_p_value <- npc(original_ANOVAs, distr = interaction_perm_dist, combine = "fisher", alternatives = "two-sided")
+combined_paired_p_value <- npc(original_diff_means, distr = paired_perm_dist, combine = "fisher", alternative = "two-sided")
+combined_soil_type_p_value <- npc(original_soil_type_ANOVAs, distr = soil_type_perm_dist, combine = "fisher", alternative = "two-sided")
+combined_interaction_p_value <- npc(original_interaction_ANOVAs, distr = interaction_perm_dist, combine = "fisher", alternatives = "two-sided")
 
 #p-values for partial tests, adjusted for multiplicity by closed testing.
 closed_paired_p_values <- fwe_minp(paired_p_values, paired_perm_dist)
 
 
-p_value_frame <- data.frame("variable" = colnames(diff_matrix), "difference_in_means" = diff_means, "p_value" = paired_p_values, "adjusted_p_value" = closed_paired_p_values)
+p_value_frame <- data.frame("variable" = colnames(diff_matrix), "difference_in_means" = original_diff_means, "p_value" = paired_p_values, "adjusted_p_value" = closed_paired_p_values)
 rownames(p_value_frame) <- NULL
 
 
@@ -387,5 +401,3 @@ for(i in 1:length(control_p_values)){
 }
 control_p_value_frame <- data.frame(variable = colnames(control_matrix), diff_mean = control_diff_means, p_value = control_p_values)
 rownames(control_p_value_frame) <- NULL
-
-
