@@ -14,12 +14,12 @@ source("functions.R")
 ############# Load data ##############
 #this has only topsoil data, but includes physical indicators of soil health
 #Site FBF is missing all biological data, we drop it.
-hr_data <- read_csv("../Data/HR_Soil_Health_Updated.csv") %>%
+hr_data <- read_csv("HR_Soil_Health_Updated.csv") %>%
   rename(site_name = `Site Name`, site = Site, hr_age = HR_age, compost = Compost, crops = Crops, cover_crop = Cover_Crop, fallow = Fallow, soil_type = Soil_Type, treatment = Treatment,  location = Location, upper_depth = Upper_Depth, profile_carbon = profileC, macroagg = Macroagg, microagg = Microagg, total_agg = Total_Agg, infiltration_dry = Infiltration_Dry, infiltration_wet = Infiltration_Wet, surface_hardness = SH_15, subsurface_hardness = SSH_30) %>% 
   filter(site_name != "FBF") %>%
   filter(!is.na(site_name)) #there's a tail of all NA values, which I'm deleting
 
-carbon_data <- read_csv("../Data/HR_soil_carbon.csv") %>%
+carbon_data <- read_csv("HR_soil_carbon.csv") %>%
   rename(site_name = `Site Name`, site = Site, hr_age = HR_age, compost = Compost, crops = Crops, cover_crop = Cover_Crop, fallow = Fallow, soil_type = Soil_Type, treatment = Treatment,  location = Location, upper_depth = Upper_Depth, lower_depth = Lower_Depth, length = Length) %>% 
   filter(site_name != "FBF") 
 
@@ -218,8 +218,8 @@ carbon_matrix <- carbon_means %>%
 top_corr_matrix <- cor(topmeans_matrix, use = "complete.obs", method = 'spearman')
 sub_corr_matrix <- cor(submeans_matrix, use = "complete.obs", method = 'spearman')
 total_corr_matrix <- cor(cbind(topmeans_matrix, submeans_matrix, carbon_matrix), use = "complete.obs", method = "spearman")
-varnames_top <- c("Percent C", "Percent N", "POXc", "EOC", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", "Macroaggregates", "Microaggregates", "Dry Infiltration", "Wet Infiltration", "Surface Hardness")
-varnames_sub <- c("Percent C", "Percent N", "POXc", "EOC", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", " Surface Hardness")
+varnames_top <- c("Percent C", "Percent N", "POXc", "EOC", "EON", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", "Macroaggregates", "Microaggregates", "Dry Infiltration", "Wet Infiltration", "Surface Hardness")
+varnames_sub <- c("Percent C", "Percent N", "POXc", "EOC", "EON", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", " Surface Hardness")
 varnames_carbon <- c("C Stock 0-10", "C Stock 10-20", "C Stock 20-50", "C Stock 50-75", "C Stock 75-100")
 colnames(top_corr_matrix) <- rownames(top_corr_matrix) <- varnames_top
 colnames(sub_corr_matrix) <- rownames(sub_corr_matrix) <- varnames_sub
