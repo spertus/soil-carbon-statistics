@@ -10,6 +10,6 @@ This is a repository with code to run simulations and analyses to estimate soil 
 
 `soil_carbon_measurements.Rmd` and `soil_carbon_permutations.Rmd` are R markdown notebooks analyzing measurement errors in SOC assays and permutation analyses of SOC experiments, respectively.  
 
-`hedgerow_analysis.R` is an analysis of Jessica Chiartas' hedgerow/row quasi-experiment in the Central Valley.
+`hedgerow_analysis.R` is an analysis of Jessica Chiartas' hedgerow/row quasi-experiment in the Central Valley. The corresponding data files are `HR_Soil_Health_Updated.csv` and `HR_soil_carbon.csv`.
 
-`california_SOC_analysis.R` is a script to analyze Paige Stanley's samples from Paicines Ranch, Jessica Chiartas' samples from Southern California cropland, and assay replicates done on their respective labs. The corresponding data is `R_Heterogeneity_Master_PS_04132021.xlsx`. 
+`california_SOC_analysis.R` is a script to analyze Paige Stanley's samples from Paicines Ranch, Jessica Chiartas' samples from Southern California cropland, and assay replicates done on their respective labs. The corresponding data file is `R_Heterogeneity_Master_PS_04132021.xlsx`. 
