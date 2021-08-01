@@ -343,6 +343,7 @@ diff_matrix <- cbind(diff_matrix_top, diff_matrix_sub)
 #original means are used for soil types
 mean_matrix <- cbind(topmeans_matrix, submeans_matrix)
 colnames(mean_matrix) <- c(paste("top", colnames(topmeans_matrix), sep = "_"), paste("sub", colnames(submeans_matrix), sep = "_"))
+mean_matrix <- mean_matrix[,colnames(diff_matrix)]
 
 #compute original test statistics
 original_diff_means <- apply(diff_matrix, 2, mean)
@@ -352,7 +353,7 @@ original_interaction_ANOVAs <- apply(diff_matrix, 2, get_ANOVA, group = soil_typ
 
 #simulate from permutation distributions
 paired_perm_dist <- lockstep_one_sample(diff_matrix, reps = 1e5)
-soil_type_perm_dist <- lockstep_ANOVA(mean_matrix, group = topsoil_means$soil_type, reps = 10000)
+soil_type_perm_dist <- lockstep_ANOVA(mean_matrix, group = topsoil_means$soil_type, reps = 1e5)
 interaction_perm_dist <- lockstep_ANOVA(diff_matrix, group = soil_type, reps = 1000)
 
 #compute p-values from original test statistics and simulated permutation distributions
@@ -368,20 +369,28 @@ for(i in 1:length(paired_p_values)){
 #p-value for the intersection null, that there is no effect on any SH variable
 #nonparametric one-way MANOVA
 combined_paired_p_value <- npc(original_diff_means, distr = paired_perm_dist, combine = "fisher", alternative = "two-sided")
-combined_soil_type_p_value <- npc(original_soil_type_ANOVAs, distr = soil_type_perm_dist, combine = "fisher", alternative = "two-sided")
-combined_interaction_p_value <- npc(original_interaction_ANOVAs, distr = interaction_perm_dist, combine = "fisher", alternatives = "two-sided")
+combined_soil_type_p_value <- npc(original_soil_type_ANOVAs, distr = soil_type_perm_dist, combine = "fisher", alternative = "greater")
+combined_interaction_p_value <- npc(original_interaction_ANOVAs, distr = interaction_perm_dist, combine = "fisher", alternatives = "greater")
+
 
 #p-values for partial tests, adjusted for multiplicity by closed testing.
 closed_paired_p_values <- fwe_minp(paired_p_values, paired_perm_dist)
+closed_soil_type_p_values <- fwe_minp(soil_type_p_values, soil_type_perm_dist)
 
-
-p_value_frame <- data.frame("variable" = colnames(diff_matrix), "difference_in_means" = original_diff_means, "p_value" = paired_p_values, "adjusted_p_value" = closed_paired_p_values)
+p_value_frame <- data.frame(
+  "variable" = colnames(diff_matrix), 
+  "management_effect" = original_diff_means, 
+  "management_p_value" = paired_p_values, 
+  "adjusted_management_p_value" = closed_paired_p_values, 
+  "soil_type_p_value" = soil_type_p_values,
+  "adjusted_soil_type_p_value" = closed_soil_type_p_values
+  )
 rownames(p_value_frame) <- NULL
 
 
 #Negative controls
-#check that there aren't differences in texture, pH, and GWC
-control_matrix <- topsoil_means %>%
+#presumably there won't be differences on these variables for management
+control_diff_matrix <- topsoil_means %>%
   select(site_name, treatment, sand, clay, GWC, pH) %>%
   pivot_wider(names_from = treatment, values_from = all_of(c("sand","clay","GWC","pH"))) %>%
   mutate(
@@ -392,12 +401,24 @@ control_matrix <- topsoil_means %>%
   ) %>%
   select(starts_with("diff")) %>%
   as.matrix()
+#there are likely to be differences on soil type
+control_mean_matrix <- topsoil_means %>%
+  select(sand, clay, GWC, pH) %>%
+  as.matrix()
 
-control_diff_means <- apply(control_matrix, 2, mean)
-control_perm_dist <- apply(control_matrix, 2, one_sample, reps = 10000)
-control_p_values <- rep(1, length(control_diff_means))
+
+control_diff_means <- apply(control_diff_matrix, 2, mean)
+control_soil_type_ANOVA <- apply(control_mean_matrix, 2, get_ANOVA, group = topsoil_means$soil_type)
+control_paired_perm_dist <- apply(control_diff_matrix, 2, one_sample, reps = 10000)
+control_soil_type_perm_dist <- lockstep_ANOVA(control_mean_matrix, group = topsoil_means$soil_type, reps = 1e4)
+
+control_paired_p_values <- rep(1, length(control_diff_means))
+control_soil_type_p_values <- rep(1, length(control_soil_type_ANOVA))
 for(i in 1:length(control_p_values)){
-  control_p_values[i] <- t2p(control_diff_means[i], control_perm_dist[,i], alternative = "two-sided")
+  control_paired_p_values[i] <- t2p(control_diff_means[i], control_paired_perm_dist[,i], alternative = "two-sided")
+  control_soil_type_p_values <- t2p(control_soil_type_ANOVA[i], control_soil_type_perm_dist[,i], alternative = "greater")
 }
-control_p_value_frame <- data.frame(variable = colnames(control_matrix), diff_mean = control_diff_means, p_value = control_p_values)
+
+
+control_p_value_frame <- data.frame(variable = colnames(control_diff_matrix), diff_mean = control_diff_means, paired_p_value = control_paired_p_values, soil_type_p_value = control_soil_type_p_values)
 rownames(control_p_value_frame) <- NULL
