@@ -39,7 +39,7 @@ mean_impute <- function(column){
 #texture and pH should not differ between treatments but should differ between soil types
 #GWC should not predict changes in soil health, microbial biomass should be controlled for GWC. Note that we do not see a significant difference in GWC between H and R
 #these are names of the variables that are soil health indicators:
-soil_health_vars <- c("per_C", "per_N", "profile_carbon", "POXc", "EOC", "EON", "MBC", "MBN", "glucam", "glucos", "cell", "BD")
+soil_health_vars <- c("per_C", "per_N", "profile_carbon", "POXc", "EOC", "EON", "MBC", "MBN", "glucam", "glucos", "cell")
 
 
 #the site FBF is missing all biological information, so delete it for now.
@@ -218,8 +218,8 @@ carbon_matrix <- carbon_means %>%
 top_corr_matrix <- cor(topmeans_matrix, use = "complete.obs", method = 'spearman')
 sub_corr_matrix <- cor(submeans_matrix, use = "complete.obs", method = 'spearman')
 total_corr_matrix <- cor(cbind(topmeans_matrix, submeans_matrix, carbon_matrix), use = "complete.obs", method = "spearman")
-varnames_top <- c("Percent C", "Percent N", "POXc", "EOC", "EON", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", "Macroaggregates", "Microaggregates", "Dry Infiltration", "Wet Infiltration", "Surface Hardness")
-varnames_sub <- c("Percent C", "Percent N", "POXc", "EOC", "EON", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", "Bulk Density", " Surface Hardness")
+varnames_top <- c("Percent C", "Percent N", "POXc", "EOC", "EON", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase",  "Macroaggregates", "Microaggregates", "Dry Infiltration", "Wet Infiltration", "Surface Hardness")
+varnames_sub <- c("Percent C", "Percent N", "POXc", "EOC", "EON", "MBC", "MBN", "Glucaminidase", "Glucosidase", "Cellulase", " Surface Hardness")
 varnames_carbon <- c("C Stock 0-10", "C Stock 10-20", "C Stock 20-50", "C Stock 50-75", "C Stock 75-100")
 colnames(top_corr_matrix) <- rownames(top_corr_matrix) <- varnames_top
 colnames(sub_corr_matrix) <- rownames(sub_corr_matrix) <- varnames_sub
@@ -276,7 +276,6 @@ topsoil_means_differences <- topsoil_means %>%
   mutate(
     diff_per_N = per_N_H - per_N_R,
     diff_per_C = per_C_H - per_C_R,
-    diff_BD = BD_H - BD_R,
     diff_POXc = POXc_H - POXc_R,
     diff_EOC = EOC_H - EOC_R,
     diff_EON = EON_H - EON_R,
@@ -299,7 +298,6 @@ subsoil_means_differences <- subsoil_means %>%
   mutate(
     diff_per_N = per_N_H - per_N_R,
     diff_per_C = per_C_H - per_C_R,
-    diff_BD = BD_H - BD_R,
     diff_POXc = POXc_H - POXc_R,
     diff_EOC = EOC_H - EOC_R,
     diff_EON = EON_H - EON_R,
@@ -347,14 +345,14 @@ mean_matrix <- mean_matrix[,colnames(diff_matrix)]
 
 #compute original test statistics
 original_diff_means <- apply(diff_matrix, 2, mean)
-original_soil_type_ANOVAs <- apply(mean_matrix, 2, get_ANOVA, group = topsoil_means$soil_type)
+original_soil_type_ANOVAs <- apply(mean_matrix, 2, get_ANOVA, group = topsoil_means$soil_type, strata = topsoil_means$treatment)
 original_interaction_ANOVAs <- apply(diff_matrix, 2, get_ANOVA, group = soil_type)
 
 
 #simulate from permutation distributions
 paired_perm_dist <- lockstep_one_sample(diff_matrix, reps = 1e5)
-soil_type_perm_dist <- lockstep_ANOVA(mean_matrix, group = topsoil_means$soil_type, reps = 1e5)
-interaction_perm_dist <- lockstep_ANOVA(diff_matrix, group = soil_type, reps = 1000)
+soil_type_perm_dist <- lockstep_ANOVA(mean_matrix, group = topsoil_means$soil_type, strata = topsoil_means$treatment, reps = 1e4)
+interaction_perm_dist <- lockstep_ANOVA(diff_matrix, group = soil_type, reps = 1e4)
 
 #compute p-values from original test statistics and simulated permutation distributions
 paired_p_values <- rep(1, length(original_diff_means))
@@ -373,17 +371,31 @@ combined_soil_type_p_value <- npc(original_soil_type_ANOVAs, distr = soil_type_p
 combined_interaction_p_value <- npc(original_interaction_ANOVAs, distr = interaction_perm_dist, combine = "fisher", alternatives = "greater")
 
 
-#p-values for partial tests, adjusted for multiplicity by closed testing.
-closed_paired_p_values <- fwe_minp(paired_p_values, paired_perm_dist)
-closed_soil_type_p_values <- fwe_minp(soil_type_p_values, soil_type_perm_dist)
+#p-values for partial tests, adjusted for multiplicity with the BH procedure. Note tests aren't independent, but likely have positive dependency.
+adjusted_paired_p_values <- p.adjust(p = paired_p_values, method = "BH")
+adjusted_soil_type_p_values <- p.adjust(p = soil_type_p_values, method = "BH")
 
 p_value_frame <- data.frame(
   "variable" = colnames(diff_matrix), 
   "management_effect" = original_diff_means, 
   "management_p_value" = paired_p_values, 
-  "adjusted_management_p_value" = closed_paired_p_values, 
+  "adjusted_management_p_value" = adjusted_paired_p_values, 
+  "management_significance" = ifelse(
+    adjusted_paired_p_values > .1, "-", 
+    ifelse(
+      adjusted_paired_p_values > .05, "*", 
+      ifelse(
+        adjusted_paired_p_values > .01, "**", "***"
+      ))),
   "soil_type_p_value" = soil_type_p_values,
-  "adjusted_soil_type_p_value" = closed_soil_type_p_values
+  "adjusted_soil_type_p_value" = adjusted_soil_type_p_values,
+  "soil_type_significance" = ifelse(
+    adjusted_soil_type_p_values > .1, "-", 
+    ifelse(
+      adjusted_soil_type_p_values > .05, "*", 
+      ifelse(
+        adjusted_soil_type_p_values > .01, "**", "***"
+      )))
   )
 rownames(p_value_frame) <- NULL
 
@@ -392,12 +404,13 @@ rownames(p_value_frame) <- NULL
 #presumably there won't be differences on these variables for management
 control_diff_matrix <- topsoil_means %>%
   select(site_name, treatment, sand, clay, GWC, pH) %>%
-  pivot_wider(names_from = treatment, values_from = all_of(c("sand","clay","GWC","pH"))) %>%
+  pivot_wider(names_from = treatment, values_from = all_of(c("sand","clay","GWC","pH", "BD"))) %>%
   mutate(
     diff_sand = sand_H - sand_R,
     diff_clay = clay_H - clay_R,
     diff_GWC = GWC_H - GWC_R,
-    diff_pH = pH_H - pH_R
+    diff_pH = pH_H - pH_R,
+    diff_BD = BD_H - BD_R
   ) %>%
   select(starts_with("diff")) %>%
   as.matrix()
@@ -414,7 +427,7 @@ control_soil_type_perm_dist <- lockstep_ANOVA(control_mean_matrix, group = topso
 
 control_paired_p_values <- rep(1, length(control_diff_means))
 control_soil_type_p_values <- rep(1, length(control_soil_type_ANOVA))
-for(i in 1:length(control_p_values)){
+for(i in 1:length(control_paired_p_values)){
   control_paired_p_values[i] <- t2p(control_diff_means[i], control_paired_perm_dist[,i], alternative = "two-sided")
   control_soil_type_p_values <- t2p(control_soil_type_ANOVA[i], control_soil_type_perm_dist[,i], alternative = "greater")
 }
