@@ -2,6 +2,7 @@ library(tidyverse)
 library(data.table)
 library(gstat)
 library(BalancedSampling)
+library(permuter)
 
 ################## function to simulate a % SOC surface #################
 simulate_truth <- function(size = c(250,600), nugget = .01, sill = .05, range = 20, intercept = .01, y_trend = TRUE, max_mean = .2){
@@ -564,19 +565,29 @@ get_power_two_sample <- function(n_1 = NULL, k_1 = NULL, n_2 = NULL, k_2 = NULL,
 shuffle <- function(x){sample(x, size = length(x), replace = FALSE)}
 
 
-
+################### Permutation tests ################
 #ANOVA test statistic 
 #for an example of this see the permuter github page https://github.com/statlab/permuter/blob/master/vignettes/examples_chapters1_4.Rmd
-#this function returns the same one-way ANOVA test statistic used in permuter
+#this function returns the same (one or two-way) ANOVA test statistic used in permuter
 #inputs:
-#dependent_variable: the dependent variable (outcome of interest)
-#block: the blocks (groups) that describe the dependent variable0
+  #dependent_variable: the dependent variable (outcome of interest)
+  #group: the groups that may describe the dependent_variable, to be tested for equality in distribution
+  #strata: optional auxiliary variables that describe variation in dependent_variable, used for two-way ANOVA
 #outputs:
-#a permutation equivalent of the one-way ANOVA test statistic
-get_ANOVA <- function(dependent_variable, block){
-  group_means <- tapply(dependent_variable, block, mean)
-  group_sizes <- as.numeric(table(block))
-  sum(group_sizes * group_means^2)
+  #a permutation equivalent of the one-way ANOVA test statistic if strata is null, otherwise the two-way ANOVA test statistic
+get_ANOVA <- function(dependent_variable, group, strata = NULL){
+  if(!is.null(strata)){
+    group_sizes <- as.numeric(table(group))
+    group_means <- tapply(dependent_variable, group, mean)
+    strata_means <- tapply(dependent_variable, strata, mean)
+    grand_mean <- mean(dependent_variable)
+    sum(group_sizes * (group_means - grand_mean)^2) / sum((dependent_variable - group_means[match(group, names(group_means))] - strata_means[match(strata, names(strata_means))] + grand_mean)^2)
+  } else{
+    group_means <- tapply(dependent_variable, group, mean)
+    group_sizes <- as.numeric(table(group))
+    sum(group_sizes * group_means^2)
+  }
+  
 }
 
 
@@ -632,18 +643,30 @@ lockstep_two_sample <- function(x_matrix, y_matrix, reps = 1000, exact = FALSE){
 
 #lockstep ANOVA
 #inputs:
-#outcome_matrix: a numeric matrix of outcomes (dependent variables) to be assessed, observations in rows, variables in columns
-#group: a categorical vector of group assignments (independent variable)
-#reps: the number of permutations to draw
+  #outcome_matrix: a numeric matrix of outcomes (dependent variables) to be assessed, observations in rows, variables in columns
+  #group: a categorical vector of group assignments (independent variable)
+  #reps: the number of permutations to draw
+  #strata: variables representing strata or blocks, for two-way ANOVA. Groups are shuffled within strata only. 
 #outputs:
-#a reps by ncol(outcome_matrix) matrix of draws from the permutation distributions of each partial test
-lockstep_ANOVA <- function(delta_matrix, group, reps = 1000){
-  n_rows <- nrow(delta_matrix)
-  K <- length(group)
-  permutation_ANOVAs <- matrix(NA, nrow = reps, ncol = ncol(delta_matrix))
-  for(b in 1:reps){
-    shuffled_group <- sample(group, size = K, replace = FALSE)
-    permutation_ANOVAs[b,] <- apply(delta_matrix, 2, get_ANOVA, block = shuffled_group)
+  #a reps by ncol(outcome_matrix) matrix of draws from the permutation distributions of each partial test
+lockstep_ANOVA <- function(outcome_matrix, group, strata = NULL, reps = 1000){
+  if(!is.null(strata)){
+    n_rows <- nrow(outcome_matrix)
+    K <- length(group)
+    permutation_ANOVAs <- matrix(NA, nrow = reps, ncol = ncol(outcome_matrix))
+    group <- as.numeric(group)
+    for(b in 1:reps){
+      shuffled_group <- permute_within_groups(group, strata)
+      permutation_ANOVAs[b,] <- apply(outcome_matrix, 2, get_ANOVA, group = shuffled_group, strata = strata)
+    }
+  } else {
+    n_rows <- nrow(outcome_matrix)
+    K <- length(group)
+    permutation_ANOVAs <- matrix(NA, nrow = reps, ncol = ncol(outcome_matrix))
+    for(b in 1:reps){
+      shuffled_group <- sample(group, size = K, replace = FALSE)
+      permutation_ANOVAs[b,] <- apply(outcome_matrix, 2, get_ANOVA, group = shuffled_group)
+    }
   }
   permutation_ANOVAs
 }
@@ -654,32 +677,35 @@ lockstep_ANOVA <- function(delta_matrix, group, reps = 1000){
 #test_statistics: a length V vector of "original" test statistics, or a scalar 
 #permutations: a matrix of test statistics computed from permuted data, or a vector
 #output:
-#a length V vector of permutation p-values. Is exact if permutations are exact.
+#a length V vector of permutation p-values
 get_perm_p_value <- function(test_statistics, permutations, alternative = "two-sided"){
+  if(!(alternative %in% c("two-sided", "greater", "less"))){
+    stop("Argument alternative must be one of \"two-sided\", \"greater\", or \"less\"")
+  }
   if(is.matrix(permutations)){
     B <- nrow(permutations)
     if(alternative == "two-sided"){
-      pmin(2 * (colSums(t(t(abs(permutations)) >= test_statistics))) / B, 1)
+      pmin(2 * (colSums(t(t(abs(permutations)) >= test_statistics)) + 1) / (B + 1), 1)
     } else if(alternative == "greater"){
-      pmin((colSums(t(t(permutations) <= test_statistics))) / B, 1)
+      pmin((colSums(t(t(permutations) >= test_statistics)) + 1) / (B + 1), 1)
     } else if(alternative == "less"){
-      pmin((colSums(t(t(permutations) >= test_statistics))) / B, 1)
+      pmin((colSums(t(t(permutations) <= test_statistics)) + 1) / (B + 1), 1)
     }
   } else {
     B <- length(permutations)
     if(alternative == "two-sided"){
-      pmin(2 * sum(abs(permutations) >= test_statistics) / B, 1)
+      pmin(2 * (sum(abs(permutations) >= test_statistics) + 1) / (B + 1), 1)
     } else if(alternative == "greater"){
-      pmin(sum(permutations <= test_statistics) / B, 1)
+      pmin((sum(permutations >= test_statistics) + 1) / (B + 1), 1)
     } else if(alternative == "less"){
-      pmin(sum(permutation >= test_statistics) / B, 1)
+      pmin((sum(permutation <= test_statistics) + 1) / (B + 1), 1)
     }
   }
 }
 
 #this is a very straightforward modification of the npc function from the permuter package to use a slightly different way to compute the p-values that ensures conservativeness.
 #same as npc but uses get_perm_p_value() instead of t2p()
-npc <- function (statistics, distr, combine = "fisher", alternatives = "greater") 
+npc <- function(statistics, distr, combine = "fisher", alternatives = "greater") 
 {
   if (length(statistics) < 2) {
     stop("Nothing to combine!")
@@ -918,7 +944,7 @@ empirical_bernstein_bound <- function(x, alpha = .05, side = "upper"){
 
 
 
-######### towards the Romano and Wolf bounds ######### 
+######### ECDF-based bounds ######### 
 #find a lower and upper bound on the ECDF
 #inputs:
   #x: a vector of samples
@@ -934,7 +960,9 @@ DKW_bounds <- function(x, alpha = .05, grid = seq(0,1,by=.01)){
   cbind("ecdf" = ecdf_x(grid), "lower" = lower_bound, "upper" = upper_bound)
 }
 
-#compute a (1-\alpha) confidence interval on the mean by Anderson's method of choosing the distribution with the lowest/highest mean in the (1-alpha) K-S band (in this case computed by the DKW bound)
+
+#UNDER DEVELOPMENT
+#compute a (1-\alpha) confidence interval on the mean by Anderson's method of choosing the distribution with the lowest/highest mean in the (1-alpha) K-S band 
 #inputs:
   #x: a vector of independent random samples from a population distribution on [0,1]
   #alpha: the desired level of the confidence interval
