@@ -349,7 +349,7 @@ original_soil_type_ANOVAs <- apply(mean_matrix, 2, get_ANOVA, group = topsoil_me
 original_interaction_ANOVAs <- apply(diff_matrix, 2, get_ANOVA, group = soil_type)
 
 
-#simulate from permutation distributions
+#simulate from permutation distributions. Everything should probably be run 1e5 times or so for a final answer, but note that ANOVAs take a long time to run.
 paired_perm_dist <- lockstep_one_sample(diff_matrix, reps = 1e5)
 soil_type_perm_dist <- lockstep_ANOVA(mean_matrix, group = topsoil_means$soil_type, strata = topsoil_means$treatment, reps = 1e4)
 interaction_perm_dist <- lockstep_ANOVA(diff_matrix, group = soil_type, reps = 1e4)
@@ -403,7 +403,7 @@ rownames(p_value_frame) <- NULL
 #Negative controls
 #presumably there won't be differences on these variables for management
 control_diff_matrix <- topsoil_means %>%
-  select(site_name, treatment, sand, clay, GWC, pH) %>%
+  select(site_name, treatment, sand, clay, GWC, pH, BD) %>%
   pivot_wider(names_from = treatment, values_from = all_of(c("sand","clay","GWC","pH", "BD"))) %>%
   mutate(
     diff_sand = sand_H - sand_R,
@@ -416,20 +416,20 @@ control_diff_matrix <- topsoil_means %>%
   as.matrix()
 #there are likely to be differences on soil type
 control_mean_matrix <- topsoil_means %>%
-  select(sand, clay, GWC, pH) %>%
+  select(sand, clay, GWC, pH, BD) %>%
   as.matrix()
 
 
 control_diff_means <- apply(control_diff_matrix, 2, mean)
-control_soil_type_ANOVA <- apply(control_mean_matrix, 2, get_ANOVA, group = topsoil_means$soil_type)
+control_soil_type_ANOVA <- apply(control_mean_matrix, 2, get_ANOVA, group = topsoil_means$soil_type, strata = topsoil_means$treatment)
 control_paired_perm_dist <- apply(control_diff_matrix, 2, one_sample, reps = 10000)
-control_soil_type_perm_dist <- lockstep_ANOVA(control_mean_matrix, group = topsoil_means$soil_type, reps = 1e4)
+control_soil_type_perm_dist <- lockstep_ANOVA(control_mean_matrix, group = topsoil_means$soil_type, strata = topsoil_means$treatment, reps = 1e4)
 
 control_paired_p_values <- rep(1, length(control_diff_means))
 control_soil_type_p_values <- rep(1, length(control_soil_type_ANOVA))
 for(i in 1:length(control_paired_p_values)){
   control_paired_p_values[i] <- t2p(control_diff_means[i], control_paired_perm_dist[,i], alternative = "two-sided")
-  control_soil_type_p_values <- t2p(control_soil_type_ANOVA[i], control_soil_type_perm_dist[,i], alternative = "greater")
+  control_soil_type_p_values[i] <- t2p(control_soil_type_ANOVA[i], control_soil_type_perm_dist[,i], alternative = "greater")
 }
 
 
