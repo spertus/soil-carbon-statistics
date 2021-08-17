@@ -24,8 +24,8 @@ carbon_data <- read_csv("HR_soil_carbon.csv") %>%
   filter(site_name != "FBF") 
 
 
-topsoil_data <- hr_data %>% filter(upper_depth == 0)
-subsoil_data <- hr_data %>% filter(upper_depth == 10)
+topsoil_data <- hr_data %>% filter(upper_depth == 0) %>% arrange(site_name, treatment, location)
+subsoil_data <- hr_data %>% filter(upper_depth == 10) %>% arrange(site_name, treatment, location)
 
 
 #function to fill in the missing values in a vector with the mean of observed values
@@ -336,28 +336,28 @@ diff_matrix_carbon <- carbon_means_differences %>%
 
 
 #carbon stock is not included in this analysis
-#differences are used for management and interaction analysis
+#differences in plot averages are used to assess treatment effect of management and interaction with soil type
 diff_matrix <- cbind(diff_matrix_top, diff_matrix_sub)
-#original means are used for soil types
-mean_matrix <- cbind(topmeans_matrix, submeans_matrix)
-colnames(mean_matrix) <- c(paste("top", colnames(topmeans_matrix), sep = "_"), paste("sub", colnames(submeans_matrix), sep = "_"))
-mean_matrix <- mean_matrix[,colnames(diff_matrix)]
+#original data is used to test for differences in soil types 
+soil_matrix <- cbind(topsoil_matrix, subsoil_matrix)
+colnames(soil_matrix) <- c(paste("top", colnames(topsoil_matrix), sep = "_"), paste("sub", colnames(subsoil_matrix), sep = "_"))
+soil_matrix <- soil_matrix[,colnames(diff_matrix)]
 
 #compute original test statistics
 original_diff_means <- apply(diff_matrix, 2, mean)
-original_soil_type_ANOVAs <- apply(mean_matrix, 2, get_ANOVA, group = topsoil_means$soil_type, strata = topsoil_means$treatment)
+original_soil_type_ANOVAs <- apply(soil_matrix, 2, get_ANOVA, group = topsoil_data$soil_type, strata = topsoil_data$treatment)
 original_interaction_ANOVAs <- apply(diff_matrix, 2, get_ANOVA, group = soil_type)
 
 
 #simulate from permutation distributions. Everything should probably be run 1e5 times or so for a final answer, but note that ANOVAs take a long time to run.
-paired_perm_dist <- lockstep_one_sample(diff_matrix, reps = 1e5)
-soil_type_perm_dist <- lockstep_ANOVA(mean_matrix, group = topsoil_means$soil_type, strata = topsoil_means$treatment, reps = 1e4)
+paired_perm_dist <- lockstep_one_sample(diff_matrix, reps = 1e4)
+soil_type_perm_dist <- lockstep_ANOVA(soil_matrix, group = topsoil_data$soil_type, strata = topsoil_data$treatment, reps = 1e4)
 interaction_perm_dist <- lockstep_ANOVA(diff_matrix, group = soil_type, reps = 1e4)
 
 #compute p-values from original test statistics and simulated permutation distributions
-paired_p_values <- rep(1, length(original_diff_means))
-soil_type_p_values <- rep(1, length(original_diff_means))
-interaction_p_values <- rep(1, length(original_diff_means))
+paired_p_values <- rep(NA, length(original_diff_means))
+soil_type_p_values <- rep(NA, length(original_diff_means))
+interaction_p_values <- rep(NA, length(original_diff_means))
 for(i in 1:length(paired_p_values)){
   paired_p_values[i] <- t2p(original_diff_means[i], paired_perm_dist[,i], alternative = "two-sided")
   soil_type_p_values[i] <- t2p(original_soil_type_ANOVAs[i], soil_type_perm_dist[,i], alternative = "greater")
@@ -372,8 +372,8 @@ combined_interaction_p_value <- npc(original_interaction_ANOVAs, distr = interac
 
 
 #p-values for partial tests, adjusted for multiplicity with the BH procedure. Note tests aren't independent, but likely have positive dependency.
-adjusted_paired_p_values <- p.adjust(p = paired_p_values, method = "BH")
-adjusted_soil_type_p_values <- p.adjust(p = soil_type_p_values, method = "BH")
+adjusted_paired_p_values <- p.adjust(p = paired_p_values, method = "BY")
+adjusted_soil_type_p_values <- p.adjust(p = soil_type_p_values, method = "BY")
 
 p_value_frame <- data.frame(
   "variable" = colnames(diff_matrix), 
@@ -401,6 +401,7 @@ rownames(p_value_frame) <- NULL
 
 
 #Negative controls
+#note that right now these are all just run on topsoil
 #presumably there won't be differences on these variables for management
 control_diff_matrix <- topsoil_means %>%
   select(site_name, treatment, sand, clay, GWC, pH, BD) %>%
@@ -415,18 +416,20 @@ control_diff_matrix <- topsoil_means %>%
   select(starts_with("diff")) %>%
   as.matrix()
 #there are likely to be differences on soil type
-control_mean_matrix <- topsoil_means %>%
+control_matrix <- topsoil_data %>%
   select(sand, clay, GWC, pH, BD) %>%
   as.matrix()
 
 
+#original test statistics
 control_diff_means <- apply(control_diff_matrix, 2, mean)
-control_soil_type_ANOVA <- apply(control_mean_matrix, 2, get_ANOVA, group = topsoil_means$soil_type, strata = topsoil_means$treatment)
+control_soil_type_ANOVA <- apply(control_matrix, 2, get_ANOVA, group = topsoil_data$soil_type, strata = topsoil_data$treatment)
+#permutation distributions
 control_paired_perm_dist <- apply(control_diff_matrix, 2, one_sample, reps = 10000)
-control_soil_type_perm_dist <- lockstep_ANOVA(control_mean_matrix, group = topsoil_means$soil_type, strata = topsoil_means$treatment, reps = 1e4)
+control_soil_type_perm_dist <- lockstep_ANOVA(control_matrix, group = topsoil_data$soil_type, strata = topsoil_data$treatment, reps = 1e4)
 
-control_paired_p_values <- rep(1, length(control_diff_means))
-control_soil_type_p_values <- rep(1, length(control_soil_type_ANOVA))
+control_paired_p_values <- rep(NA, length(control_diff_means))
+control_soil_type_p_values <- rep(NA, length(control_soil_type_ANOVA))
 for(i in 1:length(control_paired_p_values)){
   control_paired_p_values[i] <- t2p(control_diff_means[i], control_paired_perm_dist[,i], alternative = "two-sided")
   control_soil_type_p_values[i] <- t2p(control_soil_type_ANOVA[i], control_soil_type_perm_dist[,i], alternative = "greater")
