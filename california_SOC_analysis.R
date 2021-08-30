@@ -270,6 +270,31 @@ rangeland_stocks <- rangeland_master %>%
 rangeland_wp_stock <- rangeland_stocks %>%
   summarize(wp_stock_Mg_ha = sum(mean_stock_Mg_ha), wp_stock_se_Mg_ha = sum(se_stock_Mg_ha), wp_stock_max_BD = sum(max_stock_Mg_ha), wp_stock_min_BD = sum(min_stock_Mg_ha))
 
+#cropland stocks
+cropland_stocks <- cropland_master %>% 
+  select(site, depth, TC) %>%
+  mutate(TC = TC / 100) %>% #since TC is currently in percent
+  left_join(
+    cropland_BD %>% 
+      group_by(site, depth) %>% 
+      summarize(mean_BD = mean(bd, na.rm = TRUE), max_BD = max(bd, na.rm = TRUE), min_BD = min(bd, na.rm = TRUE)) %>% 
+      mutate(max_BD = ifelse(max_BD == -Inf, NA, max_BD), min_BD = ifelse(min_BD == Inf, NA, min_BD))
+  ) %>%
+  mutate(mean_stock = TC * mean_BD, max_stock = TC * max_BD, min_stock = TC * min_BD) %>%
+  mutate(length = as.numeric(recode(depth, a = "15", b = "15", c = "30", d = "40"))) %>%
+  group_by(site, depth) %>%
+  summarize(mean_TC = mean(TC, na.rm = T), mean_stock_g_cm3 = mean(mean_stock, na.rm = T), se_stock_g_cm3 = sd(mean_stock, na.rm = T)/sqrt(n()), max_stock_g_cm3 = mean(max_stock, na.rm = T), min_stock_g_cm3 = mean(min_stock, na.rm = T), length = first(length)) %>%
+  mutate(mean_stock_Mg_ha = mean_stock_g_cm3 * length * 1e8 * 1e-6) %>% #1e8 cm2 in a hectare, 1e-6 metric tons in a gram
+  mutate(se_stock_Mg_ha = se_stock_g_cm3 * length * 1e8 * 1e-6) %>%
+  mutate(max_stock_Mg_ha = max_stock_g_cm3 * length * 1e8 * 1e-6) %>%
+  mutate(min_stock_Mg_ha = min_stock_g_cm3 * length * 1e8 * 1e-6) 
+
+#whole profile cropland stock
+cropland_wp_stock <- cropland_stocks %>%
+  group_by(site) %>%
+  summarize(wp_stock_Mg_ha = sum(mean_stock_Mg_ha), wp_stock_se_Mg_ha = sum(se_stock_Mg_ha), wp_stock_max_BD = sum(max_stock_Mg_ha), wp_stock_min_BD = sum(min_stock_Mg_ha))
+
+
 
 ############## replicates and assay error ##############
 #compare variation due to sampling and variation due to assay
