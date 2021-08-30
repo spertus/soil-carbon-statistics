@@ -254,7 +254,8 @@ rangeland_stocks <- rangeland_master %>%
   left_join(
     rangeland_BD %>% 
       group_by(transect, depth) %>% 
-      summarize(mean_BD = mean(bd, na.rm = TRUE), max_BD = max(bd, na.rm = TRUE), min_BD = min(bd, na.rm = TRUE))
+      summarize(mean_BD = mean(bd, na.rm = TRUE), max_BD = max(bd, na.rm = TRUE), min_BD = min(bd, na.rm = TRUE)) %>% 
+      mutate(max_BD = ifelse(max_BD == -Inf, NA, max_BD), min_BD = ifelse(min_BD == Inf, NA, min_BD))
   ) %>%
   mutate(mean_stock = TC * mean_BD, max_stock = TC * max_BD, min_stock = TC * min_BD) %>%
   mutate(length = as.numeric(recode(depth, a = "10", b = "20", c = "20", d = "25", e = "25"))) %>%
@@ -267,7 +268,7 @@ rangeland_stocks <- rangeland_master %>%
 
 #whole profile stock on rangeland
 rangeland_wp_stock <- rangeland_stocks %>%
-  summarize(wp_stock_Mg_ha = sum(mean_stock_Mg_ha), wp_stock_se_Mg_ha = sum(se_stock_Mg_ha))
+  summarize(wp_stock_Mg_ha = sum(mean_stock_Mg_ha), wp_stock_se_Mg_ha = sum(se_stock_Mg_ha), wp_stock_max_BD = sum(max_stock_Mg_ha), wp_stock_min_BD = sum(min_stock_Mg_ha))
 
 
 ############## replicates and assay error ##############
