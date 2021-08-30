@@ -187,10 +187,6 @@ cropland_depth_ANOVA <- t2p(
   distr = k_sample(x = cropland_master_complete$TC, group = cropland_master_complete$depth_id, stat = "oneway_anova", reps = 10000),
   alternative = "two-sided")
 
-rangeland_model <- lm(TC ~ transect*depth, data = rangeland_master)
-cropland_model <- lm(TC ~ site*depth, data = cropland_master)
-anova(rangeland_model)
-anova(cropland_model)
 
 
 #bulk densities
@@ -316,9 +312,10 @@ assay_error_long <- assay_error %>%
 ggplot(assay_error_long, aes(sigma_delta_TC*100, fill = machine)) +
   #geom_density(alpha = .75) +
   geom_histogram(binwidth = 1, alpha = .75, position = "stack") +
-  xlab("Percent Error") +
+  xlab("Relative Error") +
   ylab("Number of Samples") +
   theme_bw() +
+  scale_x_continuous(labels = scales::percent_format(scale = 1)) +
   scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("Costech", "SoliTOC")) +
   theme(text = element_text(size = 16))
 
@@ -429,24 +426,31 @@ reps_long_both <- reps_long_both %>%
 
 #plot assay densities stratified by sample number
 #all samples that were not significantly different (TC and TOC)
-assay_density_plot_accepted <- ggplot(reps_long_both %>% filter(rejected == 0), aes(carbon, fill = machine)) +
-  geom_density(alpha = .5) +
-  facet_wrap(~ identifier, scales = "free_y") +
-  xlim(0,6) +
-  xlab("Percent Organic Carbon") +
+assay_histogram_plot_accepted <- ggplot(reps_long_both %>% filter(rejected == 0), aes(carbon, fill = machine)) +
+  geom_histogram( alpha = .75, position = "stack", binwidth = .2) +
+  facet_wrap(~ identifier) +
+  #xlim(0,6) +
+  xlab("TOC% or TC%") +
+  ylab("Number of Replicates") +
   ggtitle("Similar Assays") +
+  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("Costech", "SoliTOC")) +
+  scale_y_continuous(breaks=seq(0,9)) +
+  scale_x_continuous(breaks=seq(0,6), limits = c(0,6)) +
   theme_bw() +
-  scale_fill_discrete(name = "Machine") +
-  theme(text = element_text(size = 16), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.title.y = element_blank())
+  theme(text = element_text(size = 16), panel.grid.minor.y = element_blank())
 #only TOC that were rejected (since rejected TC were re-run for TOC)
-assay_density_plot_rejected <- ggplot(reps_long_both %>% filter(rejected == 1, carbon_type == "TOC"), aes(carbon, fill = machine)) +
-  geom_density(alpha = .5) +
-  facet_wrap(~ identifier, scales = "free_y") +
-  xlab("Percent Organic Carbon") +
-  ggtitle("Significantly Different Assays") +
+assay_histogram_plot_rejected <- ggplot(reps_long_both %>% filter(rejected == 1, carbon_type == "TOC"), aes(carbon, fill = machine)) +
+  geom_histogram( alpha = .75, position = "stack", binwidth = .05) +
+  facet_wrap(~ identifier) +
+  #xlim(0,6) +
+  xlab("TOC%") +
+  ylab("Number of Replicates") +
+  ggtitle("Significantly Different Analyses") +
+  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("Costech", "SoliTOC")) +
+  scale_y_continuous(breaks=seq(0,9)) +
+  scale_x_continuous(breaks=seq(0,6), limits = c(0,6)) +
   theme_bw() +
-  scale_fill_discrete(name = "Machine") +
-  theme(text = element_text(size = 16), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.title.y = element_blank())
+  theme(text = element_text(size = 16), panel.grid.minor.y = element_blank())
 
 
 #standards comparison
@@ -456,15 +460,18 @@ known_standards <- standards_comparison %>%
 standards_comparison <- standards_comparison %>%
   mutate(known_TC = ifelse(sample_ID == "EML", 1.86, 0.926))
 
-standards_density_plot <- ggplot(standards_comparison, aes(TC, fill = machine)) +
-  geom_density(alpha = .5) +
+standards_histogram <- ggplot(standards_comparison, aes(TC, fill = machine)) +
+  geom_histogram( alpha = .75, position = "stack", binwidth = .01) +
   geom_vline(data = standards_comparison %>% filter(sample_ID == "EML"), aes(xintercept = 1.86)) +
   geom_vline(data = standards_comparison %>% filter(sample_ID == "LECO"), aes(xintercept = 0.926)) +
+  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("Costech", "SoliTOC")) +
   facet_grid(~ sample_ID, scales = "free") +
   xlim(0.8, 2.2) +
-  xlab("% Total Carbon") +
-  ylab("") +
-  theme_bw()
+  scale_y_continuous(breaks=seq(0,12)) +
+  xlab("TC%") +
+  ylab("Number of Replicates") +
+  theme_bw() +
+  theme(text = element_text(size = 16), panel.grid.minor.y = element_blank())
 
 
 ############# spatial correlation of TC concentrations on rangeland ##########
@@ -528,7 +535,7 @@ avg_variogram <- colMeans(rbind(variog_T$v, variog_Mx$v, variog_My$v, variog_Bx$
 
 
 #sample size
-sample_size <- 60
+sample_size <- 100
 #max budget, i.e. the budget to sample and measure sample_size samples, with no compositing
 max_budget <- 20 * sample_size + 13.6 * sample_size
 #sample size if we measure once and devote the rest of the budget to sampling
@@ -540,6 +547,11 @@ sigma_delta_costech <- median_sigma_delta %>%
 sigma_delta_solitoc <- median_sigma_delta %>% 
   filter(machine == "solitoc") %>%
   pull(sigma_delta)
+
+
+
+
+
 
 #precision of the sample mean 
 precision_combined <- combined_master %>%
@@ -570,14 +582,14 @@ sigma_p_rangeland <- precision_combined %>% filter(depth == "a", land_use == "Ra
 mu_cropland <- precision_combined %>% filter(depth == "a", land_use == "Cropland") %>% pull(mu)
 sigma_p_cropland <- precision_combined %>% filter(depth == "a", land_use == "Cropland") %>% pull(sigma_p)
 
-rangeland_grid <- expand.grid(
+rangeland_grid_precision <- expand.grid(
   land_use = "Rangeland",
   sample_size = seq(1,110,by=1),
   mu = mu_rangeland, 
   sigma_p = sigma_p_rangeland, 
   sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc)
 )
-cropland_grid <- expand.grid(
+cropland_grid_precision <- expand.grid(
   land_use = "Cropland",
   sample_size = seq(1,110,by=1),
   mu = mu_cropland, 
@@ -585,8 +597,8 @@ cropland_grid <- expand.grid(
   sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc)
 )
 
-precision_topsoil <- rangeland_grid %>%
-  bind_rows(cropland_grid) %>%
+precision_topsoil <- rangeland_grid_precision %>%
+  bind_rows(cropland_grid_precision) %>%
   mutate(Machine = ifelse(sigma_delta == sigma_delta_costech, "Costech", "SoliTOC")) %>%
   mutate(budget = 20 * sample_size + 13.6 * sample_size) %>%
   mutate(max_sample_size = floor((budget - 13.6) / 20)) %>%
@@ -606,8 +618,49 @@ precision_plot <- ggplot(precision_topsoil, aes(x = sample_size, y = std_error, 
   coord_cartesian(xlim = c(5,100), ylim = c(0,.4)) +
   theme(text = element_text(size = 16))
 
+#Power to detect change using t-test
+rangeland_grid_power <- expand.grid(
+  land_use = "Rangeland",
+  sample_size = c(60,90,120),
+  mu_0 = mu_rangeland,
+  delta = seq(0, .5 * mu_rangeland, length.out = 30),
+  sigma_p = sigma_p_rangeland, 
+  sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc)
+)
+cropland_grid_power <- expand.grid(
+  land_use = "Cropland",
+  sample_size = c(60,90,120),
+  mu_0 = mu_cropland,
+  delta = seq(0, .5 * mu_cropland, length.out = 100),
+  sigma_p = sigma_p_cropland, 
+  sigma_delta = c(sigma_delta_costech, sigma_delta_solitoc)
+)
 
+power_change_topsoil <- rangeland_grid_power %>%
+  bind_rows(cropland_grid_power) %>%
+  mutate(Machine = ifelse(sigma_delta == sigma_delta_costech, "Costech", "SoliTOC")) %>%
+  mutate(relative_delta = ifelse(land_use == "Cropland", delta / mu_cropland, delta / mu_rangeland)) %>%
+  mutate(budget = 20 * sample_size + 13.6 * sample_size) %>%
+  mutate(max_sample_size = floor((budget - 13.6) / 20)) %>%
+  mutate(opt_n = get_minimum_error(sigma_p = sigma_p, mu = mu_0, sigma_delta = sigma_delta, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = budget)$n) %>%
+  mutate(opt_k = get_minimum_error(sigma_p = sigma_p, mu = mu_0, sigma_delta = sigma_delta, C_0 = 0, cost_c = 20, cost_P = 0, cost_A = 13.60, B = budget)$k) %>%
+  mutate(power_no_compositing = get_power_two_sample(n_1 = sample_size, k_1 = sample_size, n_2 = sample_size, k_2 = sample_size, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
+  mutate(power_full_compositing = get_power_two_sample(n_1 = max_sample_size, k_1 = 1, n_2 = max_sample_size, k_2 = 1, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
+  mutate(power_optimal_compositing = get_power_two_sample(n_1 = opt_n, k_1 = opt_k, n_2 = opt_n, k_2 = opt_k, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
+  pivot_longer(cols = starts_with("power_"), names_to = "Compositing", values_to = "power", names_prefix = "power_") %>%
+  mutate(Compositing = ifelse(Compositing == "full_compositing", "Full", ifelse(Compositing == "no_compositing", "None", "Optimal"))) 
 
+ggplot(power_change_topsoil, aes(x = 100*relative_delta, y = power, color = Compositing)) +
+  geom_line(size = 1.2) +
+  facet_grid(sample_size ~ land_use + Machine) +
+  xlab("Relative TC% Change") +
+  ylab("Power of two-sample t-test") +
+  scale_y_continuous(labels = scales::percent, limits = c(0,1), breaks = c(0,.25,.5,.75,1)) +
+  scale_x_continuous(labels = function(x) paste0(x,"%")) +
+  scale_color_manual(values = c("firebrick","forestgreen","steelblue")) +
+  coord_cartesian(xlim = c(0,40)) +
+  theme_bw() +
+  theme(text = element_text(size = 16))
 
 
 
@@ -720,37 +773,35 @@ run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE)
 
 
 #these take a while to run, we can save them as an object
-power_10_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 10, stratified = TRUE)
-power_30_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 30, stratified = TRUE)
-power_90_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 90, stratified = TRUE)
-power_200_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 200, stratified = TRUE)
-power_10_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 10)
-power_30_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 30)
-power_90_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 90)
-power_200_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 200)
-power_frame <- bind_rows(
-  as.data.frame(power_10_rangeland) %>% mutate(sample_size = 10, relative_effect_size = effect_grid, land_use = "Rangeland"),
-  as.data.frame(power_30_rangeland) %>% mutate(sample_size = 30, relative_effect_size = effect_grid, land_use = "Rangeland"),
-  as.data.frame(power_90_rangeland) %>% mutate(sample_size = 90, relative_effect_size = effect_grid, land_use = "Rangeland"),
-  as.data.frame(power_200_rangeland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Rangeland"),
-  as.data.frame(power_10_cropland) %>% mutate(sample_size = 10, relative_effect_size = effect_grid, land_use = "Cropland"),
-  as.data.frame(power_30_cropland) %>% mutate(sample_size = 30, relative_effect_size = effect_grid, land_use = "Cropland"),
-  as.data.frame(power_90_cropland) %>% mutate(sample_size = 90, relative_effect_size = effect_grid, land_use = "Cropland"),
-  as.data.frame(power_200_cropland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Cropland")) %>%
-  rename("t test" = normal, "LMT test" = LMT) %>%
-  pivot_longer(cols = c("t test", "LMT test"), names_to = "Test", values_to = "Power")
-# save(power_frame, file = "power_frame_nonparametric")
+# power_10_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 10, stratified = TRUE)
+# power_30_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 30, stratified = TRUE)
+# power_90_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 90, stratified = TRUE)
+# power_200_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 200, stratified = TRUE)
+# power_10_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 10)
+# power_30_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 30)
+# power_90_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 90)
+# power_200_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 200)
+# power_frame <- bind_rows(
+#   as.data.frame(power_10_rangeland) %>% mutate(sample_size = 10, relative_effect_size = effect_grid, land_use = "Rangeland"),
+#   as.data.frame(power_30_rangeland) %>% mutate(sample_size = 30, relative_effect_size = effect_grid, land_use = "Rangeland"),
+#   as.data.frame(power_90_rangeland) %>% mutate(sample_size = 90, relative_effect_size = effect_grid, land_use = "Rangeland"),
+#   as.data.frame(power_200_rangeland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Rangeland"),
+#   as.data.frame(power_10_cropland) %>% mutate(sample_size = 10, relative_effect_size = effect_grid, land_use = "Cropland"),
+#   as.data.frame(power_30_cropland) %>% mutate(sample_size = 30, relative_effect_size = effect_grid, land_use = "Cropland"),
+#   as.data.frame(power_90_cropland) %>% mutate(sample_size = 90, relative_effect_size = effect_grid, land_use = "Cropland"),
+#   as.data.frame(power_200_cropland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Cropland")
+#   ) %>%
+#   rename("t test" = normal, "Nonparametric test" = LMT, "Stratified t test" = stratified) %>%
+#   pivot_longer(cols = c("t test", "Nonparametric test", "Stratified t test"), names_to = "Test", values_to = "Power")
+#save(power_frame, file = "power_frame_nonparametric")
 load("power_frame_nonparametric")
 
 
-ggplot(power_frame %>% 
-         filter(Test != "Hedged test") %>% 
-         mutate(Test = ifelse(Test == "LMT test", "Nonparametric test", Test)), 
-       aes(x = relative_effect_size, y = Power, color = Test, linetype = Test)) +
+ggplot(power_frame, aes(x = relative_effect_size, y = Power, color = Test, linetype = Test)) +
   geom_line(size = 1.5) +
   facet_grid(sample_size ~ land_use) +
   theme_bw() +
-  scale_color_manual(values = c("darkorange3","steelblue")) +
+  scale_color_manual(values = c("darkorange3","steelblue","forestgreen")) +
   scale_y_continuous(labels = scales::percent) +
   scale_x_continuous(labels = scales::percent) +
   xlab("Relative effect size (additional percent TC%)") +
