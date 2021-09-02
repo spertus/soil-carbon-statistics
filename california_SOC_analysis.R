@@ -351,7 +351,7 @@ median_sigma_delta <- assay_error_long %>%
 
 
 #proportions of assay heterogeneity as proportions of field heterogeneity
-sample_size <- 30
+sample_size <- 90
 assay_field_proportions <- combined_master %>%
   group_by(site, depth, land_use) %>%
   summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T)) %>% 
@@ -368,7 +368,7 @@ assay_field_proportions <- combined_master %>%
   mutate(compositing = factor(compositing, levels = c("No Compositing", "Full Compositing"))) %>%
   mutate(field_proportion = 1 - assay_proportion) %>%
   pivot_longer(cols = c(assay_proportion,field_proportion), names_to = "source", values_to = "proportion") %>%
-  mutate(source = ifelse(source == "assay_proportion", "Assay Variability", "Spatial Heterogeneity")) %>%
+  mutate(source = ifelse(source == "assay_proportion", "Analytical Variability", "Spatial Heterogeneity")) %>%
   mutate(land_use = factor(land_use, levels = c("Rangeland","Cropland"))) %>%
   filter(depth != "e")
 
@@ -647,7 +647,7 @@ precision_plot <- ggplot(precision_topsoil, aes(x = sample_size, y = std_error, 
 #Power to detect change using t-test
 rangeland_grid_power <- expand.grid(
   land_use = "Rangeland",
-  sample_size = c(60,90,120),
+  sample_size = c(90),
   mu_0 = mu_rangeland,
   delta = seq(0, .5 * mu_rangeland, length.out = 30),
   sigma_p = sigma_p_rangeland, 
@@ -655,7 +655,7 @@ rangeland_grid_power <- expand.grid(
 )
 cropland_grid_power <- expand.grid(
   land_use = "Cropland",
-  sample_size = c(60,90,120),
+  sample_size = c(90),
   mu_0 = mu_cropland,
   delta = seq(0, .5 * mu_cropland, length.out = 100),
   sigma_p = sigma_p_cropland, 
@@ -674,11 +674,12 @@ power_change_topsoil <- rangeland_grid_power %>%
   mutate(power_full_compositing = get_power_two_sample(n_1 = max_sample_size, k_1 = 1, n_2 = max_sample_size, k_2 = 1, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
   mutate(power_optimal_compositing = get_power_two_sample(n_1 = opt_n, k_1 = opt_k, n_2 = opt_n, k_2 = opt_k, mu_1 = mu_0, sigma_p_1 = sigma_p, mu_2 = mu_0 + delta, sigma_p_2 = sigma_p, sigma_delta = sigma_delta)) %>%
   pivot_longer(cols = starts_with("power_"), names_to = "Compositing", values_to = "power", names_prefix = "power_") %>%
-  mutate(Compositing = ifelse(Compositing == "full_compositing", "Full", ifelse(Compositing == "no_compositing", "None", "Optimal"))) 
+  mutate(Compositing = ifelse(Compositing == "full_compositing", "Full", ifelse(Compositing == "no_compositing", "None", "Optimal"))) %>% 
+  mutate(Budget = paste("$", formatC(budget, format = "d", big.mark = ","), sep = ""))
 
 ggplot(power_change_topsoil, aes(x = 100*relative_delta, y = power, color = Compositing)) +
   geom_line(size = 1.2) +
-  facet_grid(sample_size ~ land_use + Machine) +
+  facet_grid(Machine ~ land_use) +
   xlab("Relative TC% Change") +
   ylab("Power of two-sample t-test") +
   scale_y_continuous(labels = scales::percent, limits = c(0,1), breaks = c(0,.25,.5,.75,1)) +
@@ -686,7 +687,7 @@ ggplot(power_change_topsoil, aes(x = 100*relative_delta, y = power, color = Comp
   scale_color_manual(values = c("firebrick","forestgreen","steelblue")) +
   coord_cartesian(xlim = c(0,40)) +
   theme_bw() +
-  theme(text = element_text(size = 16))
+  theme(text = element_text(size = 16), axis.text.x = element_text(size = 10))
 
 
 
@@ -719,7 +720,7 @@ for(i in 1:length(n_grid)){
   t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
   LMT_rejection_rate[i] <- mean(LMT_reject)
 }
-plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "False rejection rate", col = 'darkorange3', lwd = 4, cex.axis = 1.5, cex.lab = 1.5)
+plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "Significance level", col = 'darkorange3', lwd = 4, cex.axis = 1.5, cex.lab = 1.5)
 points(y = LMT_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 4)
 #points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'darkorange3', lwd = 2, lty = "dashed")
 legend(x = 35, y = 0.8, legend = c("Nonparametric test","t-test"), lty = c( "solid","solid"), col = c("steelblue","darkorange3"), lwd = 4, bty = "n")
