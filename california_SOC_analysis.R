@@ -770,7 +770,7 @@ run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE)
       sample_1 <- sample(x, size = sample_size, replace = TRUE)
       sample_2 <- sample(x + shift[j], size = sample_size, replace = TRUE)
       diff_mean <- mean(sample_1) - mean(sample_2)
-      normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
+      normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "less")$p.value
       #hedged_rejections[i,j] <- two_sample_hedged_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
       LMT_rejections[i,j] <- two_sample_LMT_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE, B = 200)
       if(stratified){
@@ -820,7 +820,7 @@ run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE)
 #   ) %>%
 #   rename("t test" = normal, "Nonparametric test" = LMT, "Stratified t test" = stratified) %>%
 #   pivot_longer(cols = c("t test", "Nonparametric test", "Stratified t test"), names_to = "Test", values_to = "Power")
-#save(power_frame, file = "power_frame_nonparametric")
+# save(power_frame, file = "power_frame_nonparametric")
 load("power_frame_nonparametric")
 
 
