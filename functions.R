@@ -2,7 +2,9 @@ library(tidyverse)
 library(data.table)
 library(gstat)
 library(BalancedSampling)
+#permuter can be downloaded from Github by following README: https://github.com/statlab/permuter
 library(permuter)
+library(kolmim)
 
 ################## function to simulate a % SOC surface #################
 simulate_truth <- function(size = c(250,600), nugget = .01, sill = .05, range = 20, intercept = .01, y_trend = TRUE, max_mean = .2){
@@ -994,6 +996,7 @@ anderson_CI <- function(x, alpha = .05, side = "upper"){
 }
 
 #Learned-Miller and Thomas bound https://arxiv.org/pdf/1905.06208.pdf
+#Originally proposed by Gaffke 
 #inputs:
   #x: a vector of iid random samples
   #alpha: a desired level for the confidence interval
@@ -1009,6 +1012,9 @@ LMT_CI <- function(x, alpha = .05, B = 10000, side = "upper"){
   z <- sort(x, decreasing = FALSE)
   ms <- rep(NA, B)
   s <- c(diff(z), 1 - z[n])
+  #u_matrix <- matrix(runif(n * B), nrow = B, ncol = n)
+  #u_matrix <- t(apply(u_matrix, 1, sort, decreasing = FALSE))
+  #ms <- 1 - u_matrix %*% s
   for(i in 1:B){
     u <- sort(runif(n), decreasing = FALSE)
     ms[i] <- 1 - sum(u * s)
@@ -1021,14 +1027,110 @@ LMT_CI <- function(x, alpha = .05, B = 10000, side = "upper"){
   }
 }
 
-#Romano and Wolf (2000) I_{n,2} Bound. UNDER DEVELOPMENT
-romano_wolf_CI <- function(sample, alpha = .05, beta_n = NULL){
-  n <- length(sample)
-  if(is.null(beta_n)){
-    beta_n <- log(1 + 1/(1:n))
+#function to compute the value of the ECDF at point t, given sample
+get_ecdf <- function(x){
+  ecdf(x)(unique(sort(x)))
+}
+
+bootstrap_from_ecdf <- function(ecdf_matrix, size){
+  x <- ecdf_matrix[,1]
+  prob_x = diff(c(0,ecdf_matrix[,2]))
+  sample(x, size = size, replace = TRUE, prob = prob_x)
+}
+
+
+#function to compute approximate K-S confidence bands, adapted from ecdf.ks.CI() in the NSM3 package
+get_KS_bands <- function(x, alpha){
+  
+  n <- length(x)
+  
+  #solving for alpha in the asymptotic distribution of D_n
+  # asymptotic_ksD <- uniroot(
+  #   f = function(x){2 * sum((-1)^(1:100 + 1) * exp(-2 * (1:100)^2 * x^2)) - alpha},
+  #   interval = c(0,1)
+  # )
+  #there only work for confidence level 95%, need more general approximation
+  #these are apparently from Bickel and Docksum, page 483. See also https://stat.ethz.ch/pipermail/r-help/2003-July/036643.html
+  # approx.ksD <- function(n){
+  #   ifelse(n > 80, 1.358/(sqrt(n) + 0.12 + 0.11/sqrt(n)), 
+  #          splinefun(c(1:9, 10, 15, 10 * 2:8), c(0.975, 0.84189, 
+  #                                                0.7076, 0.62394, 0.56328, 0.51926, 0.48342, 0.45427, 
+  #                                                0.43001, 0.40925, 0.3376, 0.29408, 0.2417, 0.21012, 
+  #                                                0.18841, 0.17231, 0.15975, 0.1496))(n))}
+  
+  #use asymptotic approximation to D if n is large enough (per Birnbaum)
+  D <- ifelse(n >= 80, 
+              #uniroot(function(x){2*sum((-1)^(1:100 + 1) * exp(-2 *(1:100)^2*x^2)) - alpha}, interval = c(1e-4,1))$root, 
+              "Asymptotic approximation goes here",
+              uniroot(function(x){pkolmim(d = x, n) - (1- alpha)}, interval = c(1e-8,1))$root)
+  
+  
+  unique_x <- sort(unique(x))
+  estimate <- get_ecdf(x)
+  upper <- pmin(estimate + D, 1)
+  lower <- pmax(estimate - D, 0)
+  #pads the ECDF with extremal values if they don't appear in the sample
+  if(!any(unique_x == 1)){
+    unique_x <- c(unique_x, 1)
+    estimate <- c(estimate, 1)
+    lower <- c(lower, 1)
+    upper <- c(upper, 1)
   }
-  sample_mean <- mean(sample)
-  LB <- sample_mean - sqrt(n) * qnorm(1 - alpha/2 + beta_n[n])
+  if(!any(unique_x == 0)){
+    unique_x <- c(0, unique_x)
+    estimate <- c(0, estimate)
+    lower <- c(0, lower)
+    upper <- c(0, upper)
+  }
+  cbind(x = unique_x, ECDF = estimate, lower = lower, upper = upper)
+}
+
+
+#Romano and Wolf (2000) Bound: https://projecteuclid.org/journals/annals-of-statistics/volume-28/issue-3/Finite-sample-nonparametric-inference-and-large-sample-efficiency/10.1214/aos/1015951997.full
+#right now this only works for a significance level of alpha = .05, and a beta_n of .005 because that is the critical value I am using
+romano_wolf_CI <- function(x, B_0 = 100, B_1 = 1000, alpha = .05){
+  n <- length(x)
+  beta_n <- .005
+  sample_mean <- mean(x)
+  
+  #get the ECDF bands for the original sample
+  ECDF <- get_KS_bands(x, alpha = 1 - beta_n)
+  
+  # possible_CDFs <- matrix(NA, ncol = B_0 + 2, nrow = nrow(ECDF))
+  # possible_CDFs[,1:2] <- ECDF[,3:4]
+  lower_quantiles <- rep(NA, B_0 + 2)
+  upper_quantiles <- rep(NA, B_0 + 2)
+  #bootstrapped mean quantiles for extreme distributions
+  lower_KS_bootstraps <- replicate(n = B_1, mean(bootstrap_from_ecdf(ECDF[,c(1,3), drop = F], size = n)))
+  upper_KS_bootstraps <- replicate(n = B_1, mean(bootstrap_from_ecdf(ECDF[,c(1,4), drop = F], size = n)))
+  upper_quantiles[1] <- quantile(lower_KS_bootstraps, 1 - alpha / 2 + beta_n)
+  upper_quantiles[2] <- quantile(upper_KS_bootstraps, 1 - alpha / 2 + beta_n)
+  lower_quantiles[1] <- quantile(lower_KS_bootstraps, alpha / 2 - beta_n)
+  lower_quantiles[2] <- quantile(upper_KS_bootstraps, alpha / 2 - beta_n)
+  
+  i <- 1
+  max_counter <- 0
+  #sample B CDFs that lie within the K-S ECDF bands
+  while(i <= B_0){
+    resample <- sample(x, size = n, replace = TRUE)
+    #get values of the ECDF of the resample at the locations of the original sample to check if they are within KS bands
+    resample_ECDF <- ecdf(resample)(ECDF[,1])
+    if(all((resample_ECDF >= ECDF[,3]) & (resample_ECDF <= ECDF[,4]))){
+      #possible_CDFs[,i + 2] <- resample_ECDF
+      mean_bootstraps <- replicate(n = B_1, mean(sample(resample, size = n, replace = TRUE)))
+      upper_quantiles[i + 2] <- quantile(mean_bootstraps, 1 - alpha / 2 + beta_n)
+      lower_quantiles[i + 2] <- quantile(mean_bootstraps, alpha / 2 - beta_n)
+      i <- i + 1
+    }
+    max_counter <- max_counter + 1
+    if(max_counter >= B_0 * 10){
+      warning("Broke out of loop before finding B distributions in K-S bands.")
+      break
+    }
+  }
+  inf_quantile <- min(lower_quantiles, na.rm = T)
+  sup_quantile <- max(upper_quantiles, na.rm = T)
+  c(inf_quantile, sup_quantile)
 }
 
 
@@ -1036,13 +1138,13 @@ romano_wolf_CI <- function(sample, alpha = .05, beta_n = NULL){
 run_two_sample_t_test <- function(n, pop_1, pop_2){
   sample_1 <- sample(pop_1, size = n, replace = TRUE)
   sample_2 <- sample(pop_2, size = n, replace = TRUE)
-  t.test(x = sample_1, y = sample_2, alternative = "two.sided")$p.value
+  t.test(x = sample_1, y = sample_2, alternative = "less")$p.value
 }
 
 two_sample_hedged_test <- function(n, pop_1, pop_2, resample = TRUE){
   #these are one sided Simes intervals, since draws are independent
-  upper_1 <- hedged_CI(pop_1/20, n = n, alpha = 1-sqrt(1-.05), theta = 0, resample = resample)*20
-  lower_2 <- hedged_CI(pop_2/20, n = n, alpha = 1-sqrt(1-.05), theta = 1, resample = resample)*20
+  upper_1 <- hedged_CI(pop_1, n = n, alpha = 1-sqrt(1-.05), theta = 0, resample = resample)
+  lower_2 <- hedged_CI(pop_2, n = n, alpha = 1-sqrt(1-.05), theta = 1, resample = resample)
   reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
   reject
 }
@@ -1056,13 +1158,13 @@ two_sample_eb_test <- function(n, pop_1, pop_2, resample){
     sample_1 <- pop_1
     sample_2 <- pop_2
   }
-  upper_1 <- empirical_bernstein_bound(x = sample_1/20, alpha = 1-sqrt(1-.05), side = "upper")*20
-  lower_2 <- empirical_bernstein_bound(x = sample_2/20, alpha = 1-sqrt(1-.05), side = "lower")*20
+  upper_1 <- empirical_bernstein_bound(x = sample_1, alpha = 1-sqrt(1-.05), side = "upper")
+  lower_2 <- empirical_bernstein_bound(x = sample_2, alpha = 1-sqrt(1-.05), side = "lower")
   reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
   reject
 }
 
-#assumes samples are bounded between 0 and 20%
+#assumes samples are bounded between 0 and 1
 two_sample_anderson_test <- function(n, pop_1, pop_2, resample){
   if(resample){
     sample_1 <- sample(pop_1, size = n, replace = TRUE)
@@ -1071,24 +1173,69 @@ two_sample_anderson_test <- function(n, pop_1, pop_2, resample){
     sample_1 <- pop_1
     sample_2 <- pop_2
   }
-  upper_1 <- anderson_CI(x = sample_1/20, alpha = 1-sqrt(1-.05), side = "upper")*20
-  lower_2 <- anderson_CI(x = sample_2/20, alpha = 1-sqrt(1-.05), side = "lower")*20
+  upper_1 <- anderson_CI(x = sample_1, alpha = 1-sqrt(1-.05), side = "upper")
+  lower_2 <- anderson_CI(x = sample_2, alpha = 1-sqrt(1-.05), side = "lower")
   reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
   reject
 }
 
-two_sample_LMT_test <- function(n, pop_1, pop_2, resample, B = 1000){
-  if(resample){
-    sample_1 <- sample(pop_1, size = n, replace = TRUE)
-    sample_2 <- sample(pop_2, size = n, replace = TRUE)
+
+#a function to run a one-sided two-sample nonparametric test based on the Gaffke (LMT) test
+#the hypothesis H_0: mu_2 <= mu_1 is tested
+#populations are assumed to be bounded between [0,1] but can be pre-processed to accomodate any bounded distribution 
+#subtract the lower bound, divide by the upper bound to get to [0,1]
+#inputs:
+  #sample_1: a vector, a random sample from a larger population
+  #sample_2: a vector, a random sample from a second population. 
+  #alpha: a double in [0,1], the desired level of the test
+  #B: a positive integer, the number of Monte Carlo iterations to be used in running the test
+  #method: a string, the method of combining the two one-sample tests into a two-sample test of equality
+    #Sidak: compute a 1-sqrt(1-alpha) upper and lower bound (respectively) and see if they overlap
+    #Fisher: compute a combined p-value of whether both means are equal to a particular mu_0, then maximize this over mu_0 in [a,b]
+      #if [a,b] is [0,1] this test is always valid, but may be faster if the mean is known to lie in a more narrow interval 
+  #mu_0: interval of null means to search over for Fisher's test
+  #pval: a boolean, if TRUE return a pvalue (only works for Fisher), if FALSE return a boolean indicating rejection at level alpha 
+two_sample_LMT_test <- function(sample_1, sample_2, alpha, B = 1000, method = "Sidak", pval = FALSE){
+  if(method == "Sidak"){
+    upper_1 <- LMT_CI(x = sample_1, alpha = 1-sqrt(1-alpha), B = B, side = "upper")
+    lower_2 <- LMT_CI(x = sample_2, alpha = 1-sqrt(1-alpha), B = B, side = "lower")
+    reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
+    reject
+  } else if(method == "Fisher"){
+    n_1 <- length(sample_1)
+    n_2 <- length(sample_2)
+    x_1 <- sample_1
+    x_2 <- sample_2
+    ms_1 <- rep(NA, B)
+    ms_2 <- rep(NA, B)
+    for(b in 1:B){
+      Z <- rexp(n_1 + 1)
+      D <- Z / sum(Z)
+      ms_1[b] <- sum(D * c(x_1, 1))
+      ms_2[b] <- sum(D * c(x_2, 0))
+    }
+    #it might be possible to find the maximizing mu_0 deterministically based on the draws...
+    #sorted_ms_1 <- sort(ms_1, decreasing = T)
+    #sorted_ms_2 <- sort(ms_2, decreasing = F)
+    #closest_point <- which.min(abs(sorted_ms_1 - sorted_ms_2))
+    #opt_mu_0 <- (sorted_ms_1[closest_point] + sorted_ms_2[closest_point])/2
+    
+    combined_p <- function(mu_0){
+      p_1 <- mean(c(ms_1 >= mu_0, TRUE))
+      p_2 <- mean(c(ms_2 <= mu_0, TRUE))
+      combined_test_stat <- -2 * (log(p_1) + log(p_2))
+      p_val <- pchisq(q = combined_test_stat, df = 4, lower.tail = FALSE)
+      p_val
+    }
+    max_p_val <- optimize(combined_p, lower = min(c(ms_1, ms_2)), upper = max(c(ms_1, ms_2)), maximum = TRUE)$objective
+    if(pval){
+      max_p_val
+    } else{
+      ifelse(max_p_val < alpha, TRUE, FALSE)
+    }
   } else{
-    sample_1 <- pop_1
-    sample_2 <- pop_2
+    stop("Input a valid method: Sidak or Fisher")
   }
-  upper_1 <- LMT_CI(x = sample_1/20, alpha = 1-sqrt(1-.05), B = B, side = "upper")*20
-  lower_2 <- LMT_CI(x = sample_2/20, alpha = 1-sqrt(1-.05), B = B, side = "lower")*20
-  reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
-  reject
 }
 
 

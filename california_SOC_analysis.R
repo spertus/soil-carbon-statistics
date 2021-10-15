@@ -248,6 +248,7 @@ average_cropland_bd <- cropland_summary_bd %>%
 #stock totals on rangeland 
 #first compute volumetric concentration (vc) at each sampled point
 #then compute rangeland stocks within depth
+#assume that the entire volume is soil 
 rangeland_stocks <- rangeland_master %>% 
   select(transect, depth, TC) %>%
   mutate(TC = TC / 100) %>% #since TC is currently in percent
@@ -349,6 +350,13 @@ median_sigma_delta <- assay_error_long %>%
   group_by(machine) %>%
   summarize(sigma_delta = median(sigma_delta_TC))
 
+mean_sigma_delta <- assay_error_long %>%
+  group_by(machine) %>%
+  summarize(sigma_delta = mean(sigma_delta_TC))
+
+upper_quartile_sigma_delta <- assay_error_long %>%
+  group_by(machine) %>%
+  summarize(sigma_delta = quantile(sigma_delta_TC, .75))
 
 #proportions of assay heterogeneity as proportions of field heterogeneity
 sample_size <- 90
@@ -694,36 +702,36 @@ ggplot(power_change_topsoil, aes(x = 100*relative_delta, y = power, color = Comp
 
 ########### two-sample inference  #########
 #an example where the t-test fails to give valid inference under the null (the mean does not change)
-N <- 100
+N <- 1000
 #means are exactly 3 in both populations. Population 1 is highly skewed so that high values (which make means equal) are rarely sampled
-pop_1 <- c(rep(3, N-5), rep(6, 5)) + rnorm(N, sd = .05)
+pop_1 <- c(rnorm(N-10, mean = 3, sd = .05), rep(20, 10))
 pop_1 <- pop_1 - mean(pop_1) + 3
 pop_2 <- rep(3, N) + rnorm(N, sd = .05)
 pop_2 <- pop_2 - mean(pop_2) + 3
 
 par(mfrow = c(1,2))
-hist(pop_1, breaks = 50, xlim = c(2,6), xlab = "%TC at time 1", freq = FALSE, main = "", cex.axis = 1.5, cex.lab = 1.5)
-hist(pop_2, breaks = 5, xlim = c(2,6), xlab = "%TC at time 2", freq = FALSE, main = "", cex.axis = 1.5, cex.lab = 1.5)
+hist(pop_1, breaks = 50, xlim = c(1,20), xlab = "%TC at time 1", freq = FALSE, main = "", cex.axis = 1.5, cex.lab = 1.5)
+hist(pop_2, breaks = 50, xlim = c(1,20), xlab = "%TC at time 2", freq = FALSE, main = "", cex.axis = 1.5, cex.lab = 1.5)
 par(mfrow = c(1,1))
 
 
 
-n_grid <- seq(5,60, by = 2)
+n_grid <- seq(5,200, by = 2)
 t_test_rejection_rate <- rep(0, length(n_grid))
 hedged_rejection_rate <- rep(0, length(n_grid))
 eb_rejection_rate <- rep(0, length(n_grid))
 anderson_rejection_rate <- rep(0, length(n_grid))
 LMT_rejection_rate <- rep(0, length(n_grid))
 for(i in 1:length(n_grid)){
-  t_test_p_values <- replicate(n = 200, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
-  LMT_reject <- replicate(n = 200, two_sample_LMT_test(n = n_grid[i], pop_1, pop_2, resample = TRUE, B = 200))
+  t_test_p_values <- replicate(n = 500, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
+  LMT_reject <- replicate(n = 500, two_sample_LMT_test(sample_1 = sample(pop_1/20, size = n_grid[i], replace = T), sample_2 = sample(pop_2/20, size = n_grid[i], replace = T), alpha = .05, B = 200, method = "Fisher"))
   t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
   LMT_rejection_rate[i] <- mean(LMT_reject)
 }
-plot(y = cummin(t_test_rejection_rate), x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "Significance level", col = 'darkorange3', lwd = 4, cex.axis = 1.5, cex.lab = 1.5)
+plot(y = t_test_rejection_rate, x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "True significance level", col = 'darkorange3', lwd = 4, cex.axis = 1.5, cex.lab = 1.5)
 points(y = LMT_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 4)
 #points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'darkorange3', lwd = 2, lty = "dashed")
-legend(x = 35, y = 0.8, legend = c("Nonparametric test","t-test"), lty = c( "solid","solid"), col = c("steelblue","darkorange3"), lwd = 4, bty = "n")
+legend(x = 140, y = 0.8, legend = c("Nonparametric test","t-test"), lty = c( "solid","solid"), col = c("steelblue","darkorange3"), lwd = 4, bty = "n")
 abline(a = 0.05, b = 0, lty = 'dashed', col = 'black', lwd = 2)
 
 
@@ -769,10 +777,14 @@ run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE)
     for(j in 1:length(shift)){
       sample_1 <- sample(x, size = sample_size, replace = TRUE)
       sample_2 <- sample(x + shift[j], size = sample_size, replace = TRUE)
-      diff_mean <- mean(sample_1) - mean(sample_2)
-      normal_p_values[i,j] <- t.test(x = sample_1, y = sample_2, alternative = "less")$p.value
+      diff_mean <- mean(sample_2) - mean(sample_1)
+      std_error <- sqrt(var(sample_1)/sample_size + var(sample_2)/sample_size)
+      #this is for Welch's t-test
+      dof <- std_error^4 / ((var(sample_1)/sample_size)^2 / (sample_size - 1) + (var(sample_2)/sample_size)^2 / (sample_size - 1))
+      normal_p_values[i,j] <- pt(diff_mean/std_error, df = dof, lower.tail = FALSE)
       #hedged_rejections[i,j] <- two_sample_hedged_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
-      LMT_rejections[i,j] <- two_sample_LMT_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE, B = 200)
+      #assuming bounds are [0%,20%], as in mineral soils we can multiply the concentrations of rangeland samples by 5 for this test
+      LMT_rejections[i,j] <- two_sample_LMT_test(pop_1 = sample_1/20, pop_2 = sample_2/20, resample = FALSE, B = 200, alpha = .05, method = "Fisher")
       if(stratified){
         pop_2 <- data.frame(TC = x + shift[j], strata = strata)
         strat_sample_1 <- strata(data = pop_1, stratanames = "strata", size = n_strata_prop, method = "srswr")
