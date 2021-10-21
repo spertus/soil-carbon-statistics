@@ -554,11 +554,6 @@ variog_Bx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Bx", pl
 variog_By <- plot_variogram(rangeland_depth = "a", rangeland_transect = "By", plot = TRUE)
 
 
-distance <- variog_T$u
-avg_variogram <- colMeans(rbind(variog_T$v, variog_Mx$v, variog_My$v, variog_Bx$v, variog_By$v))
-
-
-
 
 
 ############### costs and optimal compositing #############
@@ -724,7 +719,7 @@ anderson_rejection_rate <- rep(0, length(n_grid))
 LMT_rejection_rate <- rep(0, length(n_grid))
 for(i in 1:length(n_grid)){
   t_test_p_values <- replicate(n = 500, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
-  LMT_reject <- replicate(n = 500, two_sample_LMT_test(sample_1 = sample(pop_1/20, size = n_grid[i], replace = T), sample_2 = sample(pop_2/20, size = n_grid[i], replace = T), alpha = .05, B = 200, method = "Fisher"))
+  LMT_reject <- replicate(n = 500, two_sample_LMT_test(sample_1 = sample(pop_1/20, size = n_grid[i], replace = T), sample_2 = sample(pop_2/20, size = n_grid[i], replace = T), alpha = .05, B = 200, method = "fisher"))
   t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
   LMT_rejection_rate[i] <- mean(LMT_reject)
 }
@@ -782,9 +777,8 @@ run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE)
       #this is for Welch's t-test
       dof <- std_error^4 / ((var(sample_1)/sample_size)^2 / (sample_size - 1) + (var(sample_2)/sample_size)^2 / (sample_size - 1))
       normal_p_values[i,j] <- pt(diff_mean/std_error, df = dof, lower.tail = FALSE)
-      #hedged_rejections[i,j] <- two_sample_hedged_test(n = sample_size, pop_1 = sample_1, pop_2 = sample_2, resample = FALSE)
-      #assuming bounds are [0%,20%], as in mineral soils we can multiply the concentrations of rangeland samples by 5 for this test
-      LMT_rejections[i,j] <- two_sample_LMT_test(pop_1 = sample_1/20, pop_2 = sample_2/20, resample = FALSE, B = 200, alpha = .05, method = "Fisher")
+      #assuming bounds are [0%,20%], as in mineral soils
+      LMT_rejections[i,j] <- two_sample_LMT_test(sample_1 = sample_1/20, sample_2 = sample_2/20, B = 300, alpha = .05, method = "fisher")
       if(stratified){
         pop_2 <- data.frame(TC = x + shift[j], strata = strata)
         strat_sample_1 <- strata(data = pop_1, stratanames = "strata", size = n_strata_prop, method = "srswr")
@@ -798,10 +792,7 @@ run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE)
     }
   }
   normal_power_shift <- colMeans(normal_p_values < .05)
-  #hedged_power_shift <- colMeans(hedged_rejections)
   LMT_power_shift <- colMeans(LMT_rejections)
-  #anderson_power_shift <- colMeans(anderson_rejections)
-  #eb_power_shift <- colMeans(eb_rejections)
   if(stratified){
     stratified_power_shift <- colMeans(stratified_p_values < 0.05)
     cbind("normal" = normal_power_shift, "stratified" = stratified_power_shift, "LMT"= LMT_power_shift)
@@ -816,24 +807,28 @@ run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE)
 # power_30_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 30, stratified = TRUE)
 # power_90_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 90, stratified = TRUE)
 # power_200_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 200, stratified = TRUE)
+# power_500_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 500, stratified = TRUE)
 # power_10_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 10)
 # power_30_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 30)
 # power_90_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 90)
 # power_200_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 200)
+# power_500_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 500)
 # power_frame <- bind_rows(
 #   as.data.frame(power_10_rangeland) %>% mutate(sample_size = 10, relative_effect_size = effect_grid, land_use = "Rangeland"),
 #   as.data.frame(power_30_rangeland) %>% mutate(sample_size = 30, relative_effect_size = effect_grid, land_use = "Rangeland"),
 #   as.data.frame(power_90_rangeland) %>% mutate(sample_size = 90, relative_effect_size = effect_grid, land_use = "Rangeland"),
 #   as.data.frame(power_200_rangeland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Rangeland"),
+#   as.data.frame(power_500_rangeland) %>% mutate(sample_size = 500, relative_effect_size = effect_grid, land_use = "Rangeland"),
 #   as.data.frame(power_10_cropland) %>% mutate(sample_size = 10, relative_effect_size = effect_grid, land_use = "Cropland"),
 #   as.data.frame(power_30_cropland) %>% mutate(sample_size = 30, relative_effect_size = effect_grid, land_use = "Cropland"),
 #   as.data.frame(power_90_cropland) %>% mutate(sample_size = 90, relative_effect_size = effect_grid, land_use = "Cropland"),
-#   as.data.frame(power_200_cropland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Cropland")
+#   as.data.frame(power_200_cropland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Cropland"),
+#   as.data.frame(power_500_cropland) %>% mutate(sample_size = 500, relative_effect_size = effect_grid, land_use = "Cropland")
 #   ) %>%
 #   rename("t test" = normal, "Nonparametric test" = LMT, "Stratified t test" = stratified) %>%
 #   pivot_longer(cols = c("t test", "Nonparametric test", "Stratified t test"), names_to = "Test", values_to = "Power")
-# save(power_frame, file = "power_frame_nonparametric")
-load("power_frame_nonparametric")
+# save(power_frame, file = "power_frame_nonparametric_fisher")
+load("power_frame_nonparametric_fisher")
 
 
 ggplot(power_frame, aes(x = relative_effect_size, y = Power, color = Test, linetype = Test)) +
@@ -844,6 +839,7 @@ ggplot(power_frame, aes(x = relative_effect_size, y = Power, color = Test, linet
   scale_y_continuous(labels = scales::percent) +
   scale_x_continuous(labels = scales::percent) +
   xlab("Relative effect size (additional percent TC%)") +
+  coord_cartesian(xlim = c(0,.6)) +
   theme(text = element_text(size = 16))
 
 
