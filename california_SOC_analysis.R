@@ -1,13 +1,15 @@
 library(tidyverse)
 library(readxl)
+#permuter is used for permutation tests. It can be installed from Github: https://github.com/statlab/permuter
 library(permuter)
 library(sampling)
 library(geoR)
-#permuter is used for permutation tests. It can be installed from Github: https://github.com/statlab/permuter
+
 source("functions.R")
 
 ########### read in data from excel spreadsheet(s) ##############
 #note that some of the conversions to numeric cause NA warnings, I have spot checked these against the excel files, there does not appear to be a real issue.
+#note, what we refer to as ECS 4010 in the paper is referred to as Costech in most of this code.
 rangeland_master <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Rangeland_All_soliTOC") %>%
   mutate(TOC = ifelse(TOC == "NA", NA, TOC)) %>%
   mutate(TIC = ifelse(TIC == "NA", NA, TIC)) %>%
@@ -31,7 +33,8 @@ rangeland_BD <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "R
   mutate(depth_long = dplyr::recode(depth, a = "0-10 cm", b = "10-30 cm", c = "30-50 cm", d = "50-75 cm", e = "75-100 cm"))
 
 #data from various croplands around California
-cropland_master <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Cropland_All_Costech")
+cropland_master <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Cropland_All_Costech") %>%
+  mutate(depth_long = dplyr::recode(depth, a = "0-15 cm", b = "15-30 cm", c = "30-60 cm", d = "60-100 cm"))
 
 cropland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
   mutate(sample_number = as.numeric(sample_number)) %>%
@@ -44,7 +47,8 @@ cropland_costech_reps <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", s
 
 cropland_BD <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Cropland_BD")  %>%
   rename('bd' = 'bulk_density_g/cm3') %>%
-  mutate(bd = as.numeric(bd))
+  mutate(bd = as.numeric(bd))  %>%
+  mutate(depth_long = dplyr::recode(depth, a = "0-15 cm", b = "15-30 cm", c = "30-60 cm", d = "60-100 cm"))
 
 replicates_comparison <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Replicate_Comparison") %>% 
   rename(TC_solitoc = TC_soliTOC, TOC_solitoc = TOC_soliTOC) %>%
@@ -55,8 +59,8 @@ standards_comparison <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sh
 
 
 combined_master <- rangeland_master %>% 
-  select(site, soil_type, depth, TC) %>%
-  bind_rows(cropland_master %>% select(site, soil_type, depth, TC)) %>%
+  select(site, soil_type, depth, depth_long, TC) %>%
+  bind_rows(cropland_master %>% select(site, soil_type, depth, depth_long, TC)) %>%
   mutate(land_use = ifelse(site == "RANGE", "Rangeland", "Cropland"))
 
 ###################### TOC concentration and BD in space ######################
@@ -64,47 +68,47 @@ combined_master <- rangeland_master %>%
 #stacked TC histograms for rangeland data
 ggplot(rangeland_master, aes(TC)) +
   geom_histogram(binwidth = 0.25, alpha = 1) +
-  facet_grid(depth ~ transect) +
+  facet_grid(depth_long ~ transect) +
   xlab("% Total Carbon (TC)") +
   ylab("Number of Samples") +
   #ylim(0,23) +
   theme_bw() +
-  theme(text = element_text(size = 16))
+  theme(text = element_text(size = 20))
 
 
 #violin plot for rangeland data
 ggplot(rangeland_master, aes(y = TC, x = transect, fill = transect, color = transect)) +
   geom_violin() +
   coord_flip() +
-  facet_grid(depth ~ .) +
+  facet_grid(depth_long ~ .) +
   scale_fill_manual(values = c("firebrick","forestgreen","darkorchid4","darkorange3","steelblue")) +
   scale_color_manual(values = c("firebrick","forestgreen","darkorchid4","darkorange3", "steelblue")) +
   xlab("Transect") +
   ylab("% Total Carbon (TC)") +
   theme_bw() +
-  theme(text = element_text(size = 16), legend.position = "none")
+  theme(text = element_text(size = 20), legend.position = "none")
 
 
 #TOC histogram for rangeland
 ggplot(rangeland_master, aes(TOC)) +
   geom_histogram(binwidth = 0.25) +
-  facet_grid(depth ~ transect) +
+  facet_grid(depth_long ~ transect) +
   xlab("% Total Organic Carbon (TOC)") +
   ylab("Number of Samples") +
   theme_bw() +
-  theme(text = element_text(size = 16))
+  theme(text = element_text(size = 20))
 
 
 #histograms for cropland data
 ggplot(cropland_master, aes(TC)) +
   geom_histogram(binwidth = 0.25) +
-  facet_grid(depth ~ site) +
+  facet_grid(depth_long ~ site) +
   xlab("% Total Carbon (TC)") +
   ylab("Number of Samples") +
   theme_bw() +
   #xlim(0,8) +
   #ylim(0,23) +
-  theme(text = element_text(size = 16))
+  theme(text = element_text(size = 20))
 
 #violin plot for cropland data
 ggplot(cropland_master, aes(y = TC, x = site, fill = site, color = site)) +
@@ -116,7 +120,7 @@ ggplot(cropland_master, aes(y = TC, x = site, fill = site, color = site)) +
   xlab("Transect") +
   ylab("% Total Carbon (TC)") +
   theme_bw() +
-  theme(text = element_text(size = 16), legend.position = "none")
+  theme(text = element_text(size = 20), legend.position = "none")
 
 
 
@@ -193,26 +197,26 @@ cropland_depth_ANOVA <- t2p(
 #NOTE: histograms are not disaggregated by location, which drives variation
 ggplot(rangeland_BD, aes(bd)) +
   geom_histogram(binwidth = 0.05) +
-  facet_grid(depth ~ .) +
+  facet_grid(depth_long ~ .) +
   xlab("Bulk Density") +
   ylab("Number of samples") +
   coord_cartesian(xlim=c(0.8,1.8)) +
   scale_x_continuous(breaks = c(0.8, 1.0, 1.2, 1.4, 1.6, 1.8)) +
   #scale_y_continuous(breaks = c(0,2,4,6), limits = c(0,6)) +
   theme_bw() +
-  theme(text = element_text(size = 16), panel.grid.minor = element_blank())
+  theme(text = element_text(size = 20), panel.grid.minor = element_blank())
 
 #cropland bulk density for site 7
 ggplot(cropland_BD %>% filter(site == "CROP7"), aes(bd)) +
   geom_histogram(binwidth = 0.05) +
-  facet_grid(depth ~ .) +
+  facet_grid(depth_long ~ .) +
   xlab("Bulk Density") +
   ylab("Number of samples") +
   coord_cartesian(xlim=c(0.8,1.8)) +
   scale_x_continuous(breaks = c(0.8, 1.0, 1.2, 1.4, 1.6, 1.8)) +
   scale_y_continuous(breaks = c(0,2,4,6), limits = c(0,6)) +
   theme_bw() +
-  theme(text = element_text(size = 16), panel.grid.minor = element_blank())
+  theme(text = element_text(size = 20), panel.grid.minor = element_blank())
 
 
 #all cropland bulk density
@@ -224,7 +228,7 @@ ggplot(cropland_BD, aes(bd)) +
   scale_x_continuous(breaks = c(0.8, 1.2, 1.6, 2.0, 2.4), limits = c(0.8,2.4)) +
   scale_y_continuous(breaks = c(0,2,4,6,8,10), limits = c(0,10)) +
   theme_bw() +
-  theme(text = element_text(size = 16))
+  theme(text = element_text(size = 20))
 
 rangeland_summary_bd <- rangeland_BD %>%
   group_by(depth) %>%
@@ -343,8 +347,8 @@ ggplot(assay_error_long, aes(sigma_delta_TC*100, fill = machine)) +
   ylab("Number of Samples") +
   theme_bw() +
   scale_x_continuous(labels = scales::percent_format(scale = 1)) +
-  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("Costech", "SoliTOC")) +
-  theme(text = element_text(size = 16))
+  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("ECS 4010", "SoliTOC")) +
+  theme(text = element_text(size = 20))
 
 median_sigma_delta <- assay_error_long %>%
   group_by(machine) %>%
@@ -361,9 +365,9 @@ upper_quartile_sigma_delta <- assay_error_long %>%
 #proportions of assay heterogeneity as proportions of field heterogeneity
 sample_size <- 90
 assay_field_proportions <- combined_master %>%
-  group_by(site, depth, land_use) %>%
+  group_by(site, depth_long, land_use) %>%
   summarize(mean_TC = mean(TC, na.rm = T), sd_TC = sd(TC, na.rm = T)) %>% 
-  group_by(depth, land_use) %>%
+  group_by(depth_long, land_use) %>%
   summarize(sd_TC = mean(sd_TC, na.rm = T), mean_TC = mean(mean_TC, na.rm = T)) %>%
   mutate(SoliTOC = median_sigma_delta$sigma_delta[median_sigma_delta$machine == "solitoc"]) %>%
   mutate(Costech = median_sigma_delta$sigma_delta[median_sigma_delta$machine == "costech"]) %>%
@@ -378,35 +382,19 @@ assay_field_proportions <- combined_master %>%
   pivot_longer(cols = c(assay_proportion,field_proportion), names_to = "source", values_to = "proportion") %>%
   mutate(source = ifelse(source == "assay_proportion", "Analytical Variability", "Spatial Heterogeneity")) %>%
   mutate(land_use = factor(land_use, levels = c("Rangeland","Cropland"))) %>%
-  filter(depth != "e")
+  mutate(machine = ifelse(machine == "Costech", "ECS 4010", machine))
 
 #variance proportions plot
-ggplot(assay_field_proportions, aes(x = depth, fill = source, y = proportion)) +
+ggplot(assay_field_proportions, aes(x = depth_long, fill = source, y = proportion)) +
   geom_bar(position = "stack", stat = "identity") +
-  facet_grid(machine ~ compositing + land_use) +
+  facet_grid(machine ~ compositing + land_use, scales = "free_x") +
   ylim(0,1) +
   guides(fill = guide_legend(title = "Source of Variance")) +
   scale_fill_manual(values = c("darkorange3","steelblue")) +
   ylab("Approximate Proportion of Estimation Variance") +
   xlab("Depth") +
-  theme(text = element_text(size = 16))
+  theme(text = element_text(size = 20), axis.text.x = element_text(angle = -45, vjust = 0.5, hjust=0))
 
-#total variance contributions plot (not proportions)
-variance_contributions <- assay_field_proportions %>%
-  filter(source == "Assay Variability") %>%
-  select(depth, land_use, sd_TC, compositing, assay_contribution, machine) %>%
-  mutate(var_TC = sd_TC^2) %>%
-  mutate(var_TC = ifelse(compositing == "Full Compositing (n=30)", var_TC/30, var_TC)) %>%
-  pivot_longer(cols = c("var_TC", "assay_contribution"), names_to = "source", values_to = "variance") %>%
-  mutate(source = ifelse(source == "assay_contribution", "Assay Variability", "Field Heterogeneity"))
- 
-ggplot(variance_contributions, aes(x = depth, y = variance, fill = source)) +
-  geom_bar(position = "stack", stat = "identity") +
-  facet_grid(machine ~ compositing + land_use)  +
-  guides(fill = guide_legend(title = "Source of Variance")) +
-  ylab("Variance of one assayed sample") +
-  xlab("Depth") +
-  theme(text = element_text(size = 14))
 
 
 #non-parametric permutation test for differences in measurement
@@ -467,24 +455,24 @@ assay_histogram_plot_accepted <- ggplot(reps_long_both %>% filter(rejected == 0)
   xlab("TOC% or TC%") +
   ylab("Number of Replicates") +
   ggtitle("Similar Assays") +
-  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("Costech", "SoliTOC")) +
+  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("ECS 4010", "SoliTOC")) +
   scale_y_continuous(breaks=seq(0,9)) +
   scale_x_continuous(breaks=seq(0,6), limits = c(0,6)) +
   theme_bw() +
-  theme(text = element_text(size = 16), panel.grid.minor.y = element_blank())
+  theme(text = element_text(size = 14), panel.grid.minor.y = element_blank())
 #only TOC that were rejected (since rejected TC were re-run for TOC)
 assay_histogram_plot_rejected <- ggplot(reps_long_both %>% filter(rejected == 1, carbon_type == "TOC"), aes(carbon, fill = machine)) +
-  geom_histogram( alpha = .75, position = "stack", binwidth = .05) +
+  geom_histogram( alpha = .75, position = "stack", binwidth = .025) +
   facet_wrap(~ identifier) +
   #xlim(0,6) +
   xlab("TOC%") +
   ylab("Number of Replicates") +
   ggtitle("Significantly Different Analyses") +
-  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("Costech", "SoliTOC")) +
+  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("ECS 4010", "SoliTOC")) +
   scale_y_continuous(breaks=seq(0,9)) +
-  scale_x_continuous(breaks=seq(0,6), limits = c(0,6)) +
+  scale_x_continuous(breaks=seq(0,3), limits = c(0,3.2)) +
   theme_bw() +
-  theme(text = element_text(size = 16), panel.grid.minor.y = element_blank())
+  theme(text = element_text(size = 20), panel.grid.minor.y = element_blank())
 
 
 #standards comparison
@@ -498,14 +486,14 @@ standards_histogram <- ggplot(standards_comparison, aes(TC, fill = machine)) +
   geom_histogram( alpha = .75, position = "stack", binwidth = .01) +
   geom_vline(data = standards_comparison %>% filter(sample_ID == "EML"), aes(xintercept = 1.86)) +
   geom_vline(data = standards_comparison %>% filter(sample_ID == "LECO"), aes(xintercept = 0.926)) +
-  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("Costech", "SoliTOC")) +
+  scale_fill_manual(name = "Instrument", values = c("steelblue","darkorange3"), labels = c("ECS 4010", "SoliTOC")) +
   facet_grid(~ sample_ID, scales = "free") +
   xlim(0.8, 2.2) +
   scale_y_continuous(breaks=seq(0,12)) +
   xlab("TC%") +
   ylab("Number of Replicates") +
   theme_bw() +
-  theme(text = element_text(size = 16), panel.grid.minor.y = element_blank())
+  theme(text = element_text(size = 20), panel.grid.minor.y = element_blank())
 
 
 ############# spatial correlation of TC concentrations on rangeland ##########
@@ -599,7 +587,7 @@ precision_combined <- combined_master %>%
 precision_combined_long <- precision_combined %>%
   pivot_longer(cols = starts_with("se_"), names_to = "compositing", values_to = "std_error", names_prefix = "se_") %>%
   separate(compositing, into = c("Compositing", "Instrument"), sep = "_compositing_") %>%
-  mutate(Instrument = ifelse(Instrument == "costech", "Costech", "SoliTOC")) %>%
+  mutate(Instrument = ifelse(Instrument == "costech", "ECS 4010", "SoliTOC")) %>%
   mutate(Compositing = recode(Compositing, no = "None", full = "Full", optimal = "Optimal"))
 
 
@@ -628,7 +616,7 @@ cropland_grid_precision <- expand.grid(
 
 precision_topsoil <- rangeland_grid_precision %>%
   bind_rows(cropland_grid_precision) %>%
-  mutate(Machine = ifelse(sigma_delta == sigma_delta_costech, "Costech", "SoliTOC")) %>%
+  mutate(Machine = ifelse(sigma_delta == sigma_delta_costech, "ECS 4010", "SoliTOC")) %>%
   mutate(budget = 20 * sample_size + 13.6 * sample_size) %>%
   mutate(max_sample_size = floor((budget - 13.6) / 20)) %>%
   mutate(se_no_compositing = sqrt(get_variance(n = sample_size, k = sample_size, sigma_p = sigma_p, mu = mu, sigma_delta = sigma_delta))) %>%
@@ -645,7 +633,7 @@ precision_plot <- ggplot(precision_topsoil, aes(x = sample_size, y = std_error, 
   xlab("Sample Size") +
   ylab("Standard Error of Sample Mean") +
   coord_cartesian(xlim = c(5,100), ylim = c(0,.4)) +
-  theme(text = element_text(size = 16))
+  theme(text = element_text(size = 20))
 
 #Power to detect change using t-test
 rangeland_grid_power <- expand.grid(
@@ -667,7 +655,7 @@ cropland_grid_power <- expand.grid(
 
 power_change_topsoil <- rangeland_grid_power %>%
   bind_rows(cropland_grid_power) %>%
-  mutate(Machine = ifelse(sigma_delta == sigma_delta_costech, "Costech", "SoliTOC")) %>%
+  mutate(Machine = ifelse(sigma_delta == sigma_delta_costech, "ECS 4010", "SoliTOC")) %>%
   mutate(relative_delta = ifelse(land_use == "Cropland", delta / mu_cropland, delta / mu_rangeland)) %>%
   mutate(budget = 20 * sample_size + 13.6 * sample_size) %>%
   mutate(max_sample_size = floor((budget - 13.6) / 20)) %>%
@@ -690,7 +678,7 @@ ggplot(power_change_topsoil, aes(x = 100*relative_delta, y = power, color = Comp
   scale_color_manual(values = c("firebrick","forestgreen","steelblue")) +
   coord_cartesian(xlim = c(0,40)) +
   theme_bw() +
-  theme(text = element_text(size = 16), axis.text.x = element_text(size = 10))
+  theme(text = element_text(size = 20), axis.text.x = element_text(size = 16))
 
 
 
@@ -709,25 +697,38 @@ hist(pop_1, breaks = 50, xlim = c(1,20), xlab = "%TC at time 1", freq = FALSE, m
 hist(pop_2, breaks = 50, xlim = c(1,20), xlab = "%TC at time 2", freq = FALSE, main = "", cex.axis = 1.5, cex.lab = 1.5)
 par(mfrow = c(1,1))
 
-
-
-n_grid <- seq(5,200, by = 2)
-t_test_rejection_rate <- rep(0, length(n_grid))
-hedged_rejection_rate <- rep(0, length(n_grid))
-eb_rejection_rate <- rep(0, length(n_grid))
-anderson_rejection_rate <- rep(0, length(n_grid))
-LMT_rejection_rate <- rep(0, length(n_grid))
-for(i in 1:length(n_grid)){
-  t_test_p_values <- replicate(n = 500, run_two_sample_t_test(n = n_grid[i], pop_1, pop_2))
-  LMT_reject <- replicate(n = 500, two_sample_LMT_test(sample_1 = sample(pop_1/20, size = n_grid[i], replace = T), sample_2 = sample(pop_2/20, size = n_grid[i], replace = T), alpha = .05, B = 200, method = "fisher"))
-  t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
-  LMT_rejection_rate[i] <- mean(LMT_reject)
-}
-plot(y = t_test_rejection_rate, x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "True significance level", col = 'darkorange3', lwd = 4, cex.axis = 1.5, cex.lab = 1.5)
+#simulations are actually run in the script california_SOC_batch_simulations.R
+par(mar = c(5.1,4.3, 4.3, 2.1))
+plot(y = t_test_rejection_rate, x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "Simulated significance level", col = 'darkorange3', lwd = 4, cex.axis = 1.8, cex.lab = 1.8)
 points(y = LMT_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 4)
 #points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'darkorange3', lwd = 2, lty = "dashed")
-legend(x = 140, y = 0.8, legend = c("Nonparametric test","t-test"), lty = c( "solid","solid"), col = c("steelblue","darkorange3"), lwd = 4, bty = "n")
+legend(x = 100, y = 0.8, legend = c("Nonparametric test","t-test"), lty = c( "solid","solid"), col = c("steelblue","darkorange3"), lwd = 4, bty = "n", cex = 1.5)
 abline(a = 0.05, b = 0, lty = 'dashed', col = 'black', lwd = 2)
+par(mar = c(5.1,4.1, 4.1, 2.1))
+
+
+#plot simulations
+load("validity_simulations")
+validity_frame <- validity_simulations %>%
+  reduce(bind_rows) %>%
+  pivot_longer(cols = c("t_test_rejections", "LMT_rejections"), names_to = "test", values_to = "rejection_rate") %>%
+  mutate(test = recode(test, "t_test_rejections" ="t-test", "LMT_rejections" = "Nonparametric test")) %>%
+  mutate(population = recode(population,  "rangeland_to_cropland" = "R to C", "hotspots_to_deadspots" = "R to -C", "skewed" = "Major hotspot", "symmetric_reduced_spread" = "Gaussian unequal variance")) %>%
+  group_by(population, test) %>%
+  mutate(running_rejection_rate = cummin(rejection_rate)) %>%
+  ungroup()
+
+ggplot(validity_frame, aes(x = sample_size, y = running_rejection_rate, color = test, linetype = test)) +
+  geom_line(size = 1.2) +
+  geom_hline(yintercept = .05, linetype = "solid") +
+  facet_wrap(~population) +
+  coord_cartesian(xlim = c(5,100), ylim = c(0,.5)) +
+  theme_bw() +
+  scale_color_manual(values = c("darkorange3", "forestgreen")) +
+  ylab("Simulated significance level") +
+  xlab("Sample size") +
+  theme(text = element_text(size = 20), axis.text.x = element_text(size = 16))
+
 
 
 # power of t-test (unstratified and stratified) or nonparametric (unstratified) to detect topsoil change 
@@ -737,7 +738,7 @@ topsoil_rangeland <- rangeland_master %>%
   filter(!is.na(TC)) %>%
   arrange(transect) %>%
   select(transect, TC)
-#cropland site 7 has the second most samples (20) and the lowest heterogeneity
+#cropland site 5 has the second most samples (20) and the lowest heterogeneity
 topsoil_cropland <- cropland_master %>% 
   filter(depth == "a") %>%
   filter(site == "CROP5") %>%
@@ -756,7 +757,10 @@ strata_weights_opt <- N_strata * sigma_strata / sum(N_strata * sigma_strata)
 effect_grid = seq(0,0.8,by=.025)
 run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE){
   mu <- mean(x)
+  n_x <- length(x)
   shift <- effect_grid * mu
+  #scaling <- 1+effect_grid
+  #spike <- cbind(matrix(0, ncol = floor(n_x * .8), nrow = length(shift)), 5*matrix(rep(shift, each = ceiling(n_x * .2)), ncol = ceiling(n_x * .2), byrow = TRUE))
   if(stratified){
     #dataframe format needed to work with sampling package
     K <- length(unique(strata))
@@ -802,7 +806,7 @@ run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE)
 }
 
 
-#these take a while to run, we can save them as an object
+#since these take a while to run, I usually save them
 # power_10_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 10, stratified = TRUE)
 # power_30_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 30, stratified = TRUE)
 # power_90_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 90, stratified = TRUE)
@@ -827,20 +831,24 @@ run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE)
 #   ) %>%
 #   rename("t test" = normal, "Nonparametric test" = LMT, "Stratified t test" = stratified) %>%
 #   pivot_longer(cols = c("t test", "Nonparametric test", "Stratified t test"), names_to = "Test", values_to = "Power")
-# save(power_frame, file = "power_frame_nonparametric_fisher")
+#save(power_frame, file = "power_frame_nonparametric_fisher_spike")
 load("power_frame_nonparametric_fisher")
 
+power_frame <- power_frame %>%
+  mutate(sample_size_long = paste(sample_size, "Samples")) %>%
+  mutate(sample_size_long = factor(sample_size_long, levels = paste(c(10, 30, 90, 200, 500), "Samples")))
 
-ggplot(power_frame, aes(x = relative_effect_size, y = Power, color = Test, linetype = Test)) +
+
+ggplot(power_frame %>% filter(sample_size != 500), aes(x = relative_effect_size, y = Power, color = Test, linetype = Test)) +
   geom_line(size = 1.5) +
-  facet_grid(sample_size ~ land_use) +
+  facet_grid(sample_size_long ~ land_use) +
   theme_bw() +
   scale_color_manual(values = c("darkorange3","steelblue","forestgreen")) +
   scale_y_continuous(labels = scales::percent) +
   scale_x_continuous(labels = scales::percent) +
   xlab("Relative effect size (additional percent TC%)") +
   coord_cartesian(xlim = c(0,.6)) +
-  theme(text = element_text(size = 16))
+  theme(text = element_text(size = 20))
 
 
 
