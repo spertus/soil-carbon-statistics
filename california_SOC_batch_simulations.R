@@ -3,6 +3,34 @@ library(readxl)
 library(sampling)
 
 #necessary functions
+#stratification helper function to make vector an integer vector with the sum preserved
+#input: 
+#n_strata: the number of samples to take from each stratum, which could be non-integer, but sums to overall sample size
+#output:
+#a rounded vector with the sum equal to the sum of the original vector
+round_strata_sizes <- function(n_strata){
+  rounded_n_strata <- floor(n_strata)
+  indices <- tail(order(n_strata-rounded_n_strata), round(sum(n_strata)) - sum(rounded_n_strata))
+  rounded_n_strata[indices] <- rounded_n_strata[indices] + 1
+  rounded_n_strata
+}
+
+#function to get mean and standard error estimate from a stratified sample used alongside 'sampling' package
+#input: 
+#sample: a dataframe of stratified samples as output by sampling::strata()
+#output:
+#length 2 vector with the estimate of the population mean and the estimated standard error of that estimate
+get_mean_se_stratified <- function(sample, N_strata){
+  N <- sum(N_strata)
+  strata_weights <- N_strata / N
+  n_strata <- as.numeric(table(sample$strata))
+  strata_means <- tapply(sample$TC, sample$strata, mean)
+  strata_vars <- tapply(sample$TC, sample$strata, var)
+  var_estimate <- N^(-2) * sum(N_strata^2 * strata_vars / n_strata)
+  c(sum(strata_weights * strata_means), sqrt(var_estimate))
+}
+
+
 
 #Learned-Miller and Thomas bound https://arxiv.org/pdf/1905.06208.pdf
 #Originally proposed by Gaffke 
@@ -13,7 +41,7 @@ library(sampling)
 #side: the side of the confidence interval, either "upper" or "lower"
 #outputs:
 #an upper or lower confidence bound
-LMT_CI <- function(x, alpha = .05, B = 10000, side = "upper"){
+gaffke_CI <- function(x, alpha = .05, B = 10000, side = "upper"){
   n <- length(x)
   if(side == "lower"){
     x <- 1 - x
@@ -46,6 +74,32 @@ run_two_sample_t_test <- function(sample_size, pop_1, pop_2){
   pt(diff_mean/std_error, df = dof, lower.tail = FALSE)
 }
 
+
+two_sample_martingale <- function(sample_1, sample_2, bounds, alt_mean = NULL, d = NULL, sequential = FALSE){
+  if(length(sample_1) != length(sample_2)){
+    stop("Unbalanced sample sizes not yet supported.")
+  }
+  #assume bounds are equal for the two populations; this makes the difference an RV on [0,1]
+  Z <- (sample_2 - sample_1 + bounds[2]) / (2 * diff(bounds)) 
+  n <- length(Z)
+  #the null is that the means of the lists are equal
+  null_mean <- 1/2
+  if(is.null(alt_mean) | is.null(d)){
+    eta_j <- cummean(Z) 
+  } else{
+    scaled_alt_mean <- (alt_mean + diff(bounds)) / (2 * diff(bounds))
+    eta_j <- pmin(pmax((d * scaled_alt_mean + cumsum(Z)) / (d + 1:n - 1), null_mean + ((scaled_alt_mean - null_mean) / 2) / sqrt(d + 1:n - 1)), 1)
+  }
+  terms <- c(1, (Z/null_mean) * (eta_j - null_mean)/(1 - null_mean) + (1 - eta_j)/(1 - null_mean))
+  T_j <- cumprod(terms)
+  if(sequential){
+    pval <- 1 / T_j
+  } else{
+    pval <- 1 / max(T_j)
+  }
+  pval
+}
+
 #a function to run a one-sided two-sample nonparametric test based on the Gaffke (LMT) test
 #the hypothesis H_0: mu_2 <= mu_1 is tested
 #populations are assumed to be bounded between [0,1] but can be pre-processed to accomodate any bounded distribution 
@@ -53,17 +107,17 @@ run_two_sample_t_test <- function(sample_size, pop_1, pop_2){
 #inputs:
 #sample_1: a vector, a random sample from a larger population
 #sample_2: a vector, a random sample from a second population. 
-#alpha: a double in [0,1], the desired level of the test
+#alpha: a double in (0,1), the desired level of the test
 #B: a positive integer, the number of Monte Carlo iterations to be used in running the test
 #method: a string, the method of combining the two one-sample tests into a two-sample test of equality
 #Sidak: compute a 1-sqrt(1-alpha) upper and lower bound (respectively) and see if they overlap
 #Fisher: compute a combined p-value using Fisher's combining function of whether both means are equal to a particular mu_0, then maximize this over possible values of mu_0
 #Liptak: compute a combined p-value using Liptak's combining function
 #pval: a boolean, if TRUE return a pvalue (only works for Fisher or Liptak), if FALSE return a boolean indicating rejection at level alpha 
-two_sample_LMT_test <- function(sample_1, sample_2, alpha, B = 1000, method = "sidak", pval = FALSE){
+two_sample_gaffke_test <- function(sample_1, sample_2, alpha, B = 1000, method = "sidak", pval = FALSE){
   if(method == "sidak"){
-    upper_1 <- LMT_CI(x = sample_1, alpha = 1-sqrt(1-alpha), B = B, side = "upper")
-    lower_2 <- LMT_CI(x = sample_2, alpha = 1-sqrt(1-alpha), B = B, side = "lower")
+    upper_1 <- gaffke_CI(x = sample_1, alpha = 1-sqrt(1-alpha), B = B, side = "upper")
+    lower_2 <- gaffke_CI(x = sample_2, alpha = 1-sqrt(1-alpha), B = B, side = "lower")
     reject <- ifelse(upper_1 < lower_2, TRUE, FALSE)
     reject
   } else if(method %in% c("fisher","liptak","tippett")){
@@ -168,7 +222,7 @@ run_validity_simulations <- function(type, n_sims = 500){
   } else if(type == "rangeland_to_cropland"){
     pop_1 <- topsoil_TC_rangeland - mean(topsoil_TC_rangeland) + 3
     pop_2 <- topsoil_TC_cropland - mean(topsoil_TC_cropland) + 3
-  } else if(type == "hotspots_to_deadspots"){
+  } else if(type == "rangeland_to_negcropland"){
     pop_1 <-  topsoil_TC_rangeland - mean(topsoil_TC_rangeland) + 3
     pop_2 <- mean(topsoil_TC_cropland) - topsoil_TC_cropland + 3
   } else if(type == "symmetric_reduced_spread"){
@@ -176,33 +230,52 @@ run_validity_simulations <- function(type, n_sims = 500){
     pop_2 <- rnorm(N, mean = 3, sd = .1)
     pop_1 <- pop_1 - mean(pop_1) + 3
     pop_2 <- pop_2 - mean(pop_2) + 3
+  } else if(type == "gaussian_gaussian"){
+    pop_1 <- rnorm(N, mean = 3, sd = .5)
+    pop_2 <- rnorm(N, mean = 3, sd = .5)
+    pop_1 <- pop_1 - mean(pop_1) + 3
+    pop_2 <- pop_2 - mean(pop_2) + 3
+  } else if(type == "rangeland_to_gaussian"){
+    pop_1 <-  topsoil_TC_rangeland - mean(topsoil_TC_rangeland) + 3
+    pop_2 <- rnorm(N, mean = 3, sd = .5)
+    pop_2 <- pop_2 - mean(pop_2) + 3
+  } else if(type == "cropland_to_gaussian"){
+    pop_1 <-  topsoil_TC_cropland - mean(topsoil_TC_cropland) + 3
+    pop_2 <- rnorm(N, mean = 3, sd = .5)
+    pop_2 <- pop_2 - mean(pop_2) + 3
+  } 
+  else if(type == "rangeland_to_negrangeland"){
+    pop_1 <-  topsoil_TC_rangeland - mean(topsoil_TC_rangeland) + 6
+    pop_2 <- mean(topsoil_TC_rangeland) - topsoil_TC_rangeland + 6
+  } else if(type == "cropland_to_negcropland"){
+    pop_1 <-  topsoil_TC_rangeland - mean(topsoil_TC_rangeland) + 6
+    pop_2 <- mean(topsoil_TC_rangeland) - topsoil_TC_rangeland + 6
   } else{
     stop("Supply valid argument to type")
   }
   
   n_grid <- seq(6,200, by = 2)
   
-  
   t_test_rejection_rate <- rep(0, length(n_grid))
-  LMT_rejection_rate <- rep(0, length(n_grid))
+  gaffke_rejection_rate <- rep(0, length(n_grid))
   
   for(i in 1:length(n_grid)){
     t_test_p_values <- replicate(n = n_sims, run_two_sample_t_test(sample_size = n_grid[i], pop_1, pop_2))
-    LMT_reject <- replicate(n = n_sims, two_sample_LMT_test(sample_1 = sample(pop_1/20, size = n_grid[i], replace = T), sample_2 = sample(pop_2/20, size = n_grid[i], replace = T), alpha = .05, B = 100, method = "fisher"))
+    gaffke_reject <- replicate(n = n_sims, two_sample_gaffke_test(sample_1 = sample(pop_1/20, size = n_grid[i], replace = T), sample_2 = sample(pop_2/20, size = n_grid[i], replace = T), alpha = .05, B = 100, method = "fisher"))
     t_test_rejection_rate[i] <- mean(t_test_p_values < .05)
-    LMT_rejection_rate[i] <- mean(LMT_reject)
+    gaffke_rejection_rate[i] <- mean(gaffke_reject)
   }
-  data.frame("sample_size" = n_grid, "t_test_rejections" = t_test_rejection_rate, "LMT_rejections" = LMT_rejection_rate, "population" = type)
+  data.frame("sample_size" = n_grid, "t_test_rejections" = t_test_rejection_rate, "gaffke_rejections" = gaffke_rejection_rate, "population" = type)
 }
 
 
-pop_list <- c("skewed", "rangeland_to_cropland", "hotspots_to_deadspots", "symmetric_reduced_spread")
-validity_simulations <- lapply(pop_list, run_validity_simulations, n_sims = 5000)
-save(validity_simulations, file = "validity_simulations")
+# pop_list <- c("skewed", "rangeland_to_cropland", "rangeland_to_negcropland", "rangeland_to_negrangeland", "rangeland_to_gaussian", "cropland_to_negcropland", "cropland_to_gaussian", "gaussian_gaussian")
+# validity_simulations <- lapply(pop_list, run_validity_simulations, n_sims = 5000)
+# save(validity_simulations, file = "validity_simulations")
 
 # par(mar = c(5.1,4.3, 4.3, 2.1))
 # plot(y = t_test_rejection_rate, x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "Simulated significance level", col = 'darkorange3', lwd = 4, cex.axis = 1.8, cex.lab = 1.8)
-# points(y = LMT_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 4)
+# points(y = gaffke_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 4)
 # #points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'darkorange3', lwd = 2, lty = "dashed")
 # legend(x = 100, y = 0.8, legend = c("Nonparametric test","t-test"), lty = c( "solid","solid"), col = c("steelblue","darkorange3"), lwd = 4, bty = "n", cex = 1.5)
 # abline(a = 0.05, b = 0, lty = 'dashed', col = 'black', lwd = 2)
@@ -214,7 +287,6 @@ save(validity_simulations, file = "validity_simulations")
 
 
 ###### POWER SIMULATIONS ######
-effect_grid = seq(0,.8,by=.02)
 run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "shift", bounds = c(0,20)){
   if(land_use == "cropland"){
     x <- (topsoil_TC_cropland - bounds[1]) / diff(bounds)
@@ -223,15 +295,17 @@ run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "sh
   } else{
     stop("input valid land_use")
   }
+  effect_grid <- seq(0,.6,by=.025)
   mu <- mean(x)
   n_x <- length(x)
   shift <- effect_grid * mu
   scaling <- 1+effect_grid
-  spike <- cbind(matrix(0, ncol = floor(n_x * .8), nrow = length(shift)), 5*matrix(rep(shift, each = ceiling(n_x * .2)), ncol = ceiling(n_x * .2), byrow = TRUE))
+  spike <- cbind(matrix(0, ncol = floor(n_x * .8), nrow = length(effect_grid)), 5*matrix(rep(shift, each = ceiling(n_x * .2)), ncol = ceiling(n_x * .2), byrow = TRUE))
   
-  t_test_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  stratified_t_test_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  LMT_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
+  t_test_p_values <- matrix(NA, nrow = n_sims, ncol = length(effect_grid))
+  stratified_t_test_p_values <- matrix(NA, nrow = n_sims, ncol = length(effect_grid))
+  gaffke_rejections <- matrix(NA, nrow = n_sims, ncol = length(effect_grid))
+  mart_p_values <- matrix(NA, nrow = n_sims, ncol = length(effect_grid))
   
   
   for(i in 1:n_sims){
@@ -244,20 +318,20 @@ run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "sh
         pop_2 <- x * scaling[j]
       }
       if(effect == "spike"){
-        pop_2 <- x + spike[,j]
+        pop_2 <- x + spike[j,]
       }
       if(effect == "to_gaussian"){
-        pop_2 <- rnorm(n = length(x), mean = 0, sd = .25) 
-        pop_2 <- pop_2 - mean(pop_2) + mu + shift
+        pop_2 <- rnorm(n = length(x), mean = 0, sd = .25/diff(bounds)) 
+        pop_2 <- pop_2 - mean(pop_2) + mu + shift[j]
       }
-      sample_2 <- sample(pop_2, size = sample_size)
+      sample_2 <- sample(pop_2, size = sample_size, replace = TRUE)
       diff_mean <- mean(sample_2) - mean(sample_1)
       std_error <- sqrt(var(sample_1)/sample_size + var(sample_2)/sample_size)
       #this is for Welch's t-test
       dof <- std_error^4 / ((var(sample_1)/sample_size)^2 / (sample_size - 1) + (var(sample_2)/sample_size)^2 / (sample_size - 1))
       t_test_p_values[i,j] <- pt(diff_mean/std_error, df = dof, lower.tail = FALSE)
-      #assuming bounds are [0%,20%], as in mineral soils
-      LMT_rejections[i,j] <- two_sample_LMT_test(sample_1 = sample_1/20, sample_2 = sample_2/20, B = 300, alpha = .1, method = "fisher")
+      gaffke_rejections[i,j] <- two_sample_gaffke_test(sample_1 = sample_1, sample_2 = sample_2, B = 200, alpha = .1, method = "fisher")
+      mart_p_values[i,j] <- two_sample_martingale(sample_1 = sample_1, sample_2 = sample_2, bounds = c(0,1), d = 5, alt_mean = shift[j])
       if(land_use == "rangeland"){
         strata <- topsoil_rangeland$transect
         N_strata <- as.numeric(table(topsoil_rangeland$transect))
@@ -270,7 +344,7 @@ run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "sh
         pop_1_frame <- data.frame(TC = x, strata = strata)
         #n_strata_opt <- round_strata_sizes(sample_size * strata_weights_opt)
         n_strata_prop <- round_strata_sizes(sample_size * strata_weights_prop)
-        stratified_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
+    
         pop_2_frame <- data.frame(TC = pop_2, strata = strata)
         strat_sample_1 <- strata(data = pop_1_frame, stratanames = "strata", size = n_strata_prop, method = "srswr")
         strat_sample_2 <- strata(data = pop_2_frame, stratanames = "strata", size = n_strata_prop, method = "srswr")
@@ -284,20 +358,21 @@ run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "sh
   }
   t_test_power <- colMeans(t_test_p_values < .1)
   stratified_t_test_power <- colMeans(stratified_t_test_p_values < .1)
-  LMT_power <- colMeans(LMT_rejections)
-  cbind("t_test" = t_test_power, "LMT"= LMT_power, "stratified_t_test" = stratified_t_test_power, "effect_size" = effect_grid, "land_use" = land_use, "sample_size" = sample_size, upper_bound = bounds[2])
+  martingale_power <- colMeans(mart_p_values < .1)
+  gaffke_power <- colMeans(gaffke_rejections)
+  data.frame("t_test" = t_test_power, "gaffke"= gaffke_power, "stratified_t_test" = stratified_t_test_power, "effect_size" = effect_grid, "martingale" = martingale_power, "land_use" = land_use, "sample_size" = sample_size, upper_bound = bounds[2], effect = effect)
 }
 
 alternative_list <- c("shift", "scaling", "spike", "to_gaussian")
 
-power_simulations_cropland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 10, bounds = c(0,20))
-power_simulations_cropland_30 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 30, bounds = c(0,20))
-power_simulations_cropland_90 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 90, bounds = c(0,20))
-power_simulations_cropland_200 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 200, bounds = c(0,20))
-power_simulations_rangeland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 10, bounds = c(0,20))
-power_simulations_rangeland_30 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 30, bounds = c(0,20))
-power_simulations_rangeland_90 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 90, bounds = c(0,20))
-power_simulations_rangeland_200 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 200, bounds = c(0,20))
+power_simulations_cropland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 10, bounds = c(0,20), n_sims = 300)
+power_simulations_cropland_30 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 30, bounds = c(0,20), n_sims = 300)
+power_simulations_cropland_90 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 90, bounds = c(0,20), n_sims = 300)
+power_simulations_cropland_200 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 200, bounds = c(0,20), n_sims = 300)
+power_simulations_rangeland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 10, bounds = c(0,20), n_sims = 300)
+power_simulations_rangeland_30 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 30, bounds = c(0,20), n_sims = 300)
+power_simulations_rangeland_90 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 90, bounds = c(0,20), n_sims = 300)
+power_simulations_rangeland_200 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 200, bounds = c(0,20), n_sims = 300)
 power_simulations <- list(
   power_simulations_cropland_10,
   power_simulations_cropland_30,
@@ -308,4 +383,4 @@ power_simulations <- list(
   power_simulations_rangeland_90,
   power_simulations_rangeland_200
 )
-save(power_simulations, file = "power_simulations")
+save(power_simulations, file = "power_simulations_mart")
