@@ -1277,7 +1277,7 @@ two_sample_LMT_test <- function(sample_1, sample_2, alpha, B = 1000, method = "s
   #sequential: if TRUE, returns the entire vector of sequential P-values computed in the order sample_1 and sample_2 are input; if FALSE, returns the maximum P-value
 #output:
   #a scalar P-value for the weak null, or a vector of sequential P-values
-two_sample_martingale <- function(sample_1, sample_2, bounds, alt_mean = NULL, d = NULL, sequential = FALSE){
+two_sample_martingale <- function(sample_1, sample_2, bounds, alternative = NULL, d = NULL, sequential = FALSE){
   if(length(sample_1) != length(sample_2)){
     stop("Unbalanced sample sizes not yet supported.")
   }
@@ -1286,10 +1286,10 @@ two_sample_martingale <- function(sample_1, sample_2, bounds, alt_mean = NULL, d
   n <- length(Z)
   #the null is that the means of the lists are equal
   null_mean <- 1/2
-  if(is.null(alt_mean) | is.null(d)){
+  if(is.null(alternative) | is.null(d)){
     eta_j <- cummean(Z) 
   } else{
-    scaled_alt_mean <- (alt_mean + diff(bounds)) / (2 * diff(bounds))
+    scaled_alt_mean <- (alternative + diff(bounds)) / (2 * diff(bounds))
     eta_j <- pmin(pmax((d * scaled_alt_mean + cumsum(Z)) / (d + 1:n - 1), null_mean + ((scaled_alt_mean - null_mean) / 2) / sqrt(d + 1:n - 1)), 1)
   }
   terms <- c(1, (Z/null_mean) * (eta_j - null_mean)/(1 - null_mean) + (1 - eta_j)/(1 - null_mean))
