@@ -1,7 +1,6 @@
 library(tidyverse)
 library(data.table)
 library(gstat)
-library(BalancedSampling)
 #permuter can be downloaded from Github by following README: https://github.com/statlab/permuter
 library(permuter)
 library(kolmim)
@@ -814,7 +813,7 @@ kmart_p_value_sequence <- function(population, prior_alpha = 1, prior_beta = 1){
 #last: return the entire sequence of p-values or just the last p-value?
 #outputs: 
 #a finite-sample, sequentially valid p-value for the hypothesis that the mean(population) == m
-hedged_pvalue <- function(population, mu_0 = 1/2, theta = 0.5, log = FALSE, shuffle = TRUE, last = FALSE){
+hedged_pvalue <- function(population, mu_0 = 1/2, theta = 0.5, log = FALSE, shuffle = TRUE, last = FALSE, sequential = FALSE){
   if(shuffle){
     population <- shuffle(population)
   }
@@ -826,8 +825,14 @@ hedged_pvalue <- function(population, mu_0 = 1/2, theta = 0.5, log = FALSE, shuf
   v_n <- (population - lagged_mu_hat)^2
   lagged_sigma_hat <- lag(sqrt(cummean((population - mu_hat)^2)))
   lagged_sigma_hat[1:2] <- 1/4
-  lambda_sequence_plus <- pmin(sqrt(2 * log(2/alpha) / (log(1:N) * 1:N * lagged_sigma_hat)), .9 / mu_0)
-  lambda_sequence_minus <- pmin(sqrt(2 * log(2/alpha) / (log(1:N) * 1:N * lagged_sigma_hat)), .9 / (1-mu_0))
+  if(sequential){
+    lambda_sequence_plus <- pmin(sqrt(2 * log(2/alpha) / (log(1:N) * 1:N * lagged_sigma_hat)), .9 / mu_0)
+    lambda_sequence_minus <- pmin(sqrt(2 * log(2/alpha) / (log(1:N) * 1:N * lagged_sigma_hat)), .9 / (1-mu_0))
+  } else{
+    lambda_sequence_plus <- pmin(sqrt(2 * log(2/alpha) / (N * lagged_sigma_hat)), .9 / mu_0)
+    lambda_sequence_minus <- pmin(sqrt(2 * log(2/alpha) / (N * lagged_sigma_hat)), .9 / (1-mu_0))
+  }
+  
   #if theta==0 or theta==1 this is really a one-sided interval
   if(theta == 0){
     lambda_sequence_plus <- 0
@@ -839,17 +844,21 @@ hedged_pvalue <- function(population, mu_0 = 1/2, theta = 0.5, log = FALSE, shuf
     K_minus <- cumsum(log(1 - lambda_sequence_minus * (population - mu_0)))
     K_plusminus <- pmax(log(theta) + K_plus, log(1 - theta) + K_minus)
     p_value <- -K_plusminus
+    if(last){
+      min(0, p_value[length(p_value)])
+    } else{
+      pmin(0, p_value)
+    }
   } else{
     K_plus <- cumprod(1 + lambda_sequence_plus * (population - mu_0))
     K_minus <- cumprod(1 - lambda_sequence_minus * (population - mu_0))
     K_plusminus <- pmax(theta * K_plus, (1 - theta) * K_minus)
     p_value <- 1 / K_plusminus
-  }
-  
-  if(last){
-    min(1, p_value[length(p_value)])
-  } else{
-    pmin(1, p_value)
+    if(last){
+      min(1, p_value[length(p_value)])
+    } else{
+      pmin(1, p_value)
+    }
   }
 }
 
@@ -1031,6 +1040,9 @@ LMT_CI <- function(x, alpha = .05, B = 10000, side = "upper"){
 get_ecdf <- function(x){
   ecdf(x)(unique(sort(x)))
 }
+
+
+
 
 bootstrap_from_ecdf <- function(ecdf_matrix, size){
   x <- ecdf_matrix[,1]
@@ -1253,6 +1265,42 @@ two_sample_LMT_test <- function(sample_1, sample_2, alpha, B = 1000, method = "s
 }
 
 
+#computes a sequentially-valid P-value for the hypothesis that sample_1 and sample_2 are drawn from populations with the same mean (the weak null)
+#constructs a martingale from the two-samples 
+#it is a betting martingale with parameters inspired by the (one-sample) ALPHA martingale for RLAs
+#inputs:
+  #sample_1: iid samples from population 1 
+  #sample_2: iid samples from population 2, CURRENTLY must be same length as sample_1
+  #bounds: the (shared) known bounds on the populations from which sample_1 and sample_2 were drawn
+  #alt_mean: optional tuning parameter, the hypothesized true difference in population means; if correct, should increase power, does not effect validity.
+  #d: optional tuning parameter, expresses confidence that the alt_mean is true. If low in relation to length(sample_1), length(sample_2) the data quickly determine the value of the tuning parameter; if high, alt_mean will largely determine the value. 
+  #sequential: if TRUE, returns the entire vector of sequential P-values computed in the order sample_1 and sample_2 are input; if FALSE, returns the maximum P-value
+#output:
+  #a scalar P-value for the weak null, or a vector of sequential P-values
+two_sample_martingale <- function(sample_1, sample_2, bounds, alt_mean = NULL, d = NULL, sequential = FALSE){
+  if(length(sample_1) != length(sample_2)){
+    stop("Unbalanced sample sizes not yet supported.")
+  }
+  #assume bounds are equal for the two populations; this makes the difference an RV on [0,1]
+  Z <- (sample_2 - sample_1 + bounds[2]) / (2 * diff(bounds)) 
+  n <- length(Z)
+  #the null is that the means of the lists are equal
+  null_mean <- 1/2
+  if(is.null(alt_mean) | is.null(d)){
+    eta_j <- cummean(Z) 
+  } else{
+    scaled_alt_mean <- (alt_mean + diff(bounds)) / (2 * diff(bounds))
+    eta_j <- pmin(pmax((d * scaled_alt_mean + cumsum(Z)) / (d + 1:n - 1), null_mean + ((scaled_alt_mean - null_mean) / 2) / sqrt(d + 1:n - 1)), 1)
+  }
+  terms <- c(1, (Z/null_mean) * (eta_j - null_mean)/(1 - null_mean) + (1 - eta_j)/(1 - null_mean))
+  T_j <- cumprod(terms)
+  if(sequential){
+    pval <- 1 / T_j
+  } else{
+    pval <- 1 / max(T_j)
+  }
+  pval
+}
 
 #stratification helper function to make vector an integer vector with the sum preserved
 #input: 
