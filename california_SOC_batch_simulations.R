@@ -75,7 +75,7 @@ run_two_sample_t_test <- function(sample_size, pop_1, pop_2){
 }
 
 
-two_sample_martingale <- function(sample_1, sample_2, bounds, alt_mean = NULL, d = NULL, sequential = FALSE){
+two_sample_martingale <- function(sample_1, sample_2, bounds, alternative = NULL, d = NULL, sequential = FALSE){
   if(length(sample_1) != length(sample_2)){
     stop("Unbalanced sample sizes not yet supported.")
   }
@@ -84,10 +84,10 @@ two_sample_martingale <- function(sample_1, sample_2, bounds, alt_mean = NULL, d
   n <- length(Z)
   #the null is that the means of the lists are equal
   null_mean <- 1/2
-  if(is.null(alt_mean) | is.null(d)){
+  if(is.null(alternative) | is.null(d)){
     eta_j <- cummean(Z) 
   } else{
-    scaled_alt_mean <- (alt_mean + diff(bounds)) / (2 * diff(bounds))
+    scaled_alt_mean <- (alternative + diff(bounds)) / (2 * diff(bounds))
     eta_j <- pmin(pmax((d * scaled_alt_mean + cumsum(Z)) / (d + 1:n - 1), null_mean + ((scaled_alt_mean - null_mean) / 2) / sqrt(d + 1:n - 1)), 1)
   }
   terms <- c(1, (Z/null_mean) * (eta_j - null_mean)/(1 - null_mean) + (1 - eta_j)/(1 - null_mean))
@@ -331,7 +331,7 @@ run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "sh
       dof <- std_error^4 / ((var(sample_1)/sample_size)^2 / (sample_size - 1) + (var(sample_2)/sample_size)^2 / (sample_size - 1))
       t_test_p_values[i,j] <- pt(diff_mean/std_error, df = dof, lower.tail = FALSE)
       gaffke_rejections[i,j] <- two_sample_gaffke_test(sample_1 = sample_1, sample_2 = sample_2, B = 200, alpha = .1, method = "fisher")
-      mart_p_values[i,j] <- two_sample_martingale(sample_1 = sample_1, sample_2 = sample_2, bounds = c(0,1), d = 5, alt_mean = shift[j])
+      mart_p_values[i,j] <- two_sample_martingale(sample_1 = sample_1, sample_2 = sample_2, bounds = c(0,1), d = 5, alternative = shift[j])
       if(land_use == "rangeland"){
         strata <- topsoil_rangeland$transect
         N_strata <- as.numeric(table(topsoil_rangeland$transect))
@@ -365,22 +365,26 @@ run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "sh
 
 alternative_list <- c("shift", "scaling", "spike", "to_gaussian")
 
-power_simulations_cropland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 10, bounds = c(0,20), n_sims = 300)
+power_simulations_cropland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 10, bounds = c(0,20), n_sims = 10)
 power_simulations_cropland_30 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 30, bounds = c(0,20), n_sims = 300)
 power_simulations_cropland_90 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 90, bounds = c(0,20), n_sims = 300)
 power_simulations_cropland_200 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 200, bounds = c(0,20), n_sims = 300)
+power_simulations_cropland_1000 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 200, bounds = c(0,20), n_sims = 1000)
 power_simulations_rangeland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 10, bounds = c(0,20), n_sims = 300)
 power_simulations_rangeland_30 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 30, bounds = c(0,20), n_sims = 300)
 power_simulations_rangeland_90 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 90, bounds = c(0,20), n_sims = 300)
 power_simulations_rangeland_200 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 200, bounds = c(0,20), n_sims = 300)
+power_simulations_rangeland_1000 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 1000, bounds = c(0,20), n_sims = 300)
 power_simulations <- list(
   power_simulations_cropland_10,
   power_simulations_cropland_30,
   power_simulations_cropland_90,
   power_simulations_cropland_200,
+  power_simulations_cropland_1000
   power_simulations_rangeland_10,
   power_simulations_rangeland_30,
   power_simulations_rangeland_90,
-  power_simulations_rangeland_200
+  power_simulations_rangeland_200,
+  power_simulations_rangeland_1000
 )
 save(power_simulations, file = "power_simulations_mart")
