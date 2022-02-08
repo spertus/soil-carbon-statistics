@@ -380,7 +380,7 @@ power_simulations <- list(
   power_simulations_cropland_30,
   power_simulations_cropland_90,
   power_simulations_cropland_200,
-  power_simulations_cropland_1000
+  power_simulations_cropland_1000,
   power_simulations_rangeland_10,
   power_simulations_rangeland_30,
   power_simulations_rangeland_90,
