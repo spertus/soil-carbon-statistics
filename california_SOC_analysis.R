@@ -216,7 +216,7 @@ ggplot(cropland_BD %>% filter(site == "CROP7"), aes(bd)) +
   scale_x_continuous(breaks = c(0.8, 1.0, 1.2, 1.4, 1.6, 1.8)) +
   scale_y_continuous(breaks = c(0,2,4,6), limits = c(0,6)) +
   theme_bw() +
-  theme(text = element_text(size = 20), panel.grid.minor = element_blank())
+  theme(text = element_text(size = 20), panel.grid.minor = element_blank(), axis.text.x = 16)
 
 
 #all cropland bulk density
@@ -376,8 +376,8 @@ assay_field_proportions <- combined_master %>%
   mutate(variance_prop_nocompositing = assay_contribution / (sd_TC^2 + assay_contribution)) %>%
   mutate(variance_prop_fullcompositing =  sample_size * assay_contribution / (sd_TC^2 + sample_size * assay_contribution)) %>%
   pivot_longer(cols = c(variance_prop_nocompositing, variance_prop_fullcompositing), names_to = "compositing", names_prefix = "variance_prop_", values_to = "assay_proportion") %>%
-  mutate(compositing = ifelse(compositing == "nocompositing", "No Compositing", "Full Compositing")) %>%
-  mutate(compositing = factor(compositing, levels = c("No Compositing", "Full Compositing"))) %>%
+  mutate(compositing = ifelse(compositing == "nocompositing", "No compositing", "Full compositing")) %>%
+  mutate(compositing = factor(compositing, levels = c("No compositing", "Full compositing"))) %>%
   mutate(field_proportion = 1 - assay_proportion) %>%
   pivot_longer(cols = c(assay_proportion,field_proportion), names_to = "source", values_to = "proportion") %>%
   mutate(source = ifelse(source == "assay_proportion", "Analytical Variability", "Spatial Heterogeneity")) %>%
@@ -391,7 +391,7 @@ ggplot(assay_field_proportions, aes(x = depth_long, fill = source, y = proportio
   ylim(0,1) +
   guides(fill = guide_legend(title = "Source of Variance")) +
   scale_fill_manual(values = c("darkorange3","steelblue")) +
-  ylab("Approximate Proportion of Estimation Variance") +
+  ylab("Approximate Proportion of Variance") +
   xlab("Depth") +
   theme(text = element_text(size = 20), axis.text.x = element_text(angle = -45, vjust = 0.5, hjust=0))
 
@@ -552,7 +552,7 @@ variog_By <- plot_variogram(rangeland_depth = "a", rangeland_transect = "By", pl
 
 
 #sample size
-sample_size <- 100
+sample_size <- 90
 #max budget, i.e. the budget to sample and measure sample_size samples, with no compositing
 max_budget <- 20 * sample_size + 13.6 * sample_size
 #sample size if we measure once and devote the rest of the budget to sampling
@@ -564,11 +564,6 @@ sigma_delta_costech <- median_sigma_delta %>%
 sigma_delta_solitoc <- median_sigma_delta %>% 
   filter(machine == "solitoc") %>%
   pull(sigma_delta)
-
-
-
-
-
 
 #precision of the sample mean 
 precision_combined <- combined_master %>%
@@ -683,46 +678,28 @@ ggplot(power_change_topsoil, aes(x = 100*relative_delta, y = power, color = Comp
 
 
 
-########### two-sample inference  #########
-#an example where the t-test fails to give valid inference under the null (the mean does not change)
-N <- 1000
-#means are exactly 3 in both populations. Population 1 is highly skewed so that high values (which make means equal) are rarely sampled
-pop_1 <- c(rnorm(N-10, mean = 3, sd = .05), rep(20, 10))
-pop_1 <- pop_1 - mean(pop_1) + 3
-pop_2 <- rep(3, N) + rnorm(N, sd = .05)
-pop_2 <- pop_2 - mean(pop_2) + 3
-
-par(mfrow = c(1,2))
-hist(pop_1, breaks = 50, xlim = c(1,20), xlab = "%TC at time 1", freq = FALSE, main = "", cex.axis = 1.5, cex.lab = 1.5)
-hist(pop_2, breaks = 50, xlim = c(1,20), xlab = "%TC at time 2", freq = FALSE, main = "", cex.axis = 1.5, cex.lab = 1.5)
-par(mfrow = c(1,1))
-
-#simulations are actually run in the script california_SOC_batch_simulations.R
-par(mar = c(5.1,4.3, 4.3, 2.1))
-plot(y = t_test_rejection_rate, x = n_grid, type ='l', ylim = c(0,1), xlab = "Sample size", ylab = "Simulated significance level", col = 'darkorange3', lwd = 4, cex.axis = 1.8, cex.lab = 1.8)
-points(y = LMT_rejection_rate, x = n_grid, type = 'l', col = 'steelblue', lwd = 4)
-#points(y = hedged_rejection_rate, x = n_grid, type = 'l', col = 'darkorange3', lwd = 2, lty = "dashed")
-legend(x = 100, y = 0.8, legend = c("Nonparametric test","t-test"), lty = c( "solid","solid"), col = c("steelblue","darkorange3"), lwd = 4, bty = "n", cex = 1.5)
-abline(a = 0.05, b = 0, lty = 'dashed', col = 'black', lwd = 2)
-par(mar = c(5.1,4.1, 4.1, 2.1))
+########### plot simulations #########
 
 
-#plot simulations
+#plot validity simulations
 load("validity_simulations")
 validity_frame <- validity_simulations %>%
   reduce(bind_rows) %>%
   pivot_longer(cols = c("t_test_rejections", "LMT_rejections"), names_to = "test", values_to = "rejection_rate") %>%
-  mutate(test = recode(test, "t_test_rejections" ="t-test", "LMT_rejections" = "Nonparametric test")) %>%
-  mutate(population = recode(population,  "rangeland_to_cropland" = "R to C", "hotspots_to_deadspots" = "R to -C", "skewed" = "Major hotspot", "symmetric_reduced_spread" = "Gaussian unequal variance")) %>%
+  filter(population %in% c("gaussian_gaussian", "cropland_to_gaussian", "rangeland_to_negrangeland", "skewed")) %>%
+  mutate(test = recode(test, "t_test_rejections" = "t-test", "LMT_rejections" = "Nonparametric test")) %>%
+ mutate(population = recode(population,  "gaussian_gaussian" = "Unchanged normal distribution", "cropland_to_gaussian" = "Tilled cropland", "rangeland_to_negrangeland" = "Change in skew",  "skewed" = "Extreme hotspot")) %>%
+  mutate(population = factor(population, levels = c("Unchanged normal distribution", "Tilled cropland", "Change in skew", "Extreme hotspot"))) %>%
   group_by(population, test) %>%
   mutate(running_rejection_rate = cummin(rejection_rate)) %>%
-  ungroup()
+  ungroup() %>%
+  rename(Test = test)
 
-ggplot(validity_frame, aes(x = sample_size, y = running_rejection_rate, color = test, linetype = test)) +
+ggplot(validity_frame, aes(x = sample_size, y = rejection_rate, color = Test, linetype = Test)) +
   geom_line(size = 1.2) +
   geom_hline(yintercept = .05, linetype = "solid") +
   facet_wrap(~population) +
-  coord_cartesian(xlim = c(5,100), ylim = c(0,.5)) +
+  coord_cartesian(xlim = c(5,150), ylim = c(0,.5)) +
   theme_bw() +
   scale_color_manual(values = c("darkorange3", "forestgreen")) +
   ylab("Simulated significance level") +
@@ -730,126 +707,30 @@ ggplot(validity_frame, aes(x = sample_size, y = running_rejection_rate, color = 
   theme(text = element_text(size = 20), axis.text.x = element_text(size = 16))
 
 
-
-# power of t-test (unstratified and stratified) or nonparametric (unstratified) to detect topsoil change 
-# run tests on topsoil from rangeland and cropland
-topsoil_rangeland <- rangeland_master %>% 
-  filter(depth == "a") %>%
-  filter(!is.na(TC)) %>%
-  arrange(transect) %>%
-  select(transect, TC)
-#cropland site 5 has the second most samples (20) and the lowest heterogeneity
-topsoil_cropland <- cropland_master %>% 
-  filter(depth == "a") %>%
-  filter(site == "CROP5") %>%
-  filter(!is.na(TC)) 
-
-topsoil_TC_rangeland <- topsoil_rangeland %>% pull(TC)
-topsoil_TC_cropland <- topsoil_cropland %>% pull(TC)
-
-# set up stratification parameters
-strata <- topsoil_rangeland$transect
-N_strata <- as.numeric(table(topsoil_rangeland$transect))
-strata_weights_prop <- N_strata / length(strata)
-sigma_strata <- tapply(topsoil_TC_rangeland, strata, sd)
-strata_weights_opt <- N_strata * sigma_strata / sum(N_strata * sigma_strata) 
-
-effect_grid = seq(0,0.8,by=.025)
-run_twosample_sims <- function(x, sample_size, n_sims = 300, stratified = FALSE){
-  mu <- mean(x)
-  n_x <- length(x)
-  shift <- effect_grid * mu
-  #scaling <- 1+effect_grid
-  #spike <- cbind(matrix(0, ncol = floor(n_x * .8), nrow = length(shift)), 5*matrix(rep(shift, each = ceiling(n_x * .2)), ncol = ceiling(n_x * .2), byrow = TRUE))
-  if(stratified){
-    #dataframe format needed to work with sampling package
-    K <- length(unique(strata))
-    pop_1 <- data.frame(TC = x, strata = strata)
-    #n_strata_opt <- round_strata_sizes(sample_size * strata_weights_opt)
-    n_strata_prop <- round_strata_sizes(sample_size * strata_weights_prop)
-    stratified_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  }
-  normal_p_values <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  LMT_rejections <- matrix(NA, nrow = n_sims, ncol = length(shift))
-  
-  for(i in 1:n_sims){
-    for(j in 1:length(shift)){
-      sample_1 <- sample(x, size = sample_size, replace = TRUE)
-      sample_2 <- sample(x + shift[j], size = sample_size, replace = TRUE)
-      diff_mean <- mean(sample_2) - mean(sample_1)
-      std_error <- sqrt(var(sample_1)/sample_size + var(sample_2)/sample_size)
-      #this is for Welch's t-test
-      dof <- std_error^4 / ((var(sample_1)/sample_size)^2 / (sample_size - 1) + (var(sample_2)/sample_size)^2 / (sample_size - 1))
-      normal_p_values[i,j] <- pt(diff_mean/std_error, df = dof, lower.tail = FALSE)
-      #assuming bounds are [0%,20%], as in mineral soils
-      LMT_rejections[i,j] <- two_sample_LMT_test(sample_1 = sample_1/20, sample_2 = sample_2/20, B = 300, alpha = .05, method = "fisher")
-      if(stratified){
-        pop_2 <- data.frame(TC = x + shift[j], strata = strata)
-        strat_sample_1 <- strata(data = pop_1, stratanames = "strata", size = n_strata_prop, method = "srswr")
-        strat_sample_2 <- strata(data = pop_2, stratanames = "strata", size = n_strata_prop, method = "srswr")
-        stratified_estimate_1 <- get_mean_se_stratified(sample = getdata(pop_1, strat_sample_1), N_strata = table(pop_1$strata))
-        stratified_estimate_2 <- get_mean_se_stratified(sample = getdata(pop_2, strat_sample_2), N_strata = table(pop_2$strata))
-        difference_estimate <- stratified_estimate_2[1] - stratified_estimate_1[1]
-        combined_se <- sqrt(stratified_estimate_1[2]^2 + stratified_estimate_2[2]^2)
-        stratified_p_values[i,j] <- 1 - pt(q = difference_estimate / combined_se, df = 2 * (sample_size - K))
-      }
-    }
-  }
-  normal_power_shift <- colMeans(normal_p_values < .05)
-  LMT_power_shift <- colMeans(LMT_rejections)
-  if(stratified){
-    stratified_power_shift <- colMeans(stratified_p_values < 0.05)
-    cbind("normal" = normal_power_shift, "stratified" = stratified_power_shift, "LMT"= LMT_power_shift)
-  } else {
-    cbind("normal" = normal_power_shift, "LMT"= LMT_power_shift)
-  }
-}
+# plot power simulations
+load("power_simulations")
+power_frame <- power_simulations %>%
+  reduce(bind_rows) %>%
+  pivot_longer(cols = c("t_test", "gaffke_bound10_alpha05","gaffke_bound10_alpha10", "gaffke_bound20_alpha05", "gaffke_bound20_alpha10", "stratified_t_test"), names_to = "test", values_to = "power") %>%
+  mutate(test = recode(test, "t_test" ="Unstratified t-test", "gaffke_bound10_alpha05" = "Nonparametric, 10% max TC, alpha = 5%", "gaffke_bound10_alpha10" =  "Nonparametric, 10% max TC, alpha = 10%", "gaffke_bound20_alpha05" =  "Nonparametric, 20% max TC, alpha = 5%", "gaffke_bound20_alpha10" = "Nonparametric, 20% max TC, alpha = 10%", "stratified_t_test" ="Stratified t-test")) %>%
+  mutate(land_use = recode(land_use, "cropland" ="Cropland", "rangeland" = "Rangeland")) %>%
+  mutate(sample_size = factor(paste(sample_size, "samples"), levels = c("10 samples", "30 samples", "90 samples", "200 samples"))) %>%
+  group_by(test, land_use, sample_size, effect) %>%
+  mutate(running_rejection_rate = cummax(power)) %>%
+  ungroup() %>% 
+  rename(Test = test)
 
 
-#since these take a while to run, I usually save them
-# power_10_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 10, stratified = TRUE)
-# power_30_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 30, stratified = TRUE)
-# power_90_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 90, stratified = TRUE)
-# power_200_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 200, stratified = TRUE)
-# power_500_rangeland <- run_twosample_sims(topsoil_TC_rangeland, sample_size = 500, stratified = TRUE)
-# power_10_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 10)
-# power_30_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 30)
-# power_90_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 90)
-# power_200_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 200)
-# power_500_cropland <- run_twosample_sims(topsoil_TC_cropland, sample_size = 500)
-# power_frame <- bind_rows(
-#   as.data.frame(power_10_rangeland) %>% mutate(sample_size = 10, relative_effect_size = effect_grid, land_use = "Rangeland"),
-#   as.data.frame(power_30_rangeland) %>% mutate(sample_size = 30, relative_effect_size = effect_grid, land_use = "Rangeland"),
-#   as.data.frame(power_90_rangeland) %>% mutate(sample_size = 90, relative_effect_size = effect_grid, land_use = "Rangeland"),
-#   as.data.frame(power_200_rangeland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Rangeland"),
-#   as.data.frame(power_500_rangeland) %>% mutate(sample_size = 500, relative_effect_size = effect_grid, land_use = "Rangeland"),
-#   as.data.frame(power_10_cropland) %>% mutate(sample_size = 10, relative_effect_size = effect_grid, land_use = "Cropland"),
-#   as.data.frame(power_30_cropland) %>% mutate(sample_size = 30, relative_effect_size = effect_grid, land_use = "Cropland"),
-#   as.data.frame(power_90_cropland) %>% mutate(sample_size = 90, relative_effect_size = effect_grid, land_use = "Cropland"),
-#   as.data.frame(power_200_cropland) %>% mutate(sample_size = 200, relative_effect_size = effect_grid, land_use = "Cropland"),
-#   as.data.frame(power_500_cropland) %>% mutate(sample_size = 500, relative_effect_size = effect_grid, land_use = "Cropland")
-#   ) %>%
-#   rename("t test" = normal, "Nonparametric test" = LMT, "Stratified t test" = stratified) %>%
-#   pivot_longer(cols = c("t test", "Nonparametric test", "Stratified t test"), names_to = "Test", values_to = "Power")
-#save(power_frame, file = "power_frame_nonparametric_fisher_spike")
-load("power_frame_nonparametric_fisher")
-
-power_frame <- power_frame %>%
-  mutate(sample_size_long = paste(sample_size, "Samples")) %>%
-  mutate(sample_size_long = factor(sample_size_long, levels = paste(c(10, 30, 90, 200, 500), "Samples")))
-
-
-ggplot(power_frame %>% filter(sample_size != 500), aes(x = relative_effect_size, y = Power, color = Test, linetype = Test)) +
+ggplot(power_frame %>% filter(effect == "shift"), aes(x = effect_size, y = power, color = Test)) +
   geom_line(size = 1.5) +
-  facet_grid(sample_size_long ~ land_use) +
+  facet_grid(sample_size ~ land_use) +
   theme_bw() +
-  scale_color_manual(values = c("darkorange3","steelblue","forestgreen")) +
+  scale_color_manual(values = c("darkorange3", "firebrick", "steelblue", "forestgreen", "gray40", "gray60")) +
   scale_y_continuous(labels = scales::percent) +
   scale_x_continuous(labels = scales::percent) +
   xlab("Relative effect size (additional percent TC%)") +
   coord_cartesian(xlim = c(0,.6)) +
   theme(text = element_text(size = 20))
-
 
 
 
