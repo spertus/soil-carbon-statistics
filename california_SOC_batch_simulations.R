@@ -114,7 +114,9 @@ two_sample_martingale <- function(sample_1, sample_2, bounds, alternative = NULL
 #Fisher: compute a combined p-value using Fisher's combining function of whether both means are equal to a particular mu_0, then maximize this over possible values of mu_0
 #Liptak: compute a combined p-value using Liptak's combining function
 #pval: a boolean, if TRUE return a pvalue (only works for Fisher or Liptak), if FALSE return a boolean indicating rejection at level alpha 
-two_sample_gaffke_test <- function(sample_1, sample_2, alpha, B = 1000, method = "sidak", pval = FALSE){
+two_sample_gaffke_test <- function(sample_1, sample_2, alpha, B = 1000, method = "sidak", bounds = c(0,1), pval = FALSE){
+  sample_1 <- (sample_1 - bounds[1]) / diff(bounds)
+  sample_2 <- (sample_2 - bounds[1]) / diff(bounds)
   if(method == "sidak"){
     upper_1 <- gaffke_CI(x = sample_1, alpha = 1-sqrt(1-alpha), B = B, side = "upper")
     lower_2 <- gaffke_CI(x = sample_2, alpha = 1-sqrt(1-alpha), B = B, side = "lower")
@@ -287,11 +289,11 @@ run_validity_simulations <- function(type, n_sims = 500){
 
 
 ###### POWER SIMULATIONS ######
-run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "shift", bounds = c(0,20)){
+run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "shift"){
   if(land_use == "cropland"){
-    x <- (topsoil_TC_cropland - bounds[1]) / diff(bounds)
+    x <- topsoil_TC_cropland
   } else if(land_use == "rangeland"){
-    x <- (topsoil_TC_rangeland - bounds[1]) / diff(bounds)
+    x <- topsoil_TC_rangeland
   } else{
     stop("input valid land_use")
   }
@@ -304,8 +306,8 @@ run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "sh
   
   t_test_p_values <- matrix(NA, nrow = n_sims, ncol = length(effect_grid))
   stratified_t_test_p_values <- matrix(NA, nrow = n_sims, ncol = length(effect_grid))
-  gaffke_rejections <- matrix(NA, nrow = n_sims, ncol = length(effect_grid))
-  mart_p_values <- matrix(NA, nrow = n_sims, ncol = length(effect_grid))
+  gaffke_rejections_10 <- matrix(NA, nrow = n_sims, ncol = length(effect_grid))
+  gaffke_rejections_20 <- matrix(NA, nrow = n_sims, ncol = length(effect_grid))
   
   
   for(i in 1:n_sims){
@@ -330,8 +332,9 @@ run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "sh
       #this is for Welch's t-test
       dof <- std_error^4 / ((var(sample_1)/sample_size)^2 / (sample_size - 1) + (var(sample_2)/sample_size)^2 / (sample_size - 1))
       t_test_p_values[i,j] <- pt(diff_mean/std_error, df = dof, lower.tail = FALSE)
-      gaffke_rejections[i,j] <- two_sample_gaffke_test(sample_1 = sample_1, sample_2 = sample_2, B = 200, alpha = .1, method = "fisher")
-      mart_p_values[i,j] <- two_sample_martingale(sample_1 = sample_1, sample_2 = sample_2, bounds = c(0,1), d = 5, alternative = shift[j])
+      gaffke_rejections_10[i,j] <- two_sample_gaffke_test(sample_1 = sample_1, sample_2 = sample_2, B = 200, bounds = c(0,10), pval = TRUE, method = "fisher")
+      gaffke_rejections_20[i,j] <- two_sample_gaffke_test(sample_1 = sample_1, sample_2 = sample_2, B = 200, bounds = c(0,20), pval = TRUE, method = "fisher")
+      #mart_p_values[i,j] <- two_sample_martingale(sample_1 = sample_1, sample_2 = sample_2, bounds = bounds, d = 5, alternative = shift[j])
       if(land_use == "rangeland"){
         strata <- topsoil_rangeland$transect
         N_strata <- as.numeric(table(topsoil_rangeland$transect))
@@ -356,35 +359,35 @@ run_twosample_sims <- function(land_use, sample_size, n_sims = 300, effect = "sh
       }
     }
   }
-  t_test_power <- colMeans(t_test_p_values < .1)
-  stratified_t_test_power <- colMeans(stratified_t_test_p_values < .1)
-  martingale_power <- colMeans(mart_p_values < .1)
-  gaffke_power <- colMeans(gaffke_rejections)
-  data.frame("t_test" = t_test_power, "gaffke"= gaffke_power, "stratified_t_test" = stratified_t_test_power, "effect_size" = effect_grid, "martingale" = martingale_power, "land_use" = land_use, "sample_size" = sample_size, upper_bound = bounds[2], effect = effect)
+  t_test_power <- colMeans(t_test_p_values < .05)
+  stratified_t_test_power <- colMeans(stratified_t_test_p_values < .05)
+  #martingale_power <- colMeans(mart_p_values < .1)
+  gaffke_power_bound10_alpha05 <- colMeans(gaffke_rejections_10 < .05)
+  gaffke_power_bound10_alpha10 <- colMeans(gaffke_rejections_10 < .10)
+  gaffke_power_bound20_alpha05 <- colMeans(gaffke_rejections_20 < .05)
+  gaffke_power_bound20_alpha10 <- colMeans(gaffke_rejections_20 < .10)
+  data.frame("t_test" = t_test_power, "gaffke_bound10_alpha05"= gaffke_power_bound10_alpha05, "gaffke_bound10_alpha10" = gaffke_power_bound10_alpha10, "gaffke_bound20_alpha10" = gaffke_power_bound20_alpha10, "gaffke_bound20_alpha05" = gaffke_power_bound20_alpha05, "stratified_t_test" = stratified_t_test_power, "effect_size" = effect_grid, "land_use" = land_use, "sample_size" = sample_size, effect = effect)
 }
 
-alternative_list <- c("shift", "scaling", "spike", "to_gaussian")
+alternative_list <- c("shift", "scaling")
 
-power_simulations_cropland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 10, bounds = c(0,20), n_sims = 10)
-power_simulations_cropland_30 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 30, bounds = c(0,20), n_sims = 300)
-power_simulations_cropland_90 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 90, bounds = c(0,20), n_sims = 300)
-power_simulations_cropland_200 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 200, bounds = c(0,20), n_sims = 300)
-power_simulations_cropland_1000 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 200, bounds = c(0,20), n_sims = 1000)
-power_simulations_rangeland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 10, bounds = c(0,20), n_sims = 300)
-power_simulations_rangeland_30 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 30, bounds = c(0,20), n_sims = 300)
-power_simulations_rangeland_90 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 90, bounds = c(0,20), n_sims = 300)
-power_simulations_rangeland_200 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 200, bounds = c(0,20), n_sims = 300)
-power_simulations_rangeland_1000 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 1000, bounds = c(0,20), n_sims = 300)
+power_simulations_cropland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 10, n_sims = 500)
+power_simulations_cropland_30 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 30, n_sims = 500)
+power_simulations_cropland_90 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 90, n_sims = 500)
+power_simulations_cropland_200 <- lapply(alternative_list, run_twosample_sims, land_use = "cropland", sample_size = 200, n_sims = 500)
+power_simulations_rangeland_10 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 10, n_sims = 500)
+power_simulations_rangeland_30 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 30, n_sims = 500)
+power_simulations_rangeland_90 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 90, n_sims = 500)
+power_simulations_rangeland_200 <- lapply(alternative_list, run_twosample_sims, land_use = "rangeland", sample_size = 200, n_sims = 500)
+
 power_simulations <- list(
   power_simulations_cropland_10,
   power_simulations_cropland_30,
   power_simulations_cropland_90,
   power_simulations_cropland_200,
-  power_simulations_cropland_1000,
   power_simulations_rangeland_10,
   power_simulations_rangeland_30,
   power_simulations_rangeland_90,
-  power_simulations_rangeland_200,
-  power_simulations_rangeland_1000
+  power_simulations_rangeland_200
 )
-save(power_simulations, file = "power_simulations_mart")
+save(power_simulations, file = "power_simulations")
