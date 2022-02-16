@@ -1,6 +1,6 @@
 # soil-carbon-statistics
 
-This is a repository with code to run simulations and analyses to estimate soil organic carbon (SOC). 
+This is a repository with code to run simulations and analyses to measure soil organic carbon (SOC). Note that a skeletal R package containing functions to run the nonparametric tests we developed to test for soil carbon sequestration can be installed easily by running `devtools::install_github("spertus/nptests")`. 
 
 `functions.R` contains the key functions to simulate and estimate SOC and to compute optimal sampling and measurement designs given various parameters and costs. 
 
