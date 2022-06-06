@@ -3,7 +3,9 @@ library(readxl)
 #permuter is used for permutation tests. It can be installed from Github: https://github.com/statlab/permuter
 library(permuter)
 library(sampling)
-library(geoR)
+#geoR is no longer maintained on CRAN and is only used to create variograms, i.e., not required, but see lines 469-512
+#library(geoR)
+library(gridExtra) 
 
 source("functions.R")
 
@@ -34,7 +36,8 @@ rangeland_BD <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "R
 
 #data from various croplands around California
 cropland_master <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Cropland_All_Costech") %>%
-  mutate(depth_long = dplyr::recode(depth, a = "0-15 cm", b = "15-30 cm", c = "30-60 cm", d = "60-100 cm"))
+  mutate(depth_long = dplyr::recode(depth, a = "0-15 cm", b = "15-30 cm", c = "30-60 cm", d = "60-100 cm")) %>%
+  mutate(site_short = gsub("CROP", "", site))
 
 cropland_solitoc_reps <- read_excel("R_Heterogeneity_Master_PS_04282021.xlsx", sheet = "Cropland_Reps_soliTOC") %>%
   mutate(sample_number = as.numeric(sample_number)) %>%
@@ -66,9 +69,10 @@ combined_master <- rangeland_master %>%
 ###################### TOC concentration and BD in space ######################
 
 #stacked TC histograms for rangeland data
-ggplot(rangeland_master, aes(TC)) +
+rangeland_TC_histogram <- ggplot(rangeland_master, aes(TC)) +
   geom_histogram(binwidth = 0.25, alpha = 1) +
   facet_grid(depth_long ~ transect) +
+  scale_y_continuous(breaks = c(0, 10, 20)) +
   xlab("% Total Carbon (TC)") +
   ylab("Number of Samples") +
   #ylim(0,23) +
@@ -76,21 +80,9 @@ ggplot(rangeland_master, aes(TC)) +
   theme(text = element_text(size = 20))
 
 
-#violin plot for rangeland data
-ggplot(rangeland_master, aes(y = TC, x = transect, fill = transect, color = transect)) +
-  geom_violin() +
-  coord_flip() +
-  facet_grid(depth_long ~ .) +
-  scale_fill_manual(values = c("firebrick","forestgreen","darkorchid4","darkorange3","steelblue")) +
-  scale_color_manual(values = c("firebrick","forestgreen","darkorchid4","darkorange3", "steelblue")) +
-  xlab("Transect") +
-  ylab("% Total Carbon (TC)") +
-  theme_bw() +
-  theme(text = element_text(size = 20), legend.position = "none")
-
 
 #TOC histogram for rangeland
-ggplot(rangeland_master, aes(TOC)) +
+rangeland_TOC_histogram <- ggplot(rangeland_master, aes(TOC)) +
   geom_histogram(binwidth = 0.25) +
   facet_grid(depth_long ~ transect) +
   xlab("% Total Organic Carbon (TOC)") +
@@ -100,7 +92,7 @@ ggplot(rangeland_master, aes(TOC)) +
 
 
 #histograms for cropland data
-ggplot(cropland_master, aes(TC)) +
+cropland_TC_histogram <- ggplot(cropland_master, aes(TC)) +
   geom_histogram(binwidth = 0.25) +
   facet_grid(depth_long ~ site) +
   xlab("% Total Carbon (TC)") +
@@ -110,20 +102,7 @@ ggplot(cropland_master, aes(TC)) +
   #ylim(0,23) +
   theme(text = element_text(size = 20))
 
-#violin plot for cropland data
-ggplot(cropland_master, aes(y = TC, x = site, fill = site, color = site)) +
-  geom_violin() +
-  coord_flip() +
-  facet_grid(depth ~ .) +
-  scale_fill_manual(values = c("hotpink","gold3","firebrick","forestgreen","darkorchid4","darkorange3","steelblue")) +
-  scale_color_manual(values = c("hotpink","gold3","firebrick","forestgreen","darkorchid4","darkorange3", "steelblue")) +
-  xlab("Transect") +
-  ylab("% Total Carbon (TC)") +
-  theme_bw() +
-  theme(text = element_text(size = 20), legend.position = "none")
-
-
-
+grid.arrange(cropland_TC_histogram, rangeland_TC_histogram, nrow=2)
 
 #summary tables
 rangeland_summary <- rangeland_master %>% 
@@ -195,7 +174,7 @@ cropland_depth_ANOVA <- t2p(
 
 #bulk densities
 #NOTE: histograms are not disaggregated by location, which drives variation
-ggplot(rangeland_BD, aes(bd)) +
+rangeland_BD_histogram <- ggplot(rangeland_BD, aes(bd)) +
   geom_histogram(binwidth = 0.05) +
   facet_grid(depth_long ~ .) +
   xlab("Bulk Density") +
@@ -207,7 +186,7 @@ ggplot(rangeland_BD, aes(bd)) +
   theme(text = element_text(size = 20), panel.grid.minor = element_blank())
 
 #cropland bulk density for site 7
-ggplot(cropland_BD %>% filter(site == "CROP7"), aes(bd)) +
+cropland_BD_histogram <- ggplot(cropland_BD %>% filter(site == "CROP7"), aes(bd)) +
   geom_histogram(binwidth = 0.05) +
   facet_grid(depth_long ~ .) +
   xlab("Bulk Density") +
@@ -216,19 +195,10 @@ ggplot(cropland_BD %>% filter(site == "CROP7"), aes(bd)) +
   scale_x_continuous(breaks = c(0.8, 1.0, 1.2, 1.4, 1.6, 1.8)) +
   scale_y_continuous(breaks = c(0,2,4,6), limits = c(0,6)) +
   theme_bw() +
-  theme(text = element_text(size = 20), panel.grid.minor = element_blank(), axis.text.x = 16)
+  theme(text = element_text(size = 20), panel.grid.minor = element_blank())
 
+grid.arrange(cropland_BD_histogram, rangeland_BD_histogram, ncol=2)
 
-#all cropland bulk density
-ggplot(cropland_BD, aes(bd)) +
-  geom_histogram(binwidth = 0.05) +
-  facet_grid(depth ~ .) +
-  xlab("Bulk Density") +
-  ylab("Number of Samples") +
-  scale_x_continuous(breaks = c(0.8, 1.2, 1.6, 2.0, 2.4), limits = c(0.8,2.4)) +
-  scale_y_continuous(breaks = c(0,2,4,6,8,10), limits = c(0,10)) +
-  theme_bw() +
-  theme(text = element_text(size = 20))
 
 rangeland_summary_bd <- rangeland_BD %>%
   group_by(depth) %>%
@@ -498,48 +468,48 @@ standards_histogram <- ggplot(standards_comparison, aes(TC, fill = machine)) +
 
 ############# spatial correlation of TC concentrations on rangeland ##########
 #first just do for a single transect
-T_topsoil_TC <- rangeland_master %>% 
-  filter(transect == "T", depth == "a") %>%
-  arrange(sample_number) %>%
-  pull(TC)
-
-#dataframe for use with geodata
-T_topsoil_geodata <- as.geodata(data.frame(x = 1:length(T_topsoil_TC), y = 1, TC = T_topsoil_TC), coords.col = 1:2, data.col = 3)
-T_topsoil_variogram <- variog(T_topsoil_geodata, option = "bin")
-plot(T_topsoil_variogram)
-
-#function to plot a variogram for any depth and transect
-#inputs:
-  #rangeland_depth: a string denoting the depth, either "a", "b", "c", "d", or "e"
-  #rangeland_transect: a string denoting the transect, eitehr "T", "Mx", "My", "Bx", or "By"
-#output:
-  #a plot of the empirical variogram generated by binning variances between points at a range of distances
-plot_variogram <- function(rangeland_depth = "a", rangeland_transect = "T", plot = TRUE){
-  if(!(rangeland_depth %in% c("a","b","c","d","e")) | !all(rangeland_transect %in% c("T","Mx","My","Bx","By"))){
-    stop("Depth or transect is invalid! See comments.")
-  }
-  TC <- rangeland_master %>% 
-    filter(transect == rangeland_transect, depth == rangeland_depth) %>%
-    arrange(sample_number) %>%
-    pull(TC)
-  
-  #dataframe for use with geodata
-  geodataframe <- as.geodata(data.frame(x = 3 * 1:length(TC), y = 1, TC = TC), coords.col = 1:2, data.col = 3)
-  variogram <- variog(geodataframe, option = "bin")
-  if(plot){
-    plot(variogram, xlab = "Distance (meters)", ylab = "Semivariance", main = paste("Variogram for transect", rangeland_transect, "and depth", rangeland_depth))
-  } else{
-    variogram
-  }
-}
-
-
-
-variog_T <- plot_variogram(rangeland_depth = "a", rangeland_transect = "T", plot = TRUE)
-variog_Mx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Mx", plot = TRUE)
-variog_My <- plot_variogram(rangeland_depth = "a", rangeland_transect = "My", plot = TRUE)
-variog_Bx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Bx", plot = TRUE)
-variog_By <- plot_variogram(rangeland_depth = "a", rangeland_transect = "By", plot = TRUE)
+# T_topsoil_TC <- rangeland_master %>% 
+#   filter(transect == "T", depth == "a") %>%
+#   arrange(sample_number) %>%
+#   pull(TC)
+# 
+# #dataframe for use with geodata
+# T_topsoil_geodata <- as.geodata(data.frame(x = 1:length(T_topsoil_TC), y = 1, TC = T_topsoil_TC), coords.col = 1:2, data.col = 3)
+# T_topsoil_variogram <- variog(T_topsoil_geodata, option = "bin")
+# plot(T_topsoil_variogram)
+# 
+# #function to plot a variogram for any depth and transect
+# #inputs:
+#   #rangeland_depth: a string denoting the depth, either "a", "b", "c", "d", or "e"
+#   #rangeland_transect: a string denoting the transect, eitehr "T", "Mx", "My", "Bx", or "By"
+# #output:
+#   #a plot of the empirical variogram generated by binning variances between points at a range of distances
+# plot_variogram <- function(rangeland_depth = "a", rangeland_transect = "T", plot = TRUE){
+#   if(!(rangeland_depth %in% c("a","b","c","d","e")) | !all(rangeland_transect %in% c("T","Mx","My","Bx","By"))){
+#     stop("Depth or transect is invalid! See comments.")
+#   }
+#   TC <- rangeland_master %>% 
+#     filter(transect == rangeland_transect, depth == rangeland_depth) %>%
+#     arrange(sample_number) %>%
+#     pull(TC)
+#   
+#   #dataframe for use with geodata
+#   geodataframe <- as.geodata(data.frame(x = 3 * 1:length(TC), y = 1, TC = TC), coords.col = 1:2, data.col = 3)
+#   variogram <- variog(geodataframe, option = "bin")
+#   if(plot){
+#     plot(variogram, xlab = "Distance (meters)", ylab = "Semivariance", main = paste("Variogram for transect", rangeland_transect, "and depth", rangeland_depth))
+#   } else{
+#     variogram
+#   }
+# }
+# 
+# 
+# 
+# variog_T <- plot_variogram(rangeland_depth = "a", rangeland_transect = "T", plot = TRUE)
+# variog_Mx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Mx", plot = TRUE)
+# variog_My <- plot_variogram(rangeland_depth = "a", rangeland_transect = "My", plot = TRUE)
+# variog_Bx <- plot_variogram(rangeland_depth = "a", rangeland_transect = "Bx", plot = TRUE)
+# variog_By <- plot_variogram(rangeland_depth = "a", rangeland_transect = "By", plot = TRUE)
 
 
 
@@ -675,6 +645,19 @@ ggplot(power_change_topsoil, aes(x = 100*relative_delta, y = power, color = Comp
   theme_bw() +
   theme(text = element_text(size = 20), axis.text.x = element_text(size = 16))
 
+#power plot for SoliTOC without compositing, land use as colors
+ggplot(power_change_topsoil %>% filter(Compositing == "None", Machine == "SoliTOC"), aes(x = 100*relative_delta, y = power, color = land_use)) +
+  geom_line(size = 1.5) +
+  xlab("Relative TC% Change") +
+  ylab("Power of t-test with 90 samples from each time") +
+  scale_y_continuous(labels = scales::percent, limits = c(0,1), breaks = c(0,.25,.5,.75,1)) +
+  scale_x_continuous(labels = function(x) paste0(x,"%")) +
+  scale_color_manual(values = c("firebrick","forestgreen","steelblue")) +
+  coord_cartesian(xlim = c(0,40)) +
+  theme_bw() +
+  theme(text = element_text(size = 20), axis.text.x = element_text(size = 16)) +
+  labs(color = "Land Use")
+
 
 
 
@@ -712,7 +695,7 @@ load("power_simulations")
 power_frame <- power_simulations %>%
   reduce(bind_rows) %>%
   pivot_longer(cols = c("t_test", "gaffke_bound10_alpha05","gaffke_bound10_alpha10", "gaffke_bound20_alpha05", "gaffke_bound20_alpha10", "stratified_t_test"), names_to = "test", values_to = "power") %>%
-  mutate(test = recode(test, "t_test" ="Unstratified t-test", "gaffke_bound10_alpha05" = "Nonparametric, 10% max TC, alpha = 5%", "gaffke_bound10_alpha10" =  "Nonparametric, 10% max TC, alpha = 10%", "gaffke_bound20_alpha05" =  "Nonparametric, 20% max TC, alpha = 5%", "gaffke_bound20_alpha10" = "Nonparametric, 20% max TC, alpha = 10%", "stratified_t_test" ="Stratified t-test")) %>%
+  mutate(test = recode(test, "t_test" ="Unstratified t-test", "gaffke_bound10_alpha05" = "NP, 0%-10% TC, alpha = 5%", "gaffke_bound10_alpha10" =  "NP, 0%-10% TC, alpha = 10%", "gaffke_bound20_alpha05" =  "NP, 0%-20% TC, alpha = 5%", "gaffke_bound20_alpha10" = "NP, 0%-20% TC, alpha = 10%", "stratified_t_test" ="Stratified t-test")) %>%
   mutate(land_use = recode(land_use, "cropland" ="Cropland", "rangeland" = "Rangeland")) %>%
   mutate(sample_size = factor(paste(sample_size, "samples"), levels = c("10 samples", "30 samples", "90 samples", "200 samples"))) %>%
   group_by(test, land_use, sample_size, effect) %>%
@@ -725,7 +708,9 @@ ggplot(power_frame %>% filter(effect == "shift"), aes(x = effect_size, y = power
   geom_line(size = 1.5) +
   facet_grid(sample_size ~ land_use) +
   theme_bw() +
-  scale_color_manual(values = c("darkorange3", "firebrick", "steelblue", "forestgreen", "gray40", "gray60")) +
+  scale_color_manual(
+    values = c("darkorange3", "firebrick", "steelblue", "forestgreen", "gray40", "gray60")) +
+    #labels = TeX(c("NP, 0%-10% TC, $\alpha$ = 10%", "NP, 0%-10% TC, $\alpha$ = 5%", "NP, 0%-20% TC, $\alpha$ = 10%", "NP, 0%-20% TC, $\alpha$ = 5%", "Stratified t-test", "Unstratified t-test"))) +
   scale_y_continuous(labels = scales::percent) +
   scale_x_continuous(labels = scales::percent) +
   xlab("Relative effect size (additional percent TC%)") +
