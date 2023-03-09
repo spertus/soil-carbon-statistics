@@ -62,7 +62,11 @@ $$\hat{\tau}(b) := \hat{\mu}_1(b) - \hat{\mu}_0(b).$$
 This is the _T-learner_ in the terminology of [Kunzel et al (2019)](https://arxiv.org/abs/1706.03461). 
 The base estimators $\hat{\mu}_1(b)$ and $\hat{\mu}_0(b)$ could be specified as stepwise (post-stratified) functions of $b$, a linear model in $b$ fit with ordinary least squares, a spline in $b$, a shape-constrained nonparametric estimator, K-nearest neighbors, etc. 
 
-It is not immediately obvious to me how to construct a confidence envelope for $\tau(b)$ that guarantees coverage uniformly in $b$. If we _fix_ a particular $b$, then we can probably use something like $\hat{\tau}(b) \pm z_{\alpha/2} \hat{SE}(\hat{\tau}(b))$ as an approximate confidence interval.
+We need a confidence band for $\tau(b)$ that guarantees coverage uniformly in $b$. If we have Bonferonni-adjusted level-$(1-\alpha/2)$ confidence intervals separately for $\mu_1(b)$ and $\mu_0(b)$, a lower bound on $\tau(b)$ is the lower bound on $\mu_1(b)$ minus the upper bound on $\mu_0(b)$; vice versa for an upper bound on $\tau(b)$. 
+
+### The strong null and tests with power against alternative of saturation.
+
+The strong null posits $\tau_i = 0$ for all $i$. More generally, $\tau_i = \delta$ for all $i$ implies that $\tau(b) = \bar{\tau}$, although the reverse is not true. Take the null hypothesis to be the composite null $H_0: \bigcup_{\delta \in \mathbb{R}} \tau_i = \delta$ and consider alternatives of the form $H_A: \tau_i = f(b_i)$ for some increasing $f$. [What are test statistics against this alternative? Split the data at some value $b$ and test for different means in each group; a linear regression; a shape constrained regression; is there something with power against all increasing $f$?]
 
 
 # Some examples
@@ -77,9 +81,10 @@ We specify $\hat{\mu}_z(b)$ as either OLS or as a nonparametric loess estimator 
 
 ```{r}
 n <- 100
+alpha <- 0.05
 Z <- rbinom(n, size = 1, prob = 0.5)
 B <- rnorm(n)
-
+b_grid <- seq(-3,3,by=.01)
 
 mu_1 <- function(x){exp(-x)}
 mu_0 <- function(x){0*x}
@@ -91,25 +96,35 @@ D <- Y - B
 #naive estimate
 naive_difference <- lm(D ~ B)
 #linear model estimates of CATE
-mu_hat_1_ols <- lm(Y ~ B, subset = Z == 1)
-mu_hat_0_ols <- lm(Y ~ B, subset = Z == 0)
+mu_hat_1_ols <- predict(lm(Y ~ B, subset = Z == 1), newdata = data.frame(B = b_grid), interval = "confidence", level = 1-alpha/2)
+mu_hat_0_ols <- predict(lm(Y ~ B, subset = Z == 0), newdata = data.frame(B = b_grid), interval = "confidence", level = 1-alpha/2)
 #nonparametric estimates via loess
 mu_hat_1_loess <- loess(Y ~ B, subset = Z == 1)
 mu_hat_0_loess <- loess(Y ~ B, subset = Z == 0)
 
-b_grid <- seq(-3,3,by=.01)
-naive_predictions <- predict(naive_difference, data.frame(B = b_grid))
+
 true_cate <- mu_1(b_grid) - mu_0(b_grid)
-tau_hat_ols <- predict(mu_hat_1_ols, data.frame(B = b_grid)) - predict(mu_hat_0_ols, data.frame(B = b_grid))
+naive_predictions <- predict(naive_difference, data.frame(B = b_grid), interval = "confidence", level = 1-alpha)
+tau_hat_ols <- cbind(
+  "estimate" = mu_hat_1_ols[,1] - mu_hat_0_ols[,1], 
+  "lower_bound" = mu_hat_1_ols[,2] - mu_hat_0_ols[,3],
+  "upper_bound" = mu_hat_1_ols[,3] - mu_hat_0_ols[,2])
 tau_hat_loess <- predict(mu_hat_1_loess, data.frame(B = b_grid)) - predict(mu_hat_0_loess, data.frame(B = b_grid))
 
 plot(y = Y, x = B, pch = 20, col = ifelse(Z == 1, 'steelblue', 'darkorange3'))
 #points(y = Y0, x = B, pch = 20, col = 'darkorange3')
 points(true_cate ~ b_grid, type = 'l', lwd = 3)
-points(naive_predictions ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'red')
-points(tau_hat_ols ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'green')
-points(tau_hat_loess ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'blue')
-legend(x = 0, y = max(Y), legend = c("True CATE", "Naive estimate", "OLS CATE estimate", "LOESS CATE estimate"), lty = c("solid", rep("dashed", 3)), col = c("black", "red", "green", "blue"))
+#naive predictions and confidence band
+points(naive_predictions[,1] ~ b_grid, type = 'l', lwd = 2, lty = 'solid', col = 'red')
+points(naive_predictions[,2] ~ b_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'red')
+points(naive_predictions[,3] ~ b_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'red')
+#ols predictions and confidence band
+points(tau_hat_ols[,1] ~ b_grid, type = 'l', lwd = 2, lty = 'solid', col = 'green')
+points(tau_hat_ols[,2] ~ b_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'green')
+points(tau_hat_ols[,3] ~ b_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'green')
+#loess predictions
+points(tau_hat_loess ~ b_grid, type = 'l', lwd = 2, lty = 'solid', col = 'blue')
+legend(x = 0, y = max(Y), legend = c("True CATE", "Naive estimate", "OLS CATE estimate", "LOESS CATE estimate"), lty = c("solid", rep("solid", 3)), col = c("black", "red", "green", "blue"))
 ```
 
 
@@ -118,6 +133,7 @@ Here is another example, where there is no saturation effect: $\tau(b) = 0$. The
 
 ```{r}
 n <- 100
+alpha <- 0.05
 Z <- rbinom(n, size = 1, prob = 0.5)
 B <- rnorm(n)
 
@@ -132,25 +148,35 @@ D <- Y - B
 #naive estimate
 naive_difference <- lm(D ~ B)
 #linear model estimates of CATE
-mu_hat_1_ols <- lm(Y ~ B, subset = Z == 1)
-mu_hat_0_ols <- lm(Y ~ B, subset = Z == 0)
+mu_hat_1_ols <- predict(lm(Y ~ B, subset = Z == 1), newdata = data.frame(B = b_grid), interval = "confidence", level = 1-alpha/2)
+mu_hat_0_ols <- predict(lm(Y ~ B, subset = Z == 0), newdata = data.frame(B = b_grid), interval = "confidence", level = 1-alpha/2)
 #nonparametric estimates via loess
 mu_hat_1_loess <- loess(Y ~ B, subset = Z == 1)
 mu_hat_0_loess <- loess(Y ~ B, subset = Z == 0)
 
 b_grid <- seq(-3,3,by=.01)
-naive_predictions <- predict(naive_difference, data.frame(B = b_grid))
 true_cate <- mu_1(b_grid) - mu_0(b_grid)
-tau_hat_ols <- predict(mu_hat_1_ols, data.frame(B = b_grid)) - predict(mu_hat_0_ols, data.frame(B = b_grid))
+naive_predictions <- predict(naive_difference, data.frame(B = b_grid), interval = "confidence", level = 1-alpha)
+tau_hat_ols <- cbind(
+  "estimate" = mu_hat_1_ols[,1] - mu_hat_0_ols[,1], 
+  "lower_bound" = mu_hat_1_ols[,2] - mu_hat_0_ols[,3],
+  "upper_bound" = mu_hat_1_ols[,3] - mu_hat_0_ols[,2])
 tau_hat_loess <- predict(mu_hat_1_loess, data.frame(B = b_grid)) - predict(mu_hat_0_loess, data.frame(B = b_grid))
 
 plot(y = Y, x = B, pch = 20, col = ifelse(Z == 1, 'steelblue', 'darkorange3'))
 #points(y = Y0, x = B, pch = 20, col = 'darkorange3')
 points(true_cate ~ b_grid, type = 'l', lwd = 3)
-points(naive_predictions ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'red')
-points(tau_hat_ols ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'green')
-points(tau_hat_loess ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'blue')
-legend(x = 0, y = max(Y), legend = c("True CATE", "Naive estimate", "OLS CATE estimate", "LOESS CATE estimate"), lty = c("solid", rep("dashed", 3)), col = c("black", "red", "green", "blue"))
+#naive predictions and confidence band
+points(naive_predictions[,1] ~ b_grid, type = 'l', lwd = 2, lty = 'solid', col = 'red')
+points(naive_predictions[,2] ~ b_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'red')
+points(naive_predictions[,3] ~ b_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'red')
+#ols predictions and confidence band
+points(tau_hat_ols[,1] ~ b_grid, type = 'l', lwd = 2, lty = 'solid', col = 'green')
+points(tau_hat_ols[,2] ~ b_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'green')
+points(tau_hat_ols[,3] ~ b_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'green')
+#loess predictions
+points(tau_hat_loess ~ b_grid, type = 'l', lwd = 2, lty = 'solid', col = 'blue')
+legend(x = 0, y = max(Y), legend = c("True CATE", "Naive estimate", "OLS CATE estimate", "LOESS CATE estimate"), lty = c("solid", rep("solid", 3)), col = c("black", "red", "green", "blue"))
 ```
 
 # Application to Nicolosso and Rice 2021
@@ -207,19 +233,25 @@ Alternatively, we can estimate the CATE using the "T-learner" method described a
 However, without an inference strategy it's not clear how to test whether the estimated functions differ ``significantly" from the constant $\tau(b) = \bar{\tau}$. 
 
 ```{r}
-mu_hat_1_ols <- lm(Y ~ B, data = nr_data, subset = Z == 1)
-mu_hat_0_ols <- lm(Y ~ B, data = nr_data, subset = Z == 0)
+b_grid <- seq(min(nr_data$B), max(nr_data$B), by = .1)
+
+mu_hat_1_ols <- predict(lm(Y ~ B, data = nr_data, subset = Z == 1), newdata = data.frame(B = b_grid), interval = "confidence", level = 1-alpha/2)
+mu_hat_0_ols <- predict(lm(Y ~ B, data = nr_data, subset = Z == 0), newdata = data.frame(B = b_grid), interval = "confidence", level = 1-alpha/2)
 mu_hat_1_loess <- loess(Y ~ B, data = nr_data, subset = Z == 1)
 mu_hat_0_loess <- loess(Y ~ B, data = nr_data, subset = Z == 0)
 
-b_grid <- seq(min(nr_data$B), max(nr_data$B), by = .1)
 
-tau_hat_ols <- predict(mu_hat_1_ols, data.frame(B = b_grid)) - predict(mu_hat_0_ols, data.frame(B = b_grid))
+tau_hat_ols <- cbind(
+  "estimate" = mu_hat_1_ols[,1] - mu_hat_0_ols[,1], 
+  "lower_bound" = mu_hat_1_ols[,2] - mu_hat_0_ols[,3],
+  "upper_bound" = mu_hat_1_ols[,3] - mu_hat_0_ols[,2])
 tau_hat_loess <- predict(mu_hat_1_loess, data.frame(B = b_grid)) - predict(mu_hat_0_loess, data.frame(B = b_grid))
 
 plot(nr_data$D ~ nr_data$B, pch = 20, col = ifelse(nr_data$Z == 1, 'steelblue', 'darkorange3'))
-points(tau_hat_ols ~ b_grid, type = 'l', col = 'red', lwd = 3, lty = 'dashed')
-points(tau_hat_loess ~ b_grid, type = 'l', col = 'blue', lwd = 3, lty = 'dashed')
+points(tau_hat_ols[,1] ~ b_grid, type = 'l', col = 'red', lwd = 3, lty = 'solid')
+points(tau_hat_ols[,2] ~ b_grid, type = 'l', col = 'red', lwd = 1, lty = 'dashed')
+points(tau_hat_ols[,3] ~ b_grid, type = 'l', col = 'red', lwd = 1, lty = 'dashed')
+points(tau_hat_loess ~ b_grid, type = 'l', col = 'blue', lwd = 3, lty = 'solid')
 ```
 
 # Simulation studies
