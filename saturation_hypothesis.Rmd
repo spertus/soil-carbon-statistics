@@ -1,0 +1,242 @@
+---
+title: "The SOC saturation hypothesis"
+author: "Jacob Spertus"
+date: "3/08/2023"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(maps)
+```
+
+# A statement of the saturation hypothesis and its pitfalls
+
+The _saturation hypothesis_ posits that changes in soil organic carbon (SOC) are _moderated_ by baseline SOC levels. 
+Suppose we draw $n$ plots from an infinite superpopulation. 
+$B_i$ is the baseline SOC in plot $i$, $Y_i$ is SOC at followup, and $D_i = Y_i - B_i$ is the change in SOC.
+[Slessarev et al (2022)](https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.16491) note that the common practice of regressing $D_i$ on $B_i$ can lead to apparent correlations that are mere artifacts of the estimation process. For example, when $(Y_{i}, B_{i}) \sim \mathcal{N}(\boldsymbol{0}_2,\mbox{diag}(1))$, there is clearly no association between baseline and followup SOC. However, naively regressing $D_i$ on $B_i$ will lead to specious evidence for the hypothesis:
+```{r}
+n <- 50
+Y <- rnorm(n)
+B <- rnorm(n)
+D <- Y - B
+plot(D ~ B, pch = 20)
+abline(lm(D ~ B), col = 'red')
+```
+
+# The saturation hypothesis in a causal setting
+
+The saturation hypothesis as stated above is, in fact, not clear enough. While temporality is involved in the model, causality is not. The more relevant statement of the saturation hypothesis is that a treatment (i.e., a management intervention or a natural process) will increase SOC less in high baseline SOC soils than in low baseline soils. 
+
+Suppose we are interested in a binary treatment.
+Plot $i$ has baseline SOC $i$, and _potential outcomes_ $Y_i(1)$ and $Y_i(0)$ indicating its followup SOC if on treatment or on control (respectively).
+Jointly, $(Y_i(1), Y_i(0)) \sim F$, where $F$ is the distribution of an infinite superpopulation. 
+The (unobservable) _treatment effect_ for plot $i$ is $\tau_i = Y_i(1) - Y_i(0)$. 
+The _population average treatment effect_: 
+$$\bar{\tau} := \mathbb{E}_F[\tau_i]$$
+is a common parameter of interest. 
+We denote the _conditional average treatment effect_ (CATE) as
+$$\tau(b) := \mathbb{E}_F[\tau_i \mid B_i = b].$$
+That is, $\tau(b)$ gives the expected treatment effect for a plot with baseline SOC $b$. 
+With these definitions in hand, the saturation hypothesis can be restated as positing that $\tau(b)$ is a decreasing function: if $b \geq b'$ then $\tau(b) \leq \tau(b')$.
+Conversely, and somewhat more generally, we might consider the null that baseline SOC is not a moderator. Under this null, $\tau(b)$ is constant and specifically $\tau(b) = \bar{\tau}$.
+We may decompose $\tau(b)$ as:
+$$\tau(b) = \mathbb{E}_F[Y_i(1) - Y_i(0) \mid B_i = b] = \mathbb{E}_F[Y_i(1) \mid B_i = b] - \mathbb{E}_F[ Y_i(0) \mid B_i = b] =: \mu_1(b) - \mu_0(b).$$
+So $\mu_1(b)$ is the conditional expectation under treatment for plots with baseline SOC $b$, and likewise $\mu_0(b)$ is the conditional expectation for control plots.
+
+
+### Data, estimation, and testing 
+
+Consider a binary treatment and let $Z_i \in \{0,1\}$ be an indicator of treatment status: 1 if plot $i$ receives treatment and 0 if it receives control. 
+When a plot enters the study, it receives treatment according to a coinflip so that $Z_i \sim \mbox{Bernoulli}(p_i)$, typically with $p_i = 0.5$ leading to a balanced experiment.
+The _observed outcome_ for plot $i$ is $Y_i := Y_i(Z_i)$, i.e., the potential outcome for the treatment it actually received.
+Overall, we observe $n$ IID triples $(Y_i, Z_i, B_i) {\sim} \mathcal{P}$.  
+
+An estimator $\hat{\tau}(b)$ of $\tau(b)$ can be obtained by separately estimating $\mu_1(b)$ and $\mu_0(b)$, and taking the difference of estimators:
+$$\hat{\tau}(b) := \hat{\mu}_1(b) - \hat{\mu}_0(b).$$
+This is the _T-learner_ in the terminology of [Kunzel et al (2019)](https://arxiv.org/abs/1706.03461). 
+The base estimators $\hat{\mu}_1(b)$ and $\hat{\mu}_0(b)$ could be specified as stepwise (post-stratified) functions of $b$, a linear model in $b$ fit with ordinary least squares, a spline in $b$, a shape-constrained nonparametric estimator, K-nearest neighbors, etc. 
+
+It is not immediately obvious to me how to construct a confidence envelope for $\tau(b)$ that guarantees coverage uniformly in $b$. If we _fix_ a particular $b$, then we can probably use something like $\hat{\tau}(b) \pm z_{\alpha/2} \hat{SE}(\hat{\tau}(b))$ as an approximate confidence interval.
+
+
+# Some examples
+
+As a first example we take an experiment with $n = 100$, $Z_i \sim \mbox{Bernoulli}(0.5)$, $B_i \sim \mathcal{N}(0,1)$, and
+\begin{align}
+Y_i(1) &= \exp(-B_i) + \varepsilon_i(1)\\
+Y_i(0) &= \varepsilon_i(0),
+\end{align}
+where $(\varepsilon_i(1), \varepsilon_i(0)) \sim \mathcal{N}_2(\boldsymbol{0}_2, {\mathbf 1}_{2\times2})$.
+We specify $\hat{\mu}_z(b)$ as either OLS or as a nonparametric loess estimator for $z \in \{0,1\}$. 
+
+```{r}
+n <- 100
+Z <- rbinom(n, size = 1, prob = 0.5)
+B <- rnorm(n)
+
+
+mu_1 <- function(x){exp(-x)}
+mu_0 <- function(x){0*x}
+Y1 <- mu_1(B) + rnorm(n)
+Y0 <- mu_0(B) + rnorm(n)
+Y <- Z*Y1 + (1-Z)*Y0
+D <- Y - B
+
+#naive estimate
+naive_difference <- lm(D ~ B)
+#linear model estimates of CATE
+mu_hat_1_ols <- lm(Y ~ B, subset = Z == 1)
+mu_hat_0_ols <- lm(Y ~ B, subset = Z == 0)
+#nonparametric estimates via loess
+mu_hat_1_loess <- loess(Y ~ B, subset = Z == 1)
+mu_hat_0_loess <- loess(Y ~ B, subset = Z == 0)
+
+b_grid <- seq(-3,3,by=.01)
+naive_predictions <- predict(naive_difference, data.frame(B = b_grid))
+true_cate <- mu_1(b_grid) - mu_0(b_grid)
+tau_hat_ols <- predict(mu_hat_1_ols, data.frame(B = b_grid)) - predict(mu_hat_0_ols, data.frame(B = b_grid))
+tau_hat_loess <- predict(mu_hat_1_loess, data.frame(B = b_grid)) - predict(mu_hat_0_loess, data.frame(B = b_grid))
+
+plot(y = Y, x = B, pch = 20, col = ifelse(Z == 1, 'steelblue', 'darkorange3'))
+#points(y = Y0, x = B, pch = 20, col = 'darkorange3')
+points(true_cate ~ b_grid, type = 'l', lwd = 3)
+points(naive_predictions ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'red')
+points(tau_hat_ols ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'green')
+points(tau_hat_loess ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'blue')
+legend(x = 0, y = max(Y), legend = c("True CATE", "Naive estimate", "OLS CATE estimate", "LOESS CATE estimate"), lty = c("solid", rep("dashed", 3)), col = c("black", "red", "green", "blue"))
+```
+
+
+Here is another example, where there is no saturation effect: $\tau(b) = 0$. The CATE estimates are approximately correct, while the naive estimate finds a saturation effect where none exists.
+
+
+```{r}
+n <- 100
+Z <- rbinom(n, size = 1, prob = 0.5)
+B <- rnorm(n)
+
+
+mu_1 <- function(x){0*x}
+mu_0 <- function(x){0*x}
+Y1 <- mu_1(B) + rnorm(n)
+Y0 <- mu_0(B) + rnorm(n)
+Y <- Z*Y1 + (1-Z)*Y0
+D <- Y - B
+
+#naive estimate
+naive_difference <- lm(D ~ B)
+#linear model estimates of CATE
+mu_hat_1_ols <- lm(Y ~ B, subset = Z == 1)
+mu_hat_0_ols <- lm(Y ~ B, subset = Z == 0)
+#nonparametric estimates via loess
+mu_hat_1_loess <- loess(Y ~ B, subset = Z == 1)
+mu_hat_0_loess <- loess(Y ~ B, subset = Z == 0)
+
+b_grid <- seq(-3,3,by=.01)
+naive_predictions <- predict(naive_difference, data.frame(B = b_grid))
+true_cate <- mu_1(b_grid) - mu_0(b_grid)
+tau_hat_ols <- predict(mu_hat_1_ols, data.frame(B = b_grid)) - predict(mu_hat_0_ols, data.frame(B = b_grid))
+tau_hat_loess <- predict(mu_hat_1_loess, data.frame(B = b_grid)) - predict(mu_hat_0_loess, data.frame(B = b_grid))
+
+plot(y = Y, x = B, pch = 20, col = ifelse(Z == 1, 'steelblue', 'darkorange3'))
+#points(y = Y0, x = B, pch = 20, col = 'darkorange3')
+points(true_cate ~ b_grid, type = 'l', lwd = 3)
+points(naive_predictions ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'red')
+points(tau_hat_ols ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'green')
+points(tau_hat_loess ~ b_grid, type = 'l', lwd = 2, lty = 'dashed', col = 'blue')
+legend(x = 0, y = max(Y), legend = c("True CATE", "Naive estimate", "OLS CATE estimate", "LOESS CATE estimate"), lty = c("solid", rep("dashed", 3)), col = c("black", "red", "green", "blue"))
+```
+
+# Application to Nicolosso and Rice 2021
+
+We apply the ideas above to evaluating the saturation hypothesis in a global dataset compiled by Nicolosso and Rice for their 2021 meta-analysis of no-till systems. 
+
+```{r, data}
+#Nicolo and Rice data
+#see: https://acsess.onlinelibrary.wiley.com/doi/full/10.1002/saj2.20260
+#paired_data <- read_excel("saj220260-sup-0002-suppmat_JVSedits.xlsx", sheet = "Paired")
+nr_data <- read_excel("saj220260-sup-0002-suppmat_JVSedits.xlsx", sheet = "Baseline")
+```
+
+
+For now we treat every row in the dataset as an independently replicated unit, although in reality there are important dimensions we are ignoring: depth of sample, location, study, and follow-up time, which should be accounted for in the analysis. 
+Furthermore, there is variability involved in measuring SOC at the plot level, which would contribute to overall uncertainty. 
+The authors provide standard deviations associated with measurements, though not, it seems, sample sizes. 
+For the time being we will ignore variability in the measurement stock, treating the $Y_i$s as fixed but for the ``random" treatment assignment.
+
+```{r data analysis}
+# note that we treat everything as independent replicates
+# we ignore (for now) depth, study, location, and followup year
+# we also ignore field / study level heterogeneity (which _is_ recorded in the data)
+nr_data <- nr_data %>%
+  mutate(Z = ifelse(tillage == "Tilled", 1, 0)) %>%
+  mutate(Y = followup_soc) %>%
+  mutate(B = baseline_soc) %>%
+  mutate(D = Y - B)
+```
+
+Followup SOC is tightly associated with baseline SOC.
+
+```{r visualizing nr data, message = F, warn = F}
+ggplot(nr_data, aes(x = B, y = Y)) + 
+  geom_point()
+```
+
+Baseline SOC appears to be associated with differences...
+
+```{r}
+ggplot(nr_data, aes(x = B, y = D)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+...which seems to be confirmed by a naive regression analysis.
+
+```{r}
+summary(lm(D ~ B, data = nr_data))
+```
+
+
+Alternatively, we can estimate the CATE using the "T-learner" method described above, using OLS or nonparametric regression.
+However, without an inference strategy it's not clear how to test whether the estimated functions differ ``significantly" from the constant $\tau(b) = \bar{\tau}$. 
+
+```{r}
+mu_hat_1_ols <- lm(Y ~ B, data = nr_data, subset = Z == 1)
+mu_hat_0_ols <- lm(Y ~ B, data = nr_data, subset = Z == 0)
+mu_hat_1_loess <- loess(Y ~ B, data = nr_data, subset = Z == 1)
+mu_hat_0_loess <- loess(Y ~ B, data = nr_data, subset = Z == 0)
+
+b_grid <- seq(min(nr_data$B), max(nr_data$B), by = .1)
+
+tau_hat_ols <- predict(mu_hat_1_ols, data.frame(B = b_grid)) - predict(mu_hat_0_ols, data.frame(B = b_grid))
+tau_hat_loess <- predict(mu_hat_1_loess, data.frame(B = b_grid)) - predict(mu_hat_0_loess, data.frame(B = b_grid))
+
+plot(nr_data$D ~ nr_data$B, pch = 20, col = ifelse(nr_data$Z == 1, 'steelblue', 'darkorange3'))
+points(tau_hat_ols ~ b_grid, type = 'l', col = 'red', lwd = 3, lty = 'dashed')
+points(tau_hat_loess ~ b_grid, type = 'l', col = 'blue', lwd = 3, lty = 'dashed')
+```
+
+# Simulation studies
+
+[TODO] 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
