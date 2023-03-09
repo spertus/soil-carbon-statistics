@@ -13,3 +13,5 @@ This is a repository with code to run simulations and analyses to measure soil o
 `hedgerow_analysis.R` is an analysis of Jessica Chiartas' hedgerow/row quasi-experiment in the Central Valley. The corresponding data files are `HR_Soil_Health_Updated.csv` and `HR_soil_carbon.csv`.
 
 `california_SOC_analysis.R` is a script to analyze Paige Stanley's samples from Paicines Ranch, Jessica Chiartas' samples from Southern California cropland, and assay replicates done on their respective labs. The corresponding data file is `R_Heterogeneity_Master_PS_04132021.xlsx`. 
+
+`saturation_hypothesis.Rmd` is an R markdown notebook evaluating the "saturation hypothesis" that SOC gains are moderated by baseline SOC levels. The hypothesis is articulated and critiqued in [Slessarev et al 2022](https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.16491).
