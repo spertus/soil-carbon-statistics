@@ -66,8 +66,26 @@ We need a confidence band for $\tau(b)$ that guarantees coverage uniformly in $b
 
 ### The strong null and tests with power against alternative of saturation.
 
-The strong null posits $\tau_i = 0$ for all $i$. More generally, $\tau_i = \delta$ for all $i$ implies that $\tau(b) = \bar{\tau}$, although the reverse is not true. Take the null hypothesis to be the composite null $H_0: \bigcup_{\delta \in \mathbb{R}} \tau_i = \delta$ and consider alternatives of the form $H_A: \tau_i = f(b_i)$ for some increasing $f$. [What are test statistics against this alternative? Split the data at some value $b$ and test for different means in each group; a linear regression; a shape constrained regression; is there something with power against all increasing $f$?]
+The strong null posits $\tau_i = 0$ for all $i$. More generally, $\tau_i = \delta$ for all $i$ implies that $\tau(b) = \bar{\tau}$, although the reverse is not true. Take the null hypothesis to be the composite null $H_0: \bigcup_{\delta \in \mathbb{R}} \tau_i = \delta$ and consider alternatives of the form $H_A: \tau_i = f(b_i)$ for some decreasing $f$. 
 
+
+What test statistics has power against this alternative? 
+Consider a cut point $c \in [\min(b_i), \max(b_i)]$, for example $c = \mbox{median}(b_i)$, and take $\mathcal{I}_{0L}$ and $\mathcal{I}_{1L}$ to denote indices of observed control and treatment outcomes with $b_i < c$;  similarly, $\mathcal{I}_{0H}$ and $\mathcal{I}_{1H}$ denote outcomes with $b_i \geq c$. The mean difference in differences: 
+$$\left (|\mathcal{I}_{1L}| \sum_{i \in \mathcal{I}_{1L}} Y_i - |\mathcal{I}_{0L}| \sum_{i \in \mathcal{I}_{0L}} Y_i\right) - \left (|\mathcal{I}_{1H}| \sum_{i \in \mathcal{I}_{1H}} Y_i - |\mathcal{I}_{0H}| \sum_{i \in \mathcal{I}_{0H}} Y_i\right) $$
+will generally be large if $f$ is a decreasing function and small otherwise. 
+There may be more clever test statistics that have more power for certain classes of increasing functions.
+
+### The weak null 
+
+The weak null in this context is that the CATE is not constant over $b_i$. In particular the weak null is:
+$$H_0: \tau(b) = \bar{\tau}.$$
+Suppose we estimate $\tau(b)$ with hat $\hat{\tau}(b)$ and construct an approximate $(1-\alpha)$ confidence band $[\hat{L}(b),\hat{U}(b)]$ with uniform coverage in $b$:
+$$\sup_b \mathbb{P}\left (\tau(b) \in [\hat{L}(b),\hat{U}(b)] \right ) \geq 1 - \alpha.$$
+Such a confidence interval can be computed using the above suggestion of taking differences in Bonferonni-adjusted intervals for $\mu_0(b)$ and $\mu_1(b)$. 
+An intuitive idea is then to check whether there is any constant function that can fit entirely within this band. If there is, then we do not reject the null. 
+This can be achieved by a grid search.
+
+See also [Li et al, 2019](https://arxiv.org/abs/1605.06566) for other ideas for decomposing treatment effect variation and testing whether any exists in observed covariates (e.g., baseline SOC).
 
 # Some examples
 
