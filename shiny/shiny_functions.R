@@ -1,7 +1,7 @@
 library(tidyverse)
 library(data.table)
 library(gstat)
-library(BalancedSampling)
+#library(BalancedSampling)
 
 ################## function to simulate a % SOC surface #################
 simulate_truth <- function(size = c(250,600), nugget = .01, sill = .05, range = 20, intercept = .01, y_trend = TRUE, max_mean = .2){
@@ -531,7 +531,6 @@ get_relative_efficiency <- function(sigma_p, mu, cost_c, sigma_delta_1, cost_P_1
   denominator <- sigma_p * sqrt((1 + sigma_delta_2) * cost_c) + mu * sigma_delta_2 * sqrt(cost_P_2 + cost_A_2)
   numerator / denominator
 }
-
 
 
 get_minimum_cost <- function(sigma_p, sigma_delta, mu, C_0, cost_c, cost_P, cost_A, V, integer_outputs = TRUE){
