@@ -2,8 +2,9 @@
 
 basicPage(
   titlePanel("Plot power across a range of effect sizes"),
-    h5("Graph the power (y-axis) of a two-sample t-test against effect size (x-axis), i.e. the difference in average SOC concentration between the two plots. The null hypothesis is no difference between average plot concentrations and the significance level is \\(\\alpha = .05\\). Results assume uniform independent random sampling, and that SOC is (marginally) normally distributed within plots. If SOC is not normally distributed results are approximately correct for large sample sizes."),
+    h5("Graph the power (y-axis) of a two-sample t-test against the effect size (x-axis), i.e. the difference in average SOC concentration between the two plots. The null hypothesis is no difference between average plot concentrations. Results assume simple random sampling, and that SOC is (marginally) normally distributed within plots. If SOC is not normally distributed results are approximately correct for large sample sizes."),
   sidebarPanel(
+            numericInput("alpha_power_Delta", "Input significance level (\\(\\alpha\\))", value = 0.05),
             sliderInput("mu_2_power_Delta", label = "Input a range of average %SOC in plot 2 (\\(\\mu_2\\))", min = 0, max = 10, value = c(1, 4), step = 0.25),
             numericInput("mu_1_power_Delta", "Input average %SOC in plot 1 (\\(\\mu_1\\))", value = 1),
              numericInput("n1_power_Delta", "Input the number of cores from plot 1 (\\(n_1\\))", value = 30),

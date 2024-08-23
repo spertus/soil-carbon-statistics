@@ -7,10 +7,6 @@ ui <- fluidPage(
   navbarPage("Estimation and Inference for Soil Organic Carbon",
              navbarMenu("App",
                         tabPanel("Explanation and Notation", source("explanation_page.R")$value),
-                        tabPanel("Compute minimum standard error for a fixed budget",
-                                 source("minimum_error_page.R")$value),
-                        tabPanel("Compute minimum budget for a fixed standard error",
-                                 source("minimum_budget_page.R")$value),
                         tabPanel("Compute power for fixed sample sizes",
                                  source("compute_power_page.R")$value),
                         tabPanel("Compute sample size to achieve a given power",
@@ -20,7 +16,11 @@ ui <- fluidPage(
                         tabPanel("Graph sample size needed to achieve a given power",
                                  source("plot_samplesize_effectsize_page.R")$value),
                         tabPanel("Graph power across a range of effect sizes",
-                                 source("plot_power_effectsize_page.R")$value)
+                                 source("plot_power_effectsize_page.R")$value),
+                        tabPanel("Compute minimum standard error for a fixed budget",
+                                 source("minimum_error_page.R")$value),
+                        tabPanel("Compute minimum budget for a fixed standard error",
+                                 source("minimum_budget_page.R")$value)
                         )
              )
            )
@@ -63,7 +63,19 @@ server <- function(input,output){
   # Compute power for a given sample size
   output$power <- renderText({
     
-    solution <- round(get_power_two_sample(n_1 = input$n_1_power, k_1 = input$k_1_power, n_2 = input$n_2_power, input$k_2_power, sigma_p_1 = input$sigma_p_1_power, mu_1 = input$mu_1_power, sigma_p_2 = input$sigma_p_2_power, mu_2 = input$mu_2_power, sigma_delta = input$sigma_delta_power), 2)
+    solution <- round(
+      get_power_two_sample(
+        n_1 = input$n_1_power, 
+        k_1 = input$k_1_power, 
+        n_2 = input$n_2_power, 
+        k_2 = input$k_2_power, 
+        sigma_p_1 = input$sigma_p_1_power, 
+        mu_1 = input$mu_1_power, 
+        sigma_p_2 = input$sigma_p_2_power, 
+        mu_2 = input$mu_2_power, 
+        sigma_delta = input$sigma_delta_power, 
+        alpha = input$alpha_power), 
+      2)
     
     paste("Power:", solution)
   })
@@ -77,7 +89,16 @@ server <- function(input,output){
   })
   
   output$n_samplesize <- renderText({
-    solution <- ceiling(get_power_two_sample(sigma_p_1 = input$sigma_p_1_samplesize_power, mu_1 = input$mu_1_samplesize_power, sigma_p_2 = input$sigma_p_2_samplesize_power, mu_2 = input$mu_2_samplesize_power, sigma_delta = input$sigma_delta_samplesize_power, beta = 1 - input$power_samplesize_power))
+    solution <- 2 * round(
+      get_power_two_sample(
+        sigma_p_1 = input$sigma_p_1_samplesize_power, 
+        mu_1 = input$mu_1_samplesize_power, 
+        sigma_p_2 = input$sigma_p_2_samplesize_power, 
+        mu_2 = input$mu_2_samplesize_power, 
+        sigma_delta = input$sigma_delta_samplesize_power, 
+        beta = 1 - input$power_samplesize_power, 
+        alpha = input$alpha_samplesize_power)/2
+      )
     paste("Total sample size:", solution)
   })
   
@@ -102,7 +123,7 @@ server <- function(input,output){
     mu_2_grid <- seq(input$mu_2_n_Delta[1], input$mu_2_n_Delta[2], length.out = 5000)
     delta_grid <- mu_2_grid - input$mu_1_n_Delta
     
-    solution <- get_power_two_sample(sigma_p_1 = input$sigma_p_1_n_Delta, mu_1 = input$mu_1_n_Delta, sigma_p_2 = input$sigma_p_2_n_Delta, mu_2 = mu_2_grid, sigma_delta = input$sigma_delta_n_Delta, beta = 1 - input$power_n_Delta)
+    solution <- get_power_two_sample(sigma_p_1 = input$sigma_p_1_n_Delta, mu_1 = input$mu_1_n_Delta, sigma_p_2 = input$sigma_p_2_n_Delta, mu_2 = mu_2_grid, sigma_delta = input$sigma_delta_n_Delta, beta = 1 - input$beta_n_Delta, alpha = input$alpha_n_Delta)
     
     
     plot(x = delta_grid, y = solution, type = 'l', lwd = 1.5, xlab = "Effect size (difference in average %SOC in plot 1 versus plot 2)", ylab = "Sample sizes needed from each plot", xlim = c(min(delta_grid),max(delta_grid)))
@@ -120,7 +141,8 @@ server <- function(input,output){
                                      mu_1 = input$mu_1_power_Delta, 
                                      sigma_p_2 = input$sigma_p_2_power_Delta, 
                                      mu_2 = mu_2_grid, 
-                                     sigma_delta = input$sigma_delta_power_Delta)
+                                     sigma_delta = input$sigma_delta_power_Delta,
+                                     alpha = input$alpha_power_Delta)
     
     
     plot(x = delta_grid, y = solution, type = 'l', lwd = 1.5, xlab = "Effect size (difference in average %SOC in plot 1 versus plot 2)", ylab = "Power of two-sample t-test", ylim = c(0,1), xlim = c(min(delta_grid),max(delta_grid)))
