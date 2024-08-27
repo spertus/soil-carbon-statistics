@@ -61,6 +61,11 @@ server <- function(input,output){
   })
   
   # Compute power for a given sample size
+  output$power_effectsize <- renderText({
+    solution <- abs(input$mu_1_power - input$mu_2_power)
+    paste("Effect size:", solution)
+  })
+  
   output$power <- renderText({
     
     solution <- round(
