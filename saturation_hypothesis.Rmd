@@ -18,6 +18,7 @@ library(maps)
 library(splines)
 library(xtable)
 library(hettx)
+library(latex2exp)
 ```
 
 # A statement of the saturation hypothesis and its pitfalls
@@ -147,6 +148,31 @@ is the sum of the sandwich estimators of the covariance of $\hat{\boldsymbol{\be
 Of course, this test is only strictly valid asympotically. 
 --->
 
+
+# Individual treatment effects
+
+```{r}
+N <- 10000
+tau_bar <- 1
+tau_i_gauss <- rnorm(N, mean = tau_bar, sd = 0.25)
+tau_i_mixture <- c(rnorm(N/2, mean = tau_bar + 2, sd = 0.25), rnorm(N/2, mean = tau_bar - 2, sd = 0.25))
+tau_frame <- data.frame(
+  dist = c(rep("Gaussian", N), rep("Mixture", N)), 
+  tau = c(tau_i_gauss, tau_i_mixture)) %>%
+  mutate(positive = as_factor(ifelse(tau > 0, 1, 0)))
+ggplot(tau_frame, aes(tau, fill = positive)) +
+  geom_vline(xintercept = 0, linetype = 'dashed') +
+  ylab("") +
+  xlab(TeX("$\\tau_i$ (\\% SOC)")) +
+  geom_histogram(bins = 100) +
+  facet_grid(~ dist) +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        text = element_text(size = 18),
+        legend.position = "none")
+```
 
 # Some examples
 
@@ -377,8 +403,6 @@ cate_plot <- ggplot(cate_data, aes(x = x, y = y, color = scenario)) +
     panel.border = element_blank(),
     legend.key.width = unit(1, "cm")) +
   labs(title = "(a) Moderation", x = "Baseline SOC", y = "SOC sequestered")
-  
-
 ```
 
 
@@ -400,119 +424,6 @@ nrcs_data <- read_csv("~/Dropbox/Carbon and Land Use/Data/NRCS 7site 2016-2019 e
   filter(site != "BethelIsland")
 ```
 
-```{r}
-#histogram across sites: variability in baseline SOC
-ggplot(nrcs_data %>% filter(year == 2016), aes(TC, fill = treatment)) +
-  geom_histogram(alpha = 0.75, position = "identity") +
-  facet_grid(treatment ~ .) + 
-  xlab("2016 %TC") +
-  ylab("Count")
-```
-
-```{r boxplots of nrcs data}
-ggplot(nrcs_data, aes(y = TC, x = site, fill = year)) +
-  geom_boxplot() +
-  facet_grid(treatment ~ .) 
-```
-
-```{r association of baseline and followup SOC}
-baseline_followup <- nrcs_data %>%
-  select(-TN) %>% 
-  group_by(treatment, site, year) %>%
-  summarize(TC = mean(TC)) %>%
-  pivot_wider(names_from = "year", values_from = "TC", names_prefix = "TC_") 
-
-ggplot(baseline_followup, aes(x = TC_2016, y = TC_2019)) +
-  geom_point(aes(color = site, shape = treatment)) +
-  geom_smooth(method = "lm") +
-  ylab("2019 %TC") +
-  xlab("2016 %TC")
-```
-
-
-
-```{r difference estimates each year}
-#this is acting as though we have paired randomization at the core level, not the site level
-yearly_estimates <- yearly_mean_effects %>% 
-  group_by(year) %>%
-  summarize(mean_diff = mean(diff), se_diff = sd(diff)/sqrt(n()))
-```
-
-```{r DiD estimate of ATE using plots}
-#this (correctly) treats plots as the fundamental unit of randomization
-estimates_plots <- nrcs_data %>% 
-  select(-TN) %>% 
-  group_by(treatment, site, year) %>%
-  summarize(TC = mean(TC)) %>%
-  pivot_wider(names_from = "year", values_from = "TC", names_prefix = "TC_") %>%
-  mutate(diff = TC_2019 - TC_2016) %>%
-  select(treatment, site, diff) %>%
-  pivot_wider(names_from = treatment, values_from = diff, names_prefix = "diff_") %>%
-  mutate(DiD = diff_T - diff_C) %>%
-  ungroup() %>%
-  summarize(mean_DiD = mean(DiD), se_DiD = sd(DiD) / sqrt(n()), n = n()) %>%
-  mutate(
-    lower_ci = mean_DiD + qt(0.05, n-1) * se_DiD, 
-    upper_ci = mean_DiD - qt(0.05, n-1) * se_DiD)
-estimates_plots
-```
-
-
-```{r plot followup against baseline at plot level}
-#core level
-plot_level_data <- nrcs_data %>% 
-  select(-TN) %>% 
-  group_by(treatment, site, year) %>%
-  summarize(TC = mean(TC)) %>%
-  pivot_wider(names_from = "year", values_from = "TC", names_prefix = "TC_") %>%
-  mutate(diff = TC_2019 - TC_2016)
-ggplot(plot_level_data, aes(x  = TC_2016, y = TC_2019, color = treatment)) +
-  geom_point() + 
-  scale_y_log10() +
-  scale_x_log10()
-```
-
-```{r specious regression to the mean, message = FALSE}
-#supposed regression to the mean effect is very pronounced, especially without BethelIsland
-ggplot(plot_level_data, aes(x  = TC_2016, y = diff)) +
-  geom_point(aes(color = treatment)) + 
-  geom_smooth(method = "lm") +
-  xlab("%TC 2016") +
-  ylab("%TC 2019 - %TC 2016")
-
-ggplot(plot_level_data %>% filter(site != "BethelIsland"), aes(x  = TC_2016, y = diff)) +
-  geom_point(aes(color = treatment)) + 
-  geom_smooth(method = "lm") +
-  xlab("%TC 2016") +
-  ylab("%TC 2019 - %TC 2016")
-```
-
-
-
-```{r plot level CATE}
-B_grid <- seq(0,12,by=0.01) #grid of baseline SOC for plotting
-alpha <- 0.05 #confidence level
-
-#naive estimate of difference exhibiting "regression to the mean"
-naive_estimate <- predict(lm(diff ~ TC_2016, data = plot_level_data), newdata = data.frame(TC_2016 = B_grid), interval = "confidence", level = 1-alpha)
-
-#linear model estimates of CATE with confidence interval
-mu_hat_0 <- predict(lm(TC_2019 ~ TC_2016, data = plot_level_data, subset = treatment == "C"), newdata = data.frame(TC_2016 = B_grid), interval = "confidence", level = 1-alpha/2)
-mu_hat_1 <- predict(lm(TC_2019 ~ TC_2016, data = plot_level_data, subset = treatment == "T"), newdata = data.frame(TC_2016 = B_grid), interval = "confidence", level = 1-alpha/2)
-tau_hat_ols <- cbind(
-  "estimate" = mu_hat_1[,1] - mu_hat_0[,1], 
-  "lower_bound" = mu_hat_1[,2] - mu_hat_0[,3],
-  "upper_bound" = mu_hat_1[,3] - mu_hat_0[,2])
-
-#plotting in base R
-plot(0,0, type = "n", xlim = c(0,12), ylim = c(-4,4), xlab = "Baseline %TC", ylab = "CATE")
-points(naive_estimate[,1] ~ B_grid, type = 'l', lwd = 2, lty = 'solid', col = 'red')
-points(naive_estimate[,2] ~ B_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'red')
-points(naive_estimate[,3] ~ B_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'red')
-points(tau_hat_ols[,1] ~ B_grid, type = 'l', lwd = 2, lty = 'solid', col = 'blue')
-points(tau_hat_ols[,2] ~ B_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'blue')
-points(tau_hat_ols[,3] ~ B_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'blue')
-```
 
 
 
@@ -582,21 +493,23 @@ treatment_effect <- nrcs_data %>%
     lower_ci = mean_DiD + qt(0.05, n-1) * se_DiD, 
     upper_ci = mean_DiD - qt(0.05, n-1) * se_DiD) %>%
   pull(mean_DiD)
-
-N = 10 * nrow(nrcs_data) #population size = 2480 fields
 ```
 
 
-```{r set up parameter grids for simulations}
+```{r set up parameters for simulations}
+N = 5000 #population size 
 assay_variability <- 0 #assume lab work is error-free for now
 #effect size as a function of the baseline spatial heterogeneity
 effect_size <- c(0, 0.05, 0.1, 0.3) #null, small, medium, large effect (5%, 10%, 30%)
 ate <- round(effect_size / sqrt(baseline_ap_var), 2)
 moderator_effect <- -c(0, 0.1, 0.5) #range of moderator effects
 idiosyncratic_teh <- c(0, 0.1) #this is idiosyncratic variation in the treatment effects
-measurement_noise <- round(c(assay_variability + baseline_wp_var/5, 
-                       assay_variability + baseline_wp_var/30, 
-                       assay_variability + baseline_wp_var/100), 2) #variability due to sampling / within-plot spatial heterogeneity. n = 5,30,100 samples per plot
+measurement_noise <- round(c(
+                         assay_variability + baseline_wp_var/5, 
+                         assay_variability + baseline_wp_var/30, 
+                         assay_variability + baseline_wp_var/100,
+                         0), 
+                       2) #variability due to sampling / within-plot spatial heterogeneity. n = 5,30,100 samples per plot
 n <- c(10, 100, 1000) #size of experiment
 
 simulation_parameters <- expand.grid(
@@ -615,7 +528,7 @@ run_simulation <- function(ate, moderator_effect, idiosyncratic_teh, measurement
   teh_noise_i <- rnorm(N, mean = 0, sd = sqrt(idiosyncratic_teh))
   y_0 <- b + rnorm(N, mean = mean_change_ctl, sd = sqrt(ap_var_change_ctl))
   y_1 <- y_0 + ate + moderator_effect * stdize(b) + teh_noise_i
-  #key parameters to be estimated
+  #parameters to be estimated
   pate <- mean(y_1) - mean(y_0) #(finite) population average treatment effect
   fpme <- coef(lm((y_1 - y_0) ~ stdize(b)))['stdize(b)'] #finite-population moderator effect
   #for now, assume the policy is not budget constrained
@@ -628,14 +541,16 @@ run_simulation <- function(ate, moderator_effect, idiosyncratic_teh, measurement
   diff_diffs_results <- matrix(0, nrow = num_sims, ncol = 3) #difference-in-differences estimate of PATE
   ols_est_results <- matrix(0, nrow = num_sims, ncol = 3) #OLS with full baseline interaction estimate of PATE
   mod_est_results <- matrix(0, nrow = num_sims, ncol = 3) #OLS estimate of moderator effect
+  naive_mod_est_results <- matrix(0, nrow = num_sims, ncol = 3) #"naive" estimate from regressing followup SOCs on differences
   optimal_policy_results <- rep(0, num_sims) #OLS estimate of optimal regime by ITE prediction
   restricted_optimal_policy_results <- rep(0, num_sims)
   for(i in 1:num_sims){
     #study level potential outcomes and covariates
     sample_index <- sample(1:N, size = n, replace = FALSE)
     #sample from population and add measurement noise from core sampling (currently commented out)
-    B <- b[sample_index] + rnorm(n, mean = 0, sd = sqrt(measurement_noise))
-    B_std <- stdize(B)
+    baseline_noise <-  rnorm(n, mean = 0, sd = sqrt(measurement_noise))
+    B <- b[sample_index] + baseline_noise
+    B_std <- stdize(b)[sample_index] + baseline_noise
     Y_0 <- y_0[sample_index] + rnorm(n, mean = 0, sd = sqrt(measurement_noise))
     Y_1 <- y_1[sample_index] + rnorm(n, mean = 0, sd = sqrt(measurement_noise))
     #balanced complete randomization
@@ -661,10 +576,11 @@ run_simulation <- function(ate, moderator_effect, idiosyncratic_teh, measurement
     ols_est <- summary(ols)$coefficients["Z","Estimate"]
     ols_se <- summary(ols)$coefficients["Z","Std. Error"] #can use usual formula for SE (not sandwich SE) because experiment is balanced; see remark (ii), page 307 of Lin (2013)
     ols_ci <- c(ols_est - qnorm(0.975) * ols_se, ols_est + qnorm(0.975) * ols_se)
+    ols_est_results[i,] <- c(ols_est, ols_ci)
     study_data <- data.frame(Y=Y,Z=Z,B_std=B_std,B=B)
     
-    #using the Ding et al package "hettx" to estimate moderator effects
-    
+    #estimate moderator effects
+    #using the Ding et al package "hettx" 
     sys_model <- summary(estimate_systematic(Y ~ Z, interaction.formula = ~ B_std, method = "OLS", data = study_data))
     # ols_est <- sys_model$ATE
     # ols_se <- sys_model$SE.ATE
@@ -675,24 +591,13 @@ run_simulation <- function(ate, moderator_effect, idiosyncratic_teh, measurement
     mod_se <- sqrt(sys_model$vcov[2,2])
     mod_ci <- c(mod_est - qnorm(0.975) * mod_se, mod_est + qnorm(0.975) * mod_se)
     mod_est_results[i,] <- c(mod_est, mod_ci)
-    
-    # X <- cbind(1, B)
-    # X_1 <- X[trt_index,]
-    # X_0 <- X[-trt_index,]
-    # S_xx1 <- (2/n) * t(X_1) %*% X_1
-    # S_xx0 <- (2/n) * t(X_0) %*% X_0
-    # S_x1 <- (2/n) * Y[trt_index] %*% X_1
-    # S_x0 <- (2/n) * Y[-trt_index] %*% X_0
-    # gamma_1 <- solve(S_xx1) %*% t(S_x1)
-    # gamma_0 <- solve(S_xx0) %*% t(S_x0)
-    # e_1 <- Y[trt_index] - X_1 %*% gamma_1 
-    # e_0 <- Y[-trt_index] - X_0 %*% gamma_0
-    # mod_est_ding <- gamma_1[2] - gamma_0[2]
-    # S_ex1 <- (1/(n/2 - 1)) * t(cbind(e_1, e_1)*X_1) %*% (cbind(e_1, e_1)*X_1) 
-    # S_ex0 <- (1/(n/2 - 1)) * t(cbind(e_0, e_0)*X_0) %*% (cbind(e_0, e_0)*X_0) 
-    # cov_mod_est <- solve(S_xx1) %*% (S_ex1/(n/2)) %*% solve(S_xx1) + solve(S_xx0) %*% (S_ex0/(n/2)) %*% solve(S_xx0)
-    # mod_se_ding <- sqrt(cov_mod_est[2,2])
-    # mod_ci_ding <- c(mod_est_ding - qnorm(0.975) * mod_se_ding, mod_est_ding + qnorm(0.975) * mod_se_ding)
+    #naive estimates of "baseline effects" 
+    D <- Y - B
+    naive_model <- summary(lm(Y ~ D))
+    naive_mod_est <- naive_model$coefficients["D","Estimate"]
+    naive_mod_se <- naive_model$coefficients["D","Std. Error"]
+    naive_mod_ci <- c(naive_mod_est - qnorm(0.975) * naive_mod_se, naive_mod_est + qnorm(0.975) * naive_mod_se)
+    naive_mod_est_results[i,] <- c(naive_mod_est, naive_mod_ci)
     
     
     #estimate optimal policy
@@ -721,29 +626,69 @@ run_simulation <- function(ate, moderator_effect, idiosyncratic_teh, measurement
     diffmeans_rmse = sqrt(mean((diff_means_results[,1] - pate)^2)),
     diffmeans_coverage = mean((diff_means_results[,2]) < pate & (diff_means_results[,3] > pate)),
     diffmeans_ciwidth = mean(diff_means_results[,3] - diff_means_results[,2]),
+    diffmeans_power = mean(diff_means_results[,2] > 0),
     diffdiffs_bias = mean(diff_diffs_results[,1]) - pate,
     diffdiffs_rmse = sqrt(mean((diff_diffs_results[,1] - pate)^2)),
     diffdiffs_coverage = mean((diff_diffs_results[,2]) < pate & (diff_diffs_results[,3] > pate)),
     diffdiffs_ciwidth = mean(diff_diffs_results[,3] - diff_diffs_results[,2]),
+    diffdiffs_power = mean(diff_diffs_results[,2] > 0),
     olsest_bias = mean(ols_est_results[,1]) - pate,
     olsest_rmse = sqrt(mean((ols_est_results[,1] - pate)^2)),
     olsest_coverage = mean((ols_est_results[,2]) < pate & (ols_est_results[,3] > pate)),
     olsest_ciwidth = mean(ols_est_results[,3] - ols_est_results[,2]),
+    olsest_power = mean(ols_est_results[,2] > 0),
     modest_bias = mean(mod_est_results[,1]) - fpme,
     modest_rmse = sqrt(mean((mod_est_results[,1] - moderator_effect)^2)),
     modest_coverage = mean((mod_est_results[,2]) < moderator_effect & (mod_est_results[,3] > moderator_effect)),
     modest_ciwidth = mean(mod_est_results[,3] - mod_est_results[,2]),
+    naive_modest_bias = mean(naive_mod_est_results[,1]) - fpme,
+    naive_modest_rmse = sqrt(mean((naive_mod_est_results[,1] - moderator_effect)^2)),
+    naive_modest_coverage = mean((naive_mod_est_results[,2]) < moderator_effect & (naive_mod_est_results[,3] > moderator_effect)),
+    naive_modest_ciwidth = mean(naive_mod_est_results[,3] - naive_mod_est_results[,2]),
     avg_optimal_policy_estimate = mean(optimal_policy_results),
     avg_restricted_optimal_policy_estimate = mean(restricted_optimal_policy_results)
   )
+  results
 }
+```
+
+
+```{r test moderator estimation}
+# mod_est <- rep(0, 200)
+# for(i in 1:200){
+#   n <- 30
+#   B <- rnorm(n)
+#   Y_0 <- rnorm(n)
+#   Y_1 <- Y_0 + 1 + B
+#   B_meas <- B + rnorm(n, sd = 0.5) #measurement error can attenuate (bias) moderator estimates
+#   trt <- sample(n, size = n/2, replace = F)
+#   Z <- rep(0, n)
+#   Y <- Y_0
+#   Y[trt] <- Y_1[trt]
+#   Z[trt] <- 1
+#   s_data <- data.frame(Y=Y, Z=Z, B=B, B_meas = B_meas)
+#   
+#   sys_model <- summary(estimate_systematic(Y ~ Z, interaction.formula = ~ B_meas, method = "OLS", data = s_data))
+#   #moderator effects
+#   mod_est[i] <- sys_model$coefficients["B_meas"]
+# }
+# 
+# mean(mod_est)
+# mod_se <- sqrt(sys_model$vcov[2,2])
+# mod_ci <- c(mod_est - qnorm(0.975) * mod_se, mod_est + qnorm(0.975) * mod_se)
+# mod_est_results[i,] <- c(mod_est, mod_ci)
 ```
 
 
 ```{r run simulations}
 all_results <- list()
 for(i in 1:nrow(simulation_parameters)){
-  all_results[[i]] <- run_simulation(simulation_parameters$ate[i], simulation_parameters$moderator_effect[i],  simulation_parameters$idiosyncratic_teh[i], simulation_parameters$measurement_noise[i], simulation_parameters$n[i])
+  all_results[[i]] <- run_simulation(
+    ate = simulation_parameters$ate[i], 
+    moderator_effect = simulation_parameters$moderator_effect[i],
+    idiosyncratic_teh = simulation_parameters$idiosyncratic_teh[i],
+    measurement_noise = simulation_parameters$measurement_noise[i], 
+    n = simulation_parameters$n[i])
 }
 results_frame <- all_results %>% 
   reduce(bind_rows) %>% 
@@ -759,6 +704,9 @@ pate_estimates_spme <- results_frame %>%
   group_by(spme, n, estimator, criterion) %>% #model-averaging over spate, teh, measurementnoise
   summarize(value = median(value)) 
 ```
+
+
+
 ```{r full PATE results}
 pate_results_table_full <- results_frame %>%
   select(n, spate, spme, measurementnoise, teh, diffmeans_rmse, diffdiffs_rmse, olsest_rmse, diffmeans_coverage, diffdiffs_coverage, olsest_coverage, diffmeans_ciwidth, diffdiffs_ciwidth, olsest_ciwidth) %>%
@@ -768,7 +716,7 @@ pate_results_table_full <- results_frame %>%
   filter(spate == 0, teh == 0) %>%
   select(-spate) %>%
   arrange(spme, measurementnoise)
-print(xtable(pate_results_table_full), include.rownames = FALSE)
+#print(xtable(pate_results_table_full), include.rownames = FALSE)
 ```
 
 
@@ -784,13 +732,108 @@ pate_results_table_avg <- results_frame %>%
   ungroup() %>%
   pivot_wider(names_from = criterion, values_from = value)
 
-print(xtable(pate_results_table_avg), include.rownames = FALSE)
+#print(xtable(pate_results_table_avg), include.rownames = FALSE)
+```
+
+```{r moderator estimates}
+mod_est_results <- results_frame %>% 
+  group_by(n, measurementnoise) %>%
+  summarize(
+    modest_bias = mean(modest_bias), 
+    modest_rmse = mean(modest_rmse), 
+    modest_coverage = mean(modest_coverage), 
+    modest_ciwidth = mean(modest_ciwidth),
+    naive_bias = mean(naive_modest_bias), 
+    naive_rmse = mean(naive_modest_rmse), 
+    naive_coverage = mean(naive_modest_coverage), 
+    naive_ciwidth = mean(naive_modest_ciwidth)) %>%
+  ungroup() %>%
+  pivot_longer(cols = -c(n, measurementnoise)) %>%
+  separate_wider_delim(name, "_", names = c("estimator", "measure")) %>%
+  mutate(plot_sample_size = factor(case_match(measurementnoise, 0 ~ "Infinite", 0.01 ~ "100", 0.04 ~ "30", 0.21 ~ "5"), levels = c("Infinite", "100", "30", "5"))) %>%
+  mutate(Measure = case_match(measure, "bias" ~ "Bias", "rmse" ~ "RMSE", "coverage" ~ "95% CI coverage", "ciwidth" ~ "CI Width")) %>%
+  mutate(Estimator = case_match(estimator, "modest" ~ "Causal Regression", "naive" ~ "Naive Regression"))
+
+
+ggplot(mod_est_results %>% filter(measure %in% c("coverage")), aes(x = as_factor(n),  y = value, color = plot_sample_size)) +
+  geom_point(size = 3) +
+  geom_hline(yintercept = .95, linetype = 'dashed') +
+  scale_y_continuous(limits = c(0,1), labels = scales::percent) +
+  facet_grid(Estimator ~ ., scales = "free") +
+  labs(
+    x = "Number of plots in study (n)",
+    y = "True coverage of 95% confidence intervals",
+    color = "Samples per plot"
+  ) +
+  theme_bw() +
+  theme(text = element_text(size = 24)) 
+
+ggplot(mod_est_results %>% filter(measure %in% c("bias")), aes(x = as_factor(n),  y = value, color = plot_sample_size)) +
+  geom_point(size = 2) +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  facet_grid(Estimator ~ Measure) +
+  labs(
+    x = "Number of plots in study (n)",
+    y = "Value",
+    color = "Samples per plot"
+  ) +
+  theme_bw() +
+  theme(text = element_text(size = 24)) 
+```
+
+
+```{r pate estimation power}
+num_sims <- 500
+samples_per_plot <- c(5, 100)
+measurement_noise <- round(c(assay_variability + baseline_wp_var/samples_per_plot), 2) 
+n <- c(14, 140)
+simulation_parameters <- expand.grid(
+  ate = seq(0, 1, by = .05), 
+  moderator_effect = c(0, -0.5), 
+  idiosyncratic_teh = 0, 
+  measurement_noise = measurement_noise, 
+  n = n)
+
+all_results_power <- list()
+for(i in 1:nrow(simulation_parameters)){
+  all_results_power[[i]] <- run_simulation(
+    simulation_parameters$ate[i], 
+    simulation_parameters$moderator_effect[i],  
+    simulation_parameters$idiosyncratic_teh[i], 
+    simulation_parameters$measurement_noise[i], 
+    simulation_parameters$n[i])
+}
+results_frame_power <- all_results_power %>% 
+  reduce(bind_rows) %>% 
+  as_tibble() 
 ```
 
 ```{r}
-mod_est_results <- results_frame %>% 
-  group_by(n) %>%
-  summarize(bias = mean(modest_bias), rmse = mean(modest_rmse), coverage = mean(modest_coverage), ciwidth = mean(modest_ciwidth))
+results_frame_power_long <- results_frame_power %>%
+  select(n, spate, spme, measurementnoise, diffmeans_power, diffdiffs_power, olsest_power) %>%
+  pivot_longer(cols = contains("_"), names_to = "estimator", values_to = "power") %>%
+  mutate(plot_sample_size = factor(case_match(measurementnoise, 0 ~ "Infinite", 0.01 ~ "100", 0.04 ~ "30", 0.21 ~ "5"), levels = c("Infinite", "100", "30", "5"))) %>%
+  mutate(relative_change = spate / baseline_avg) %>%
+  filter(n != 1400) %>%
+  filter(spme == -0.5) %>%
+  #filter(estimator != "diffdiffs_power") %>%
+  mutate(n_long = paste("n =", n)) %>%
+  mutate(estimator_long = case_match(estimator, "diffmeans_power" ~ "DiM", "diffdiffs_power" ~ "DiD", "olsest_power" ~ "OLS"))
+
+ggplot(results_frame_power_long, aes(x = relative_change, y = power, color = estimator_long, linetype = plot_sample_size)) +
+  geom_line(size = 1.8) +
+  facet_grid(n_long ~ .) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    x = "PATE size (%SOC relative to baseline)",
+    y = "Power",
+    linetype = "Samples per plot",
+    color = "Estimator") +
+  theme_bw() +
+  theme(
+    text = element_text(size = 18),
+    legend.key.width = unit(2, "cm"))
 ```
 
 
@@ -800,21 +843,26 @@ measurement_noise <- round(c(assay_variability + baseline_wp_var/samples_per_plo
 n <- seq(10,200, by = 4)
 simulation_parameters <- expand.grid(
   ate = 0, 
-  moderator_effect = c(0.5, 0, -0.5), 
+  moderator_effect = c(0, -0.5), 
   idiosyncratic_teh = 0, 
   measurement_noise = measurement_noise, 
   n = n)
 
 all_results_n <- list()
 for(i in 1:nrow(simulation_parameters)){
-  all_results_n[[i]] <- run_simulation(simulation_parameters$ate[i], simulation_parameters$moderator_effect[i],  simulation_parameters$idiosyncratic_teh[i], simulation_parameters$measurement_noise[i], simulation_parameters$n[i])
+  all_results_n[[i]] <- run_simulation(
+    simulation_parameters$ate[i], 
+    simulation_parameters$moderator_effect[i],  
+    simulation_parameters$idiosyncratic_teh[i], 
+    simulation_parameters$measurement_noise[i], 
+    simulation_parameters$n[i])
 }
 results_frame_n <- all_results_n %>% 
   reduce(bind_rows) %>% 
   as_tibble() 
 ```
 
-```{r plot properties as a function of n}
+```{r plot PATE properties as a function of n}
 results_frame_n_long <- results_frame_n %>%
   select(n, spme, measurementnoise, diffmeans_rmse, diffdiffs_rmse, olsest_rmse, diffmeans_coverage, diffdiffs_coverage, olsest_coverage, diffmeans_ciwidth, diffdiffs_ciwidth, olsest_ciwidth) %>%
   pivot_longer(cols = contains("_")) %>%
@@ -837,15 +885,6 @@ ggplot(results_frame_n_long %>% filter(criterion == "ciwidth"), aes(x = n, y = v
     legend.text = element_text(size = 14))
 ```
 
-```{r moderator effects}
-mod_estimates <- results_frame %>% 
-  select(spate, spme, n, teh, measurementnoise, starts_with("modest")) %>%
-  pivot_longer(cols = contains("modest_"), names_prefix = "modest_", names_to = "criterion") 
-
-ggplot(mod_estimates, aes(value, fill = as_factor(spme))) +
-  geom_histogram(position = "identity", alpha = 0.5) +
-  facet_grid(as_factor(measurementnoise) ~ criterion, scales = "free")
-```
 
 
 ```{r comparing policy estimates}
@@ -880,161 +919,6 @@ ggplot(results_frame, aes(x = avg_restricted_optimal_policy_estimate, y = avg_op
 
 
 
-# Russell Ranch
-
-```{r data input}
-#from Jessica Chiartas:
-#OMT = ORG; CMT = CONV; LMT = CONV+WCC; IWC = IWF; IWF = IWF+N; RWC = RWF; RWF = RWF+N; RWL = RWF+WCC.
-rr_data <- read_csv("../Data/Tautges_LTAR_data.csv") %>%
-  filter(depthcode != 6) %>% #this is originally where whole profile data was stored
-  mutate(Plot = gsub("_", "-", Plot)) %>%
-  #filter(Treatment != "CWT") %>% #CWT was removed and not reported
-  filter(Treatment %in% c("OMT", "CMT")) %>% #conventional and organic maize systems
-  filter(depthcode == 1)
-
-change_data <- rr_data %>%
-  select(year, depthcode, block, Plot, Treatment, percC) %>%
-  pivot_wider(values_from = percC, names_from = year, names_prefix = "TC_") %>%
-  mutate(
-    TC_diff = TC_2012 - TC_1993, 
-    block = as_factor(block)) 
-```
-
-```{r baseline}
-#there is a very small range of baseline SOC in this data, probably not enough to assess saturation hypothesis
-range(change_data$TC_1993)
-ggplot(change_data, aes(x = Treatment, y = TC_1993, fill = Treatment)) +
-  geom_boxplot()
-```
-
-
-```{r change over time plot}
-ggplot(change_data, aes(y = TC_diff, x = Treatment, fill = Treatment)) +
-  geom_boxplot()
-```
-
-
-```{r naive plot}
-ggplot(change_data, aes(x = TC_1993, y = TC_diff)) +
-  geom_point(aes(color = Treatment)) +
-  geom_smooth(method = "lm")
-```
-
-```{r CATE}
-B_grid <- seq(0.8, 1.1, by=0.01) 
-alpha <- 0.05 #confidence level
-
-#naive estimate of difference exhibiting "regression to the mean"
-naive_estimate <- predict(lm(TC_diff ~ TC_1993, data = change_data), newdata = data.frame(TC_1993 = B_grid), interval = "confidence", level = 1-alpha)
-
-#linear model estimates of CATE with confidence interval
-mu_hat_0 <- predict(lm(TC_2012 ~ TC_1993, data = change_data, subset = Treatment == "CMT"), newdata = data.frame(TC_1993 = B_grid), interval = "confidence", level = 1-alpha/2)
-mu_hat_1 <- predict(lm(TC_2012 ~ TC_1993, data = change_data, subset = Treatment == "OMT"), newdata = data.frame(TC_1993 = B_grid), interval = "confidence", level = 1-alpha/2)
-tau_hat_ols <- cbind(
-  "estimate" = mu_hat_1[,1] - mu_hat_0[,1], 
-  "lower_bound" = mu_hat_1[,2] - mu_hat_0[,3],
-  "upper_bound" = mu_hat_1[,3] - mu_hat_0[,2])
-
-#plotting in base R
-plot(0,0, type = "n", xlim = range(B_grid), ylim = c(-1,1), xlab = "Baseline %TC", ylab = "CATE")
-points(naive_estimate[,1] ~ B_grid, type = 'l', lwd = 2, lty = 'solid', col = 'red')
-points(naive_estimate[,2] ~ B_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'red')
-points(naive_estimate[,3] ~ B_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'red')
-points(tau_hat_ols[,1] ~ B_grid, type = 'l', lwd = 2, lty = 'solid', col = 'blue')
-points(tau_hat_ols[,2] ~ B_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'blue')
-points(tau_hat_ols[,3] ~ B_grid, type = 'l', lwd = 1, lty = 'dashed', col = 'blue')
-```
-
-
-# Marin Carbon Project and Sierra Foothills (Ryals et al 2014)
-
-
-
-
-
-<!---
-# Application to Nicolosso and Rice 2021
-
-We apply the ideas above to evaluating the saturation hypothesis in a global dataset compiled by Nicolosso and Rice for their 2021 meta-analysis of no-till systems. 
-
-```{r, data, include = FALSE}
-#Nicolo and Rice data
-#see: https://acsess.onlinelibrary.wiley.com/doi/full/10.1002/saj2.20260
-#paired_data <- read_excel("saj220260-sup-0002-suppmat_JVSedits.xlsx", sheet = "Paired")
-nr_data <- read_excel("saj220260-sup-0002-suppmat_JVSedits.xlsx", sheet = "Baseline")
-```
-
-
-For now we treat every row in the dataset as an independently replicated unit, although in reality there are important dimensions we are ignoring: depth of sample, location, study, and follow-up time, which should be accounted for in the analysis. 
-Furthermore, there is variability involved in measuring SOC at the plot level, which would contribute to overall uncertainty. 
-The authors provide standard deviations associated with measurements, though not, it seems, sample sizes. 
-For the time being we will ignore variability in the measurement stock, treating the $Y_i$s as fixed but for the ``random" treatment assignment.
-
-```{r data analysis, include = FALSE}
-# note that we treat everything as independent replicates
-# we ignore (for now) depth, study, location, and followup year
-# we also ignore field / study level heterogeneity (which _is_ recorded in the data)
-nr_data <- nr_data %>%
-  mutate(Z = ifelse(tillage == "Tilled", 1, 0)) %>%
-  mutate(Y = followup_soc) %>%
-  mutate(B = baseline_soc) %>%
-  mutate(D = Y - B)
-```
-
-Followup SOC is tightly associated with baseline SOC.
-
-```{r visualizing nr data, message = F, warn = F, include = FALSE}
-ggplot(nr_data, aes(x = B, y = Y)) + 
-  geom_point()
-```
-
-Baseline SOC appears to be associated with differences...
-
-```{r, include = FALSE}
-ggplot(nr_data, aes(x = B, y = D)) +
-  geom_point() +
-  geom_smooth(method = "lm")
-```
-
-...which seems to be confirmed by a naive regression analysis.
-
-```{r, include = FALSE}
-summary(lm(D ~ B, data = nr_data))
-```
-
-
-Alternatively, we can estimate the CATE using the "T-learner" method described above, using OLS or nonparametric regression.
-However, without an inference strategy it's not clear how to test whether the estimated functions differ ``significantly" from the constant $\tau(b) = \bar{\tau}$. 
-
-```{r, include = FALSE}
-b_grid <- seq(min(nr_data$B), max(nr_data$B), by = .1)
-
-mu_hat_1_ols <- predict(lm(Y ~ B, data = nr_data, subset = Z == 1), newdata = data.frame(B = b_grid), interval = "confidence", level = 1-alpha/2)
-mu_hat_0_ols <- predict(lm(Y ~ B, data = nr_data, subset = Z == 0), newdata = data.frame(B = b_grid), interval = "confidence", level = 1-alpha/2)
-mu_hat_1_spline <- predict(lm(Y ~ bs(B, df = 5), data = nr_data, subset = Z == 1), newdata = data.frame(B = b_grid), interval = "confidence", level = 1-alpha/2)
-mu_hat_0_spline <- predict(lm(Y ~ bs(B, df = 5), data = nr_data, subset = Z == 0), newdata = data.frame(B = b_grid), interval = "confidence", level = 1-alpha/2)
-
-
-tau_hat_ols <- cbind(
-  "estimate" = mu_hat_1_ols[,1] - mu_hat_0_ols[,1], 
-  "lower_bound" = mu_hat_1_ols[,2] - mu_hat_0_ols[,3],
-  "upper_bound" = mu_hat_1_ols[,3] - mu_hat_0_ols[,2])
-tau_hat_spline <- cbind(
-  "estimate" = mu_hat_1_spline[,1] - mu_hat_0_spline[,1], 
-  "lower_bound" = mu_hat_1_spline[,2] - mu_hat_0_spline[,3],
-  "upper_bound" = mu_hat_1_spline[,3] - mu_hat_0_spline[,2])
-
-
-
-plot(nr_data$D ~ nr_data$B, pch = 20, col = ifelse(nr_data$Z == 1, 'steelblue', 'darkorange3'))
-points(tau_hat_ols[,1] ~ b_grid, type = 'l', col = 'red', lwd = 3, lty = 'solid')
-points(tau_hat_ols[,2] ~ b_grid, type = 'l', col = 'red', lwd = 1, lty = 'dashed')
-points(tau_hat_ols[,3] ~ b_grid, type = 'l', col = 'red', lwd = 1, lty = 'dashed')
-points(tau_hat_spline[,1] ~ b_grid, type = 'l', col = 'blue', lwd = 3, lty = 'solid')
-points(tau_hat_spline[,2] ~ b_grid, type = 'l', col = 'blue', lwd = 1, lty = 'dashed')
-points(tau_hat_spline[,3] ~ b_grid, type = 'l', col = 'blue', lwd = 1, lty = 'dashed')
-```
---->
 
 
 
